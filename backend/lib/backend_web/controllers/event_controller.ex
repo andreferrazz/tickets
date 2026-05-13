@@ -1,11 +1,14 @@
 defmodule BackendWeb.EventController do
   use BackendWeb, :controller
+  require Logger
 
   alias Backend.Events
 
   @doc "GET /api/v1/events — published events plus the caller's own drafts (admins see all)"
   def index(conn, _params) do
-    json(conn, Enum.map(Events.list_events(conn.assigns[:current_user]), &event_json/1))
+    user = conn.assigns[:current_user]
+    Logger.info("event_controller.index", user_id: user && user.id, role: user && user.role)
+    json(conn, Enum.map(Events.list_events(user), &event_json/1))
   end
 
   @doc "GET /api/v1/events/:id"
