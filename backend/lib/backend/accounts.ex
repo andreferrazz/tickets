@@ -127,11 +127,12 @@ defmodule Backend.Accounts do
   end
 
   defp maybe_promote_to_creator(%User{role: "buyer"} = user) do
-    # Check for a pending invitation addressed to this email.
+    now = DateTime.utc_now()
+
     invite =
       Repo.one(
         from i in Backend.Invitations.Invitation,
-          where: i.email == ^user.email and i.status == "pending"
+          where: i.email == ^user.email and i.status == "pending" and i.expires_at > ^now
       )
 
     if invite do
@@ -153,6 +154,45 @@ defmodule Backend.Accounts do
   end
 
   defp maybe_promote_to_creator(user), do: {:ok, user}
+
+  # ---------------------------------------------------------------------------
+  # Invitation acceptance (token link flow)
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Consumes a validated invitation: finds-or-creates the user, promotes buyer→
+  creator (already-creator/admin users keep their role), marks the invitation
+  accepted, and returns a session token.
+
+  Caller (`Backend.Invitations.accept_invitation/1`) is responsible for token
+  lookup, expiry, and already-accepted checks.
+  """
+  def accept_invitation(%Backend.Invitations.Invitation{} = invitation) do
+    Repo.transaction(fn ->
+      with {:ok, user} <- find_or_create_user(invitation.email),
+           {:ok, user} <- apply_invitation_role(user, invitation),
+           {:ok, _} <- mark_invitation_accepted(invitation),
+           {:ok, token} <- create_session(user) do
+        %{token: token, user: user}
+      else
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+  end
+
+  defp apply_invitation_role(%User{role: "buyer"} = user, invitation) do
+    user
+    |> User.changeset(%{role: "creator", invited_by: invitation.inviter_id})
+    |> Repo.update()
+  end
+
+  defp apply_invitation_role(%User{} = user, _invitation), do: {:ok, user}
+
+  defp mark_invitation_accepted(invitation) do
+    invitation
+    |> Ecto.Changeset.change(status: "accepted")
+    |> Repo.update()
+  end
 
   defp create_session(user) do
     token = generate_token()

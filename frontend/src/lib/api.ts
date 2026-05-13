@@ -94,7 +94,9 @@ export const api = {
 	listInvitations: (fetcher?: typeof fetch) =>
 		request<Invitation[]>('/invitations', { fetcher }),
 	createInvitation: (email: string) =>
-		request<Invitation>('/invitations', { method: 'POST', body: { email } })
+		request<Invitation>('/invitations', { method: 'POST', body: { email } }),
+	acceptInvitation: (token: string) =>
+		request<AuthResponse>('/invitations/accept', { method: 'POST', body: { token } })
 };
 
 export function formatBRL(cents: number): string {

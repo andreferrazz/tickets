@@ -27,6 +27,26 @@ defmodule BackendWeb.InvitationController do
     json(conn, Enum.map(invitations, &invitation_json/1))
   end
 
+  @doc "POST /api/v1/invitations/accept — public; consumes a tokenized link"
+  def accept(conn, %{"token" => token}) do
+    case Invitations.accept_invitation(token) do
+      {:ok, %{token: session_token, user: user}} ->
+        json(conn, %{token: session_token, user: user_json(user)})
+
+      {:error, reason} when reason in [:invalid_token, :expired, :already_accepted] ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: Atom.to_string(reason)})
+
+      {:error, reason} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: inspect(reason)})
+    end
+  end
+
+  def accept(conn, _), do: conn |> put_status(:bad_request) |> json(%{error: "token required"})
+
   # ---------------------------------------------------------------------------
 
   defp invitation_json(inv) do
@@ -36,6 +56,16 @@ defmodule BackendWeb.InvitationController do
       email: inv.email,
       status: inv.status,
       created_at: inv.inserted_at
+    }
+  end
+
+  defp user_json(user) do
+    %{
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      invited_by: user.invited_by,
+      created_at: user.inserted_at
     }
   end
 

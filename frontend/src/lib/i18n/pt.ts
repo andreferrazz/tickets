@@ -32,6 +32,13 @@ export const pt = {
 	'auth.verify.verifying': 'Verificando...',
 	'auth.verify.changeEmail': 'Alterar e-mail',
 	'auth.verify.errorFallback': 'Falha na verificação',
+	'invite.accepting': 'Ativando seu convite...',
+	'invite.errorTitle': 'Convite inválido',
+	'invite.errorExpired': 'Este convite expirou. Peça um novo ao seu convidante.',
+	'invite.errorInvalid': 'Este link de convite não é válido.',
+	'invite.errorAlreadyAccepted': 'Este convite já foi utilizado.',
+	'invite.errorFallback': 'Não foi possível aceitar o convite.',
+	'invite.goLogin': 'Ir para o login',
 
 	// Home
 	'home.title': 'Próximos eventos',

@@ -47,6 +47,37 @@ defmodule BackendWeb.InvitationControllerTest do
     end
   end
 
+  describe "POST /api/v1/invitations/accept" do
+    test "consumes a valid token and returns a session", %{conn: conn} do
+      {creator_conn, _} = authed_conn(conn, "creator")
+      post(creator_conn, "/api/v1/invitations", %{email: "acceptme@example.com"})
+
+      inv =
+        Backend.Repo.one!(
+          from i in Backend.Invitations.Invitation, where: i.email == "acceptme@example.com"
+        )
+
+      resp =
+        build_conn()
+        |> post("/api/v1/invitations/accept", %{token: inv.token})
+        |> json_response(200)
+
+      assert is_binary(resp["token"])
+      assert resp["user"]["email"] == "acceptme@example.com"
+      assert resp["user"]["role"] == "creator"
+    end
+
+    test "returns 422 for an unknown token", %{conn: conn} do
+      conn = post(conn, "/api/v1/invitations/accept", %{token: "nope"})
+      assert %{"error" => "invalid_token"} = json_response(conn, 422)
+    end
+
+    test "returns 400 without a token", %{conn: conn} do
+      conn = post(conn, "/api/v1/invitations/accept", %{})
+      assert json_response(conn, 400)
+    end
+  end
+
   describe "GET /api/v1/invitations" do
     test "creator lists their invitations", %{conn: conn} do
       {conn, _} = authed_conn(conn, "creator")

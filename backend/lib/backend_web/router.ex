@@ -26,6 +26,8 @@ defmodule BackendWeb.Router do
     post "/auth/request-code", AuthController, :request_code
     post "/auth/verify-code", AuthController, :verify_code
     delete "/auth/logout", AuthController, :logout
+
+    post "/invitations/accept", InvitationController, :accept
   end
 
   # ---------------------------------------------------------------------------

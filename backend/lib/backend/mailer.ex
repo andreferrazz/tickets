@@ -26,7 +26,7 @@ defmodule Backend.Mailer do
   end
 
   @doc "Notifies `email` that they have been invited by `inviter_email`."
-  def send_invitation(email, inviter_email) do
+  def send_invitation(email, inviter_email, token) do
     from = Application.fetch_env!(:backend, :mail_from)
     frontend_url = Application.get_env(:backend, :frontend_url, "http://localhost:5173")
 
@@ -39,8 +39,10 @@ defmodule Backend.Mailer do
 
     #{inviter_email} te convidou para se tornar criador de eventos no Tickets.
 
-    Para ativar o seu acesso de criador, entre na plataforma com este email:
-    #{frontend_url}/auth/login
+    Abra o link abaixo para aceitar o convite e ativar o seu acesso de criador.
+    O link expira em 24 horas.
+
+    #{frontend_url}/invite/#{token}
 
     — Equipe Tickets
     """)
