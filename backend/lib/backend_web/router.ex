@@ -17,6 +17,10 @@ defmodule BackendWeb.Router do
     plug BackendWeb.RequireCreatorPlug
   end
 
+  pipeline :admin do
+    plug BackendWeb.RequireAdminPlug
+  end
+
   # ---------------------------------------------------------------------------
   # Public auth endpoints (rate-limited in the controller)
   # ---------------------------------------------------------------------------
@@ -71,6 +75,13 @@ defmodule BackendWeb.Router do
     post "/events", EventController, :create
     post "/events/:event_id/ticket-types", TicketTypeController, :create
     post "/events/:event_id/extras", ExtraItemController, :create
+  end
+
+  # ---------------------------------------------------------------------------
+  # Authenticated — admin only
+  # ---------------------------------------------------------------------------
+  scope "/api/v1", BackendWeb do
+    pipe_through [:api, :authenticated, :admin]
 
     post "/invitations", InvitationController, :create
     get "/invitations", InvitationController, :index

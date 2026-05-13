@@ -19,8 +19,8 @@ defmodule BackendWeb.InvitationControllerTest do
   end
 
   describe "POST /api/v1/invitations" do
-    test "creator sends an invitation", %{conn: conn} do
-      {conn, _} = authed_conn(conn, "creator")
+    test "admin sends an invitation", %{conn: conn} do
+      {conn, _} = authed_conn(conn, "admin")
       conn = post(conn, "/api/v1/invitations", %{email: "newbie@example.com"})
       resp = json_response(conn, 201)
       assert resp["email"] == "newbie@example.com"
@@ -28,10 +28,16 @@ defmodule BackendWeb.InvitationControllerTest do
     end
 
     test "returns 409 for duplicate pending invitation", %{conn: conn} do
-      {conn, _} = authed_conn(conn, "creator")
+      {conn, _} = authed_conn(conn, "admin")
       post(conn, "/api/v1/invitations", %{email: "dup@example.com"})
       conn = post(conn, "/api/v1/invitations", %{email: "dup@example.com"})
       assert %{"error" => _} = json_response(conn, 409)
+    end
+
+    test "creator gets 403", %{conn: conn} do
+      {conn, _} = authed_conn(conn, "creator")
+      conn = post(conn, "/api/v1/invitations", %{email: "x@example.com"})
+      assert json_response(conn, 403)
     end
 
     test "buyer gets 403", %{conn: conn} do
@@ -41,7 +47,7 @@ defmodule BackendWeb.InvitationControllerTest do
     end
 
     test "returns 400 without email", %{conn: conn} do
-      {conn, _} = authed_conn(conn, "creator")
+      {conn, _} = authed_conn(conn, "admin")
       conn = post(conn, "/api/v1/invitations", %{})
       assert json_response(conn, 400)
     end
@@ -49,8 +55,8 @@ defmodule BackendWeb.InvitationControllerTest do
 
   describe "POST /api/v1/invitations/accept" do
     test "consumes a valid token and returns a session", %{conn: conn} do
-      {creator_conn, _} = authed_conn(conn, "creator")
-      post(creator_conn, "/api/v1/invitations", %{email: "acceptme@example.com"})
+      {admin_conn, _} = authed_conn(conn, "admin")
+      post(admin_conn, "/api/v1/invitations", %{email: "acceptme@example.com"})
 
       inv =
         Backend.Repo.one!(
@@ -79,13 +85,19 @@ defmodule BackendWeb.InvitationControllerTest do
   end
 
   describe "GET /api/v1/invitations" do
-    test "creator lists their invitations", %{conn: conn} do
-      {conn, _} = authed_conn(conn, "creator")
+    test "admin lists their invitations", %{conn: conn} do
+      {conn, _} = authed_conn(conn, "admin")
       post(conn, "/api/v1/invitations", %{email: "a@example.com"})
       post(conn, "/api/v1/invitations", %{email: "b@example.com"})
 
       conn = get(conn, "/api/v1/invitations")
       assert length(json_response(conn, 200)) == 2
+    end
+
+    test "creator gets 403", %{conn: conn} do
+      {conn, _} = authed_conn(conn, "creator")
+      conn = get(conn, "/api/v1/invitations")
+      assert json_response(conn, 403)
     end
 
     test "buyer gets 403", %{conn: conn} do

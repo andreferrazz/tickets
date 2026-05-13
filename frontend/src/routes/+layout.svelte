@@ -37,6 +37,8 @@
 				>
 				{#if auth.isCreator}
 					<a href="/events/new">{t('nav.newEvent')}</a>
+				{/if}
+				{#if auth.isAdmin}
 					<a href="/admin/invitations">{t('nav.invitations')}</a>
 				{/if}
 				<a href="/profile" class="who">{auth.user?.email}</a>

@@ -50,6 +50,10 @@ class AuthStore {
 	get isCreator(): boolean {
 		return this.user?.role === 'creator' || this.user?.role === 'admin';
 	}
+
+	get isAdmin(): boolean {
+		return this.user?.role === 'admin';
+	}
 }
 
 export const auth = new AuthStore();

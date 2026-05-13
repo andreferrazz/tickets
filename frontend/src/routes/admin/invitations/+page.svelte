@@ -22,7 +22,7 @@
 			await goto('/auth/login');
 			return;
 		}
-		if (!auth.isCreator) {
+		if (!auth.isAdmin) {
 			await goto('/');
 			return;
 		}
