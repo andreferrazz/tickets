@@ -69,7 +69,8 @@ if config_env() == :prod do
     password: System.get_env("SMTP_PASS"),
     tls: :always,
     auth: :always,
-    ssl_options: [versions: [:"tlsv1.2"], verify: :verify_none]
+    ssl: false,
+    retries: 2
 
   config :backend,
          :mail_from,
