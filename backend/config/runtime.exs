@@ -63,14 +63,14 @@ if config_env() == :prod do
   # Mailer
   config :backend, Backend.Mailer,
     adapter: Swoosh.Adapters.SMTP,
-    relay: System.get_env("SMTP_HOST", "smtp.example.com"),
+    relay: System.get_env("SMTP_HOST", "smtp.gmail.com"),
     port: String.to_integer(System.get_env("SMTP_PORT", "587")),
     username: System.get_env("SMTP_USER"),
     password: System.get_env("SMTP_PASS"),
-    tls: :always,
-    auth: :always,
     ssl: false,
-    retries: 2
+    tls: :always,
+    tls_options: [verify: :verify_none],
+    auth: :always
 
   config :backend,
          :mail_from,
