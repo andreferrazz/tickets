@@ -1,0 +1,7 @@
+.git
+_build
+deps
+doc
+test
+*.md
+.formatter.exs
