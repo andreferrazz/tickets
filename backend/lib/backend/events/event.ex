@@ -13,6 +13,7 @@ defmodule Backend.Events.Event do
     field :ends_at, :utc_datetime
     field :cover_image_url, :string
     field :status, :string, default: "draft"
+    field :deleted_at, :utc_datetime_usec
 
     belongs_to :creator, Backend.Accounts.User
     has_many :ticket_types, Backend.Events.TicketType

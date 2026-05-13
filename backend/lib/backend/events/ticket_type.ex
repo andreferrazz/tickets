@@ -14,6 +14,7 @@ defmodule Backend.Events.TicketType do
     field :sales_start, :utc_datetime
     field :sales_end, :utc_datetime
     field :abacate_product_id, :string
+    field :deleted_at, :utc_datetime_usec
 
     belongs_to :event, Backend.Events.Event
 

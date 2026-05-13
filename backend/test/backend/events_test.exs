@@ -120,11 +120,54 @@ defmodule Backend.EventsTest do
   end
 
   describe "delete_event/2" do
-    test "owner can delete their event" do
+    test "owner can soft-delete their event" do
       user = creator_user()
       event = published_event(user)
       assert {:ok, _} = Events.delete_event(user, event.id)
-      assert nil == Repo.get(Event, event.id)
+
+      # row still exists but is invisible to context reads
+      row = Repo.get!(Event, event.id)
+      refute is_nil(row.deleted_at)
+      assert nil == Events.get_event(event.id)
+    end
+
+    test "cascades deleted_at to ticket types and extras" do
+      user = creator_user()
+      event = published_event(user)
+
+      {:ok, tt} =
+        Events.create_ticket_type(user, event.id, %{
+          "name" => "GA",
+          "price_cents" => 100,
+          "quantity_total" => 10
+        })
+
+      {:ok, ex} = Events.create_extra(user, event.id, %{"name" => "Cap", "price_cents" => 200})
+
+      assert {:ok, _} = Events.delete_event(user, event.id)
+
+      assert %TicketType{deleted_at: tt_at} = Repo.get!(TicketType, tt.id)
+      assert %ExtraItem{deleted_at: ex_at} = Repo.get!(ExtraItem, ex.id)
+      refute is_nil(tt_at)
+      refute is_nil(ex_at)
+    end
+
+    test "cascade preserves an already-soft-deleted child's timestamp" do
+      user = creator_user()
+      event = published_event(user)
+
+      {:ok, tt} =
+        Events.create_ticket_type(user, event.id, %{
+          "name" => "Early",
+          "price_cents" => 100,
+          "quantity_total" => 10
+        })
+
+      assert {:ok, _} = Events.delete_ticket_type(user, tt.id)
+      original = Repo.get!(TicketType, tt.id).deleted_at
+
+      assert {:ok, _} = Events.delete_event(user, event.id)
+      assert Repo.get!(TicketType, tt.id).deleted_at == original
     end
 
     test "non-owner gets forbidden" do
@@ -132,6 +175,13 @@ defmodule Backend.EventsTest do
       other = buyer_user()
       event = published_event(creator)
       assert {:error, :forbidden} = Events.delete_event(other, event.id)
+    end
+
+    test "already-deleted event returns not_found" do
+      user = creator_user()
+      event = published_event(user)
+      assert {:ok, _} = Events.delete_event(user, event.id)
+      assert {:error, :not_found} = Events.delete_event(user, event.id)
     end
   end
 
@@ -170,7 +220,7 @@ defmodule Backend.EventsTest do
   end
 
   describe "delete_ticket_type/2" do
-    test "owner deletes their ticket type" do
+    test "owner soft-deletes their ticket type" do
       user = creator_user()
       event = published_event(user)
 
@@ -182,7 +232,12 @@ defmodule Backend.EventsTest do
         })
 
       assert {:ok, _} = Events.delete_ticket_type(user, tt.id)
-      assert nil == Repo.get(TicketType, tt.id)
+
+      row = Repo.get!(TicketType, tt.id)
+      refute is_nil(row.deleted_at)
+      # absent from the event's preloaded ticket_types
+      reloaded = Events.get_event(event.id)
+      assert Enum.empty?(reloaded.ticket_types)
     end
   end
 
@@ -207,12 +262,16 @@ defmodule Backend.EventsTest do
   end
 
   describe "delete_extra/2" do
-    test "owner deletes their extra item" do
+    test "owner soft-deletes their extra item" do
       user = creator_user()
       event = published_event(user)
       {:ok, extra} = Events.create_extra(user, event.id, %{"name" => "Hat", "price_cents" => 500})
       assert {:ok, _} = Events.delete_extra(user, extra.id)
-      assert nil == Repo.get(ExtraItem, extra.id)
+
+      row = Repo.get!(ExtraItem, extra.id)
+      refute is_nil(row.deleted_at)
+      reloaded = Events.get_event(event.id)
+      assert Enum.empty?(reloaded.extras)
     end
   end
 end

@@ -155,7 +155,7 @@ defmodule Backend.Orders do
   # ---------------------------------------------------------------------------
 
   defp fetch_published_event(event_id) do
-    case Repo.get(Event, event_id) do
+    case Repo.one(from e in Event, where: e.id == ^event_id and is_nil(e.deleted_at)) do
       nil -> {:error, :event_not_found}
       %Event{status: "published"} = event -> {:ok, event}
       _event -> {:error, :event_not_available}
@@ -175,7 +175,7 @@ defmodule Backend.Orders do
 
   defp resolve_line(event, %{"item_type" => "ticket", "item_id" => id, "quantity" => qty})
        when is_integer(qty) and qty > 0 do
-    tt = Repo.get(TicketType, id)
+    tt = Repo.one(from t in TicketType, where: t.id == ^id and is_nil(t.deleted_at))
 
     cond do
       is_nil(tt) or tt.event_id != event.id -> {:error, {:invalid_item, id}}
@@ -186,7 +186,7 @@ defmodule Backend.Orders do
 
   defp resolve_line(event, %{"item_type" => "extra", "item_id" => id, "quantity" => qty})
        when is_integer(qty) and qty > 0 do
-    ex = Repo.get(ExtraItem, id)
+    ex = Repo.one(from x in ExtraItem, where: x.id == ^id and is_nil(x.deleted_at))
 
     cond do
       is_nil(ex) or ex.event_id != event.id ->

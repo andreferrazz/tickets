@@ -12,6 +12,7 @@ defmodule Backend.Events.ExtraItem do
     field :quantity_total, :integer
     field :quantity_sold, :integer, default: 0
     field :abacate_product_id, :string
+    field :deleted_at, :utc_datetime_usec
 
     belongs_to :event, Backend.Events.Event
 

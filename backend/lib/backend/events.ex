@@ -4,6 +4,11 @@ defmodule Backend.Events do
 
   Ownership checks are enforced here: only the event's creator (or an admin)
   may mutate an event or its nested resources.
+
+  Deletes are logical: every business resource carries a `deleted_at`
+  timestamp and reads filter out rows where it is set. Soft-deleting an
+  event cascades the timestamp to its ticket types and extras in the same
+  transaction.
   """
 
   import Ecto.Query
@@ -19,34 +24,50 @@ defmodule Backend.Events do
 
   Anonymous (`nil`) and buyers see only published events. Creators
   additionally see their own drafts/cancelled events. Admins see everything.
+  Soft-deleted events are never returned.
   """
   def list_events(user \\ nil)
 
   def list_events(%{role: "admin"}) do
-    Repo.all(from e in Event, order_by: [asc: e.starts_at])
+    Repo.all(from e in Event, where: is_nil(e.deleted_at), order_by: [asc: e.starts_at])
   end
 
   def list_events(%{id: user_id}) do
     Repo.all(
       from e in Event,
-        where: e.status == "published" or e.creator_id == ^user_id,
+        where:
+          is_nil(e.deleted_at) and
+            (e.status == "published" or e.creator_id == ^user_id),
         order_by: [asc: e.starts_at]
     )
   end
 
   def list_events(nil) do
-    Repo.all(from e in Event, where: e.status == "published", order_by: [asc: e.starts_at])
+    Repo.all(
+      from e in Event,
+        where: is_nil(e.deleted_at) and e.status == "published",
+        order_by: [asc: e.starts_at]
+    )
   end
 
   @doc """
   Returns an event with preloaded ticket_types and extras, or nil.
 
   Drafts are returned as-is; callers decide whether to expose them.
+  Soft-deleted events return nil; soft-deleted children are stripped from
+  the preloads.
   """
   def get_event(id) do
-    Event
-    |> Repo.get(id)
-    |> Repo.preload([:ticket_types, :extras])
+    case Repo.one(from e in Event, where: e.id == ^id and is_nil(e.deleted_at)) do
+      nil ->
+        nil
+
+      event ->
+        Repo.preload(event,
+          ticket_types: from(t in TicketType, where: is_nil(t.deleted_at)),
+          extras: from(x in ExtraItem, where: is_nil(x.deleted_at))
+        )
+    end
   end
 
   @doc "Creates an event owned by `user`."
@@ -64,10 +85,32 @@ defmodule Backend.Events do
     end
   end
 
-  @doc "Deletes `event_id`. Returns `{:error, :forbidden}` if user is not owner/admin."
+  @doc """
+  Soft-deletes `event_id` and cascades to its ticket types and extras.
+
+  Returns `{:error, :forbidden}` if user is not owner/admin. The cascade
+  only stamps children that are not already soft-deleted, preserving
+  their original `deleted_at` if they were removed independently earlier.
+  """
   def delete_event(user, event_id) do
     with {:ok, event} <- fetch_owned_event(user, event_id) do
-      Repo.delete(event)
+      now = DateTime.utc_now()
+
+      Repo.transaction(fn ->
+        {:ok, event} = soft_delete(event, now)
+
+        Repo.update_all(
+          from(t in TicketType, where: t.event_id == ^event.id and is_nil(t.deleted_at)),
+          set: [deleted_at: now]
+        )
+
+        Repo.update_all(
+          from(x in ExtraItem, where: x.event_id == ^event.id and is_nil(x.deleted_at)),
+          set: [deleted_at: now]
+        )
+
+        event
+      end)
     end
   end
 
@@ -92,10 +135,10 @@ defmodule Backend.Events do
     end
   end
 
-  @doc "Deletes ticket type `id`. Checks ownership."
+  @doc "Soft-deletes ticket type `id`. Checks ownership."
   def delete_ticket_type(user, id) do
     with {:ok, tt} <- fetch_owned_ticket_type(user, id) do
-      Repo.delete(tt)
+      soft_delete(tt, DateTime.utc_now())
     end
   end
 
@@ -120,10 +163,10 @@ defmodule Backend.Events do
     end
   end
 
-  @doc "Deletes extra item `id`. Checks ownership."
+  @doc "Soft-deletes extra item `id`. Checks ownership."
   def delete_extra(user, id) do
     with {:ok, extra} <- fetch_owned_extra(user, id) do
-      Repo.delete(extra)
+      soft_delete(extra, DateTime.utc_now())
     end
   end
 
@@ -131,8 +174,16 @@ defmodule Backend.Events do
   # Private
   # ---------------------------------------------------------------------------
 
+  defp soft_delete(struct, now) do
+    struct
+    |> Ecto.Changeset.change(deleted_at: now)
+    |> Repo.update()
+  end
+
   defp fetch_owned_event(user, event_id) do
-    case Repo.get(Event, event_id) do
+    query = from e in Event, where: e.id == ^event_id and is_nil(e.deleted_at)
+
+    case Repo.one(query) do
       nil -> {:error, :not_found}
       event when user.role == "admin" or event.creator_id == user.id -> {:ok, event}
       _event -> {:error, :forbidden}
@@ -144,7 +195,7 @@ defmodule Backend.Events do
       from tt in TicketType,
         join: e in Event,
         on: tt.event_id == e.id,
-        where: tt.id == ^id,
+        where: tt.id == ^id and is_nil(tt.deleted_at) and is_nil(e.deleted_at),
         select: {tt, e}
 
     case Repo.one(query) do
@@ -159,7 +210,7 @@ defmodule Backend.Events do
       from ex in ExtraItem,
         join: e in Event,
         on: ex.event_id == e.id,
-        where: ex.id == ^id,
+        where: ex.id == ^id and is_nil(ex.deleted_at) and is_nil(e.deleted_at),
         select: {ex, e}
 
     case Repo.one(query) do
