@@ -1,3 +1,4 @@
+import { PUBLIC_API_URL } from '$env/static/public';
 import { auth } from '$lib/stores/auth.svelte';
 import type {
 	AuthResponse,
@@ -11,9 +12,9 @@ import type {
 	CartLine
 } from '$lib/types';
 
-const BASE = import.meta.env.VITE_API_URL;
+const BASE = PUBLIC_API_URL;
 if (!BASE) {
-	throw new Error('VITE_API_URL is required (e.g. http://localhost:4000/api/v1)');
+	throw new Error('PUBLIC_API_URL is required (e.g. http://localhost:4000/api/v1)');
 }
 
 interface FetchOptions {

@@ -285,7 +285,7 @@ Use SvelteKit's own `+server.ts` files to create a fake REST API that mirrors th
 ### Why this approach
 - Zero extra dependencies (no MSW, no json-server).
 - The mock routes serve as living API documentation.
-- Swapping to the real backend = changing one environment variable (`VITE_API_URL`).
+- Swapping to the real backend = changing one environment variable (`PUBLIC_API_URL`).
 - The prototype is fully deployable and shareable with stakeholders.
 
 ### Mock data seed
@@ -465,7 +465,7 @@ Use SvelteKit's own `+server.ts` files to create a fake REST API that mirrors th
 - `FRONTEND_URL` — SvelteKit app URL (for CORS and email links)
 
 ### Frontend (.env)
-- `VITE_API_URL` — Backend API base URL (e.g., `http://localhost:4000/api/v1` or mock)
+- `PUBLIC_API_URL` — Backend API base URL (e.g., `http://localhost:4000/api/v1` or mock)
 - `VITE_APP_NAME` — "Tickets"
 
 ---
