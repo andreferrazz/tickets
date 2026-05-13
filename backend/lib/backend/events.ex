@@ -12,6 +12,7 @@ defmodule Backend.Events do
   """
 
   import Ecto.Query
+  require Logger
   alias Backend.Repo
   alias Backend.Events.{Event, ExtraItem, TicketType}
 
@@ -28,11 +29,14 @@ defmodule Backend.Events do
   """
   def list_events(user \\ nil)
 
-  def list_events(%{role: "admin"}) do
+  def list_events(%{role: "admin"} = user) do
+    Logger.info("list_events", role: "admin", user_id: user.id)
     Repo.all(from e in Event, where: is_nil(e.deleted_at), order_by: [asc: e.starts_at])
   end
 
-  def list_events(%{id: user_id}) do
+  def list_events(%{id: user_id, role: role}) do
+    Logger.info("list_events", role: role, user_id: user_id)
+
     Repo.all(
       from e in Event,
         where:
@@ -43,6 +47,8 @@ defmodule Backend.Events do
   end
 
   def list_events(nil) do
+    Logger.info("list_events", role: "anonymous")
+
     Repo.all(
       from e in Event,
         where: is_nil(e.deleted_at) and e.status == "published",
