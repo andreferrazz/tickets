@@ -42,8 +42,12 @@ async function request<T>(path: string, opts: FetchOptions = {}): Promise<T> {
 	if (!res.ok) {
 		let msg = `${res.status}`;
 		try {
-			const data = (await res.json()) as { error?: string };
+			const data = (await res.json()) as {
+				error?: string;
+				errors?: { detail?: string };
+			};
 			if (data.error) msg = data.error;
+			else if (data.errors?.detail) msg = data.errors.detail;
 		} catch {
 			/* noop */
 		}

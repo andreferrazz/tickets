@@ -4,6 +4,7 @@
 	import { api, ApiError, formatBRL } from '$lib/api';
 	import EventForm from '$lib/components/EventForm.svelte';
 	import { t } from '$lib/i18n';
+	import type { TranslationKey } from '$lib/i18n/pt';
 	import { auth } from '$lib/stores/auth.svelte';
 	import type { Event, EventDetail, ExtraItem, TicketType } from '$lib/types';
 	import { onMount } from 'svelte';
@@ -14,6 +15,11 @@
 
 	let newTicket = $state({ name: '', price_cents: 0, quantity_total: 0 });
 	let newExtra = $state({ name: '', price_cents: 0, quantity_total: 0 });
+	let actionError = $state<string | null>(null);
+
+	function reportError(e: unknown, fallbackKey: TranslationKey) {
+		actionError = e instanceof ApiError ? e.message : t(fallbackKey);
+	}
 
 	async function reload() {
 		event = await api.getEvent(page.params.id!);
@@ -52,8 +58,13 @@
 
 	async function delTicket(tk: TicketType) {
 		if (!confirm(t('eventEdit.confirmDeleteTicket', { name: tk.name }))) return;
-		await api.deleteTicketType(tk.id);
-		await reload();
+		actionError = null;
+		try {
+			await api.deleteTicketType(tk.id);
+			await reload();
+		} catch (e) {
+			reportError(e, 'eventEdit.deleteTicketError');
+		}
 	}
 
 	async function addExtra() {
@@ -65,15 +76,25 @@
 
 	async function delExtra(x: ExtraItem) {
 		if (!confirm(t('eventEdit.confirmDeleteExtra', { name: x.name }))) return;
-		await api.deleteExtra(x.id);
-		await reload();
+		actionError = null;
+		try {
+			await api.deleteExtra(x.id);
+			await reload();
+		} catch (e) {
+			reportError(e, 'eventEdit.deleteExtraError');
+		}
 	}
 
 	async function deleteEvent() {
 		if (!event) return;
 		if (!confirm(t('eventEdit.confirmDeleteEvent', { title: event.title }))) return;
-		await api.deleteEvent(event.id);
-		await goto('/');
+		actionError = null;
+		try {
+			await api.deleteEvent(event.id);
+			await goto('/');
+		} catch (e) {
+			reportError(e, 'eventEdit.deleteEventError');
+		}
 	}
 </script>
 
@@ -127,6 +148,10 @@
 			<button class="small" onclick={addExtra}>{t('eventEdit.add')}</button>
 		</div>
 	</div>
+
+	{#if actionError}
+		<div class="error" style="margin: 1rem 0;">{actionError}</div>
+	{/if}
 
 	<button class="danger" onclick={deleteEvent}>{t('eventEdit.deleteEvent')}</button>
 {/if}

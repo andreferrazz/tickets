@@ -22,7 +22,7 @@ config :backend, BackendWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}],
   check_origin: false,
   code_reloader: true,
-  debug_errors: true,
+  debug_errors: false,
   secret_key_base: "t8c+Cr+hNeNFxl/AB8jFp5uF+Cn2G8HyyaFY8KReRDTr57zazwjud1AGhXs2c/Z5",
   watchers: []
 

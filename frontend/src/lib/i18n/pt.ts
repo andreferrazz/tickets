@@ -85,6 +85,9 @@ export const pt = {
 	'eventEdit.sold': 'vendidos',
 	'eventEdit.errorFallback': 'Falha ao carregar',
 	'eventEdit.notFound': 'Não encontrado',
+	'eventEdit.deleteEventError': 'Falha ao excluir evento',
+	'eventEdit.deleteTicketError': 'Falha ao excluir tipo de ingresso',
+	'eventEdit.deleteExtraError': 'Falha ao excluir complemento',
 
 	// Orders
 	'orders.title': 'Meus pedidos',
