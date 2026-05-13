@@ -1,0 +1,157 @@
+<script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import { api, ApiError, formatBRL } from '$lib/api';
+	import EventForm from '$lib/components/EventForm.svelte';
+	import { t } from '$lib/i18n';
+	import { auth } from '$lib/stores/auth.svelte';
+	import type { Event, EventDetail, ExtraItem, TicketType } from '$lib/types';
+	import { onMount } from 'svelte';
+
+	let event = $state<EventDetail | null>(null);
+	let loading = $state(true);
+	let error = $state<string | null>(null);
+
+	let newTicket = $state({ name: '', price_cents: 0, quantity_total: 0 });
+	let newExtra = $state({ name: '', price_cents: 0, quantity_total: 0 });
+
+	async function reload() {
+		event = await api.getEvent(page.params.id!);
+	}
+
+	onMount(async () => {
+		if (!auth.isAuthed) {
+			await goto('/auth/login');
+			return;
+		}
+		try {
+			await reload();
+			if (event && event.creator_id !== auth.user?.id && auth.user?.role !== 'admin') {
+				await goto(`/events/${event.id}`);
+				return;
+			}
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : t('eventEdit.errorFallback');
+		} finally {
+			loading = false;
+		}
+	});
+
+	async function saveEvent(data: Partial<Event>) {
+		if (!event) return;
+		await api.updateEvent(event.id, data);
+		await reload();
+	}
+
+	async function addTicket() {
+		if (!event || !newTicket.name) return;
+		await api.createTicketType(event.id, newTicket);
+		newTicket = { name: '', price_cents: 0, quantity_total: 0 };
+		await reload();
+	}
+
+	async function delTicket(tk: TicketType) {
+		if (!confirm(t('eventEdit.confirmDeleteTicket', { name: tk.name }))) return;
+		await api.deleteTicketType(tk.id);
+		await reload();
+	}
+
+	async function addExtra() {
+		if (!event || !newExtra.name) return;
+		await api.createExtra(event.id, newExtra);
+		newExtra = { name: '', price_cents: 0, quantity_total: 0 };
+		await reload();
+	}
+
+	async function delExtra(x: ExtraItem) {
+		if (!confirm(t('eventEdit.confirmDeleteExtra', { name: x.name }))) return;
+		await api.deleteExtra(x.id);
+		await reload();
+	}
+
+	async function deleteEvent() {
+		if (!event) return;
+		if (!confirm(t('eventEdit.confirmDeleteEvent', { title: event.title }))) return;
+		await api.deleteEvent(event.id);
+		await goto('/');
+	}
+</script>
+
+{#if loading}
+	<p class="muted">{t('common.loading')}</p>
+{:else if error || !event}
+	<div class="error">{error ?? t('eventEdit.notFound')}</div>
+{:else}
+	<h1>{t('eventEdit.title')}</h1>
+	<div class="card" style="margin: 1rem 0;">
+		<EventForm initial={event} submitLabel={t('eventEdit.saveEvent')} onSubmit={saveEvent} />
+	</div>
+
+	<div class="card stack" style="margin: 1rem 0;">
+		<h2>{t('eventEdit.ticketTypes')}</h2>
+		{#each event.ticket_types as tk (tk.id)}
+			<div class="row-line">
+				<div>
+					<strong>{tk.name}</strong>
+					<span class="muted small">
+						— {formatBRL(tk.price_cents)} · {tk.quantity_sold}/{tk.quantity_total}
+						{t('eventEdit.sold')}</span
+					>
+				</div>
+				<button class="danger small" onclick={() => delTicket(tk)}>{t('common.delete')}</button>
+			</div>
+		{/each}
+		<div class="add">
+			<input placeholder={t('common.name')} bind:value={newTicket.name} />
+			<input type="number" placeholder={t('eventEdit.priceCents')} bind:value={newTicket.price_cents} />
+			<input type="number" placeholder={t('eventEdit.qty')} bind:value={newTicket.quantity_total} />
+			<button class="small" onclick={addTicket}>{t('eventEdit.add')}</button>
+		</div>
+	</div>
+
+	<div class="card stack" style="margin: 1rem 0;">
+		<h2>{t('eventEdit.addons')}</h2>
+		{#each event.extras as x (x.id)}
+			<div class="row-line">
+				<div>
+					<strong>{x.name}</strong>
+					<span class="muted small"> — {formatBRL(x.price_cents)}</span>
+				</div>
+				<button class="danger small" onclick={() => delExtra(x)}>{t('common.delete')}</button>
+			</div>
+		{/each}
+		<div class="add">
+			<input placeholder={t('common.name')} bind:value={newExtra.name} />
+			<input type="number" placeholder={t('eventEdit.priceCents')} bind:value={newExtra.price_cents} />
+			<input type="number" placeholder={t('eventEdit.qtyUnlimited')} bind:value={newExtra.quantity_total} />
+			<button class="small" onclick={addExtra}>{t('eventEdit.add')}</button>
+		</div>
+	</div>
+
+	<button class="danger" onclick={deleteEvent}>{t('eventEdit.deleteEvent')}</button>
+{/if}
+
+<style>
+	.row-line {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.5rem 0.75rem;
+		background: var(--surface-2);
+		border-radius: var(--radius);
+	}
+	.small {
+		font-size: 0.85rem;
+	}
+	.add {
+		display: grid;
+		grid-template-columns: 2fr 1fr 1fr auto;
+		gap: 0.5rem;
+		align-items: center;
+	}
+	@media (max-width: 600px) {
+		.add {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>
