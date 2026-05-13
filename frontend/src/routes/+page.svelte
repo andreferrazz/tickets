@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { api, ApiError, formatDate } from '$lib/api';
-	import { t } from '$lib/i18n';
+	import { t, tStatus } from '$lib/i18n';
 	import type { Event } from '$lib/types';
 	import { onMount } from 'svelte';
 
@@ -55,6 +55,9 @@
 					<div class="cover-placeholder">🎟</div>
 				{/if}
 				<div class="event-body">
+					{#if ev.status !== 'published'}
+						<span class="badge {ev.status}">{tStatus(ev.status)}</span>
+					{/if}
 					<h3>{ev.title}</h3>
 					<p class="muted small">{formatDate(ev.starts_at)}</p>
 					<p class="muted small">{ev.location}</p>
@@ -106,6 +109,9 @@
 	}
 	.event-body {
 		padding: 0.9rem;
+	}
+	.event-body .badge {
+		margin-bottom: 0.5rem;
 	}
 	.event-body h3 {
 		font-size: 1.05rem;

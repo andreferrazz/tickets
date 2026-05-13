@@ -29,22 +29,62 @@ defmodule BackendWeb.EventControllerTest do
   # ---------------------------------------------------------------------------
 
   describe "GET /api/v1/events" do
-    test "returns published events", %{conn: conn} do
-      {conn, user} = authed_conn(conn, "creator")
+    test "buyers see published events only", %{conn: conn} do
+      {buyer_conn, _} = authed_conn(conn, "buyer")
+      {_, creator} = authed_conn(build_conn(), "creator")
 
-      Events.create_event(user, %{
+      Events.create_event(creator, %{
         "title" => "Public",
         "starts_at" => "2027-01-01T00:00:00Z",
         "status" => "published"
       })
 
-      Events.create_event(user, %{"title" => "Draft", "starts_at" => "2027-01-02T00:00:00Z"})
+      Events.create_event(creator, %{"title" => "Draft", "starts_at" => "2027-01-02T00:00:00Z"})
 
-      conn = get(conn, "/api/v1/events")
-      events = json_response(conn, 200)
-      titles = Enum.map(events, & &1["title"])
+      titles = buyer_conn |> get("/api/v1/events") |> json_response(200) |> Enum.map(& &1["title"])
       assert "Public" in titles
       refute "Draft" in titles
+    end
+
+    test "creators see their own drafts alongside published events", %{conn: conn} do
+      {conn, user} = authed_conn(conn, "creator")
+
+      Events.create_event(user, %{
+        "title" => "MyPublished",
+        "starts_at" => "2027-02-01T00:00:00Z",
+        "status" => "published"
+      })
+
+      Events.create_event(user, %{"title" => "MyDraft", "starts_at" => "2027-02-02T00:00:00Z"})
+
+      # A draft owned by someone else must stay hidden.
+      {_, other} = authed_conn(build_conn(), "creator")
+      Events.create_event(other, %{"title" => "OtherDraft", "starts_at" => "2027-02-03T00:00:00Z"})
+
+      titles = conn |> get("/api/v1/events") |> json_response(200) |> Enum.map(& &1["title"])
+      assert "MyPublished" in titles
+      assert "MyDraft" in titles
+      refute "OtherDraft" in titles
+    end
+
+    test "admins see every event including drafts", %{conn: conn} do
+      {admin_conn, _} = authed_conn(conn, "admin")
+      {_, creator} = authed_conn(build_conn(), "creator")
+
+      Events.create_event(creator, %{
+        "title" => "AnyPublished",
+        "starts_at" => "2027-03-01T00:00:00Z",
+        "status" => "published"
+      })
+
+      Events.create_event(creator, %{
+        "title" => "AnyDraft",
+        "starts_at" => "2027-03-02T00:00:00Z"
+      })
+
+      titles = admin_conn |> get("/api/v1/events") |> json_response(200) |> Enum.map(& &1["title"])
+      assert "AnyPublished" in titles
+      assert "AnyDraft" in titles
     end
 
     test "anonymous users see published events", %{conn: conn} do

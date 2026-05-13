@@ -14,8 +14,27 @@ defmodule Backend.Events do
   # Events
   # ---------------------------------------------------------------------------
 
-  @doc "Returns all published events ordered by start time."
-  def list_events do
+  @doc """
+  Returns events visible to `user`, ordered by start time.
+
+  Anonymous (`nil`) and buyers see only published events. Creators
+  additionally see their own drafts/cancelled events. Admins see everything.
+  """
+  def list_events(user \\ nil)
+
+  def list_events(%{role: "admin"}) do
+    Repo.all(from e in Event, order_by: [asc: e.starts_at])
+  end
+
+  def list_events(%{id: user_id}) do
+    Repo.all(
+      from e in Event,
+        where: e.status == "published" or e.creator_id == ^user_id,
+        order_by: [asc: e.starts_at]
+    )
+  end
+
+  def list_events(nil) do
     Repo.all(from e in Event, where: e.status == "published", order_by: [asc: e.starts_at])
   end
 

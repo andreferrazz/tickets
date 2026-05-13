@@ -3,9 +3,9 @@ defmodule BackendWeb.EventController do
 
   alias Backend.Events
 
-  @doc "GET /api/v1/events — returns all published events"
+  @doc "GET /api/v1/events — published events plus the caller's own drafts (admins see all)"
   def index(conn, _params) do
-    json(conn, Enum.map(Events.list_events(), &event_json/1))
+    json(conn, Enum.map(Events.list_events(conn.assigns[:current_user]), &event_json/1))
   end
 
   @doc "GET /api/v1/events/:id"
