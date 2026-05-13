@@ -43,6 +43,7 @@ defmodule Backend.MixProject do
       {:bandit, "~> 1.5"},
       # Phase 2 additions
       {:swoosh, "~> 1.16"},
+      {:gen_smtp, "~> 1.2"},
       {:req, "~> 0.5"},
       {:corsica, "~> 2.1"}
     ]
