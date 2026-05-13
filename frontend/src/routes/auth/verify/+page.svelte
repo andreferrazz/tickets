@@ -3,6 +3,7 @@
 	import { api, ApiError } from '$lib/api';
 	import { t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
+	import { safeNext } from '$lib/next';
 	import { onMount } from 'svelte';
 
 	let email = $state('');
@@ -23,7 +24,9 @@
 			const res = await api.verifyCode(email, code);
 			auth.set(res.token, res.user);
 			sessionStorage.removeItem('tickets.pending_email');
-			await goto('/');
+			const next = safeNext(sessionStorage.getItem('tickets.pending_next'));
+			sessionStorage.removeItem('tickets.pending_next');
+			await goto(next ?? '/');
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : t('auth.verify.errorFallback');
 		} finally {

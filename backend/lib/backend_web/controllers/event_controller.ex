@@ -11,10 +11,24 @@ defmodule BackendWeb.EventController do
   @doc "GET /api/v1/events/:id"
   def show(conn, %{"id" => id}) do
     case Events.get_event(id) do
-      nil -> conn |> put_status(:not_found) |> json(%{error: "event not found"})
-      event -> json(conn, event_detail_json(event))
+      nil ->
+        conn |> put_status(:not_found) |> json(%{error: "event not found"})
+
+      event ->
+        if visible?(event, conn.assigns[:current_user]) do
+          json(conn, event_detail_json(event))
+        else
+          conn |> put_status(:not_found) |> json(%{error: "event not found"})
+        end
     end
   end
+
+  # Published events are public. Drafts/cancelled are only visible to their
+  # creator or an admin — return 404 to anyone else to avoid leaking existence.
+  defp visible?(%{status: "published"}, _user), do: true
+  defp visible?(_event, nil), do: false
+  defp visible?(_event, %{role: "admin"}), do: true
+  defp visible?(%{creator_id: cid}, %{id: uid}), do: cid == uid
 
   @doc "POST /api/v1/events — creator only"
   def create(conn, params) do

@@ -47,9 +47,22 @@ defmodule BackendWeb.EventControllerTest do
       refute "Draft" in titles
     end
 
-    test "returns 401 without auth", %{conn: conn} do
+    test "anonymous users see published events", %{conn: conn} do
+      {creator_conn, user} = authed_conn(conn, "creator")
+      _ = creator_conn
+
+      Events.create_event(user, %{
+        "title" => "PublicAnon",
+        "starts_at" => "2027-01-03T00:00:00Z",
+        "status" => "published"
+      })
+
+      Events.create_event(user, %{"title" => "DraftAnon", "starts_at" => "2027-01-04T00:00:00Z"})
+
       conn = get(conn, "/api/v1/events")
-      assert %{"error" => "unauthorized"} = json_response(conn, 401)
+      titles = Enum.map(json_response(conn, 200), & &1["title"])
+      assert "PublicAnon" in titles
+      refute "DraftAnon" in titles
     end
   end
 
@@ -81,6 +94,49 @@ defmodule BackendWeb.EventControllerTest do
       {conn, _} = authed_conn(conn)
       conn = get(conn, "/api/v1/events/#{Ecto.UUID.generate()}")
       assert %{"error" => _} = json_response(conn, 404)
+    end
+
+    test "anonymous user gets 200 for published event", %{conn: conn} do
+      {creator_conn, user} = authed_conn(conn, "creator")
+      _ = creator_conn
+
+      {:ok, event} =
+        Events.create_event(user, %{
+          "title" => "PublicShow",
+          "starts_at" => "2027-01-05T00:00:00Z",
+          "status" => "published"
+        })
+
+      conn = get(conn, "/api/v1/events/#{event.id}")
+      assert json_response(conn, 200)["title"] == "PublicShow"
+    end
+
+    test "anonymous user gets 404 for draft event", %{conn: conn} do
+      {creator_conn, user} = authed_conn(conn, "creator")
+      _ = creator_conn
+
+      {:ok, event} =
+        Events.create_event(user, %{"title" => "Hidden", "starts_at" => "2027-01-06T00:00:00Z"})
+
+      conn = get(conn, "/api/v1/events/#{event.id}")
+      assert %{"error" => "event not found"} = json_response(conn, 404)
+    end
+
+    test "creator sees their own draft", %{conn: conn} do
+      {conn, user} = authed_conn(conn, "creator")
+
+      {:ok, event} =
+        Events.create_event(user, %{"title" => "MyDraft", "starts_at" => "2027-01-07T00:00:00Z"})
+
+      conn = get(conn, "/api/v1/events/#{event.id}")
+      assert json_response(conn, 200)["title"] == "MyDraft"
+    end
+  end
+
+  describe "auth gating on mutations" do
+    test "PUT without auth returns 401", %{conn: conn} do
+      conn = put(conn, "/api/v1/events/#{Ecto.UUID.generate()}", %{title: "x"})
+      assert %{"error" => "unauthorized"} = json_response(conn, 401)
     end
   end
 

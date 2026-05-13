@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { api, ApiError, formatDate } from '$lib/api';
 	import { t } from '$lib/i18n';
-	import { auth } from '$lib/stores/auth.svelte';
 	import type { Event } from '$lib/types';
 	import { onMount } from 'svelte';
 
@@ -21,10 +20,6 @@
 	);
 
 	onMount(async () => {
-		if (!auth.isAuthed) {
-			loading = false;
-			return;
-		}
 		try {
 			events = await api.listEvents();
 		} catch (e) {
@@ -40,41 +35,33 @@
 	<p class="muted">{t('home.subtitle')}</p>
 </header>
 
-{#if !auth.isAuthed}
-	<div class="card stack" style="text-align: center; padding: 2rem;">
-		<h2>{t('home.guestTitle')}</h2>
-		<p class="muted">{t('home.guestSubtitle')}</p>
-		<a href="/auth/login" class="btn" style="align-self: center;">{t('home.guestCta')}</a>
-	</div>
-{:else}
-	<div class="search-bar">
-		<input placeholder={t('home.searchPlaceholder')} bind:value={query} />
-	</div>
+<div class="search-bar">
+	<input placeholder={t('home.searchPlaceholder')} bind:value={query} />
+</div>
 
-	{#if loading}
-		<p class="muted">{t('common.loading')}</p>
-	{:else if error}
-		<div class="error">{error}</div>
-	{:else if filtered.length === 0}
-		<p class="muted">{t('home.noResults')}</p>
-	{:else}
-		<div class="grid">
-			{#each filtered as ev (ev.id)}
-				<a href="/events/{ev.id}" class="event-card">
-					{#if ev.cover_image_url}
-						<img src={ev.cover_image_url} alt="" loading="lazy" />
-					{:else}
-						<div class="cover-placeholder">🎟</div>
-					{/if}
-					<div class="event-body">
-						<h3>{ev.title}</h3>
-						<p class="muted small">{formatDate(ev.starts_at)}</p>
-						<p class="muted small">{ev.location}</p>
-					</div>
-				</a>
-			{/each}
-		</div>
-	{/if}
+{#if loading}
+	<p class="muted">{t('common.loading')}</p>
+{:else if error}
+	<div class="error">{error}</div>
+{:else if filtered.length === 0}
+	<p class="muted">{t('home.noResults')}</p>
+{:else}
+	<div class="grid">
+		{#each filtered as ev (ev.id)}
+			<a href="/events/{ev.id}" class="event-card">
+				{#if ev.cover_image_url}
+					<img src={ev.cover_image_url} alt="" loading="lazy" />
+				{:else}
+					<div class="cover-placeholder">🎟</div>
+				{/if}
+				<div class="event-body">
+					<h3>{ev.title}</h3>
+					<p class="muted small">{formatDate(ev.starts_at)}</p>
+					<p class="muted small">{ev.location}</p>
+				</div>
+			</a>
+		{/each}
+	</div>
 {/if}
 
 <style>

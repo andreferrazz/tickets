@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { api, ApiError } from '$lib/api';
 	import { t } from '$lib/i18n';
+	import { safeNext } from '$lib/next';
 
 	let email = $state('');
 	let hint = $state<string | null>(null);
@@ -17,6 +19,9 @@
 			await api.requestCode(email);
 			hint = 'Código enviado! Verifique seu e-mail.';
 			sessionStorage.setItem('tickets.pending_email', email);
+			const next = safeNext(page.url.searchParams.get('next'));
+			if (next) sessionStorage.setItem('tickets.pending_next', next);
+			else sessionStorage.removeItem('tickets.pending_next');
 			await goto('/auth/verify');
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : t('auth.login.errorFallback');

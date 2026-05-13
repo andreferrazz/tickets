@@ -9,6 +9,10 @@ defmodule BackendWeb.Router do
     plug BackendWeb.AuthPlug
   end
 
+  pipeline :maybe_authenticated do
+    plug BackendWeb.MaybeAuthPlug
+  end
+
   pipeline :creator do
     plug BackendWeb.RequireCreatorPlug
   end
@@ -25,6 +29,16 @@ defmodule BackendWeb.Router do
   end
 
   # ---------------------------------------------------------------------------
+  # Public event browsing — optional auth so creators can see their own drafts
+  # ---------------------------------------------------------------------------
+  scope "/api/v1", BackendWeb do
+    pipe_through [:api, :maybe_authenticated]
+
+    get "/events", EventController, :index
+    get "/events/:id", EventController, :show
+  end
+
+  # ---------------------------------------------------------------------------
   # Authenticated — any role
   # ---------------------------------------------------------------------------
   scope "/api/v1", BackendWeb do
@@ -32,8 +46,6 @@ defmodule BackendWeb.Router do
 
     get "/me", UserController, :me
 
-    get "/events", EventController, :index
-    get "/events/:id", EventController, :show
     put "/events/:id", EventController, :update
     delete "/events/:id", EventController, :delete
 

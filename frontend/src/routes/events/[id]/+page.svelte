@@ -42,10 +42,6 @@
 	);
 
 	onMount(async () => {
-		if (!auth.isAuthed) {
-			await goto('/auth/login');
-			return;
-		}
 		try {
 			event = await api.getEvent(page.params.id!);
 		} catch (e) {
@@ -63,6 +59,10 @@
 
 	async function buy() {
 		if (!event || lines.length === 0) return;
+		if (!auth.isAuthed) {
+			await goto(`/auth/login?next=/events/${event.id}`);
+			return;
+		}
 		buyError = null;
 		busy = true;
 		try {
