@@ -11,7 +11,9 @@ import type {
 	CartLine
 } from '$lib/types';
 
-const BASE = '/api/v1';
+// When VITE_API_URL is set (e.g. http://localhost:4000/api/v1) all requests go
+// to the real Phoenix backend. Without it, requests hit the local mock routes.
+const BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
 
 interface FetchOptions {
 	method?: string;
@@ -51,7 +53,7 @@ async function request<T>(path: string, opts: FetchOptions = {}): Promise<T> {
 
 export const api = {
 	requestCode: (email: string) =>
-		request<{ sent: boolean; mock_code: string }>('/auth/request-code', {
+		request<{ sent: boolean; mock_code?: string }>('/auth/request-code', {
 			method: 'POST',
 			body: { email }
 		}),

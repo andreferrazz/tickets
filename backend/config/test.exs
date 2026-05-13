@@ -26,6 +26,7 @@ config :logger, level: :warning
 config :backend, Backend.Mailer, adapter: Swoosh.Adapters.Test
 config :backend, :mail_from, "test@tickets.dev"
 config :backend, :frontend_url, "http://localhost:5173"
+config :backend, :corsica_origins, "*"
 config :swoosh, :api_client, Swoosh.ApiClient.Finch
 
 # Initialize plugs at runtime for faster test compilation

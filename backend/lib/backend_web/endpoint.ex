@@ -48,6 +48,14 @@ defmodule BackendWeb.Endpoint do
 
   plug Plug.MethodOverride
   plug Plug.Head
+
+  # CORS must run before the router so OPTIONS preflight requests are handled.
+  plug Corsica,
+    origins: Application.compile_env(:backend, :corsica_origins, "*"),
+    allow_headers: ["content-type", "authorization"],
+    allow_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_credentials: false
+
   plug Plug.Session, @session_options
   plug BackendWeb.Router
 end

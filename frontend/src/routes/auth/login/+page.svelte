@@ -15,7 +15,9 @@
 		busy = true;
 		try {
 			const res = await api.requestCode(email);
-			hint = `Código enviado. (Código mock: ${res.mock_code})`;
+			hint = res.mock_code
+				? `Código enviado. (Mock: ${res.mock_code})`
+				: 'Código enviado! Verifique seu e-mail.';
 			sessionStorage.setItem('tickets.pending_email', email);
 			await goto('/auth/verify');
 		} catch (e) {

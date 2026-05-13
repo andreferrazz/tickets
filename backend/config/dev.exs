@@ -67,3 +67,4 @@ config :backend, Backend.Mailer, adapter: Swoosh.Adapters.Local
 config :swoosh, :api_client, Swoosh.ApiClient.Finch
 
 config :backend, :frontend_url, System.get_env("FRONTEND_URL", "http://localhost:5173")
+config :backend, :corsica_origins, System.get_env("FRONTEND_URL", "http://localhost:5173")

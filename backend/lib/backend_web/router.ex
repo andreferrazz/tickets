@@ -3,11 +3,6 @@ defmodule BackendWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
-    plug Corsica,
-      origins: {BackendWeb.Router, :allowed_origins, []},
-      allow_headers: ["content-type", "authorization"],
-      allow_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      allow_credentials: false
   end
 
   pipeline :authenticated do
@@ -42,8 +37,4 @@ defmodule BackendWeb.Router do
     end
   end
 
-  def allowed_origins(origin) do
-    allowed = Application.get_env(:backend, :frontend_url, "*")
-    allowed == "*" or origin == allowed
-  end
 end
