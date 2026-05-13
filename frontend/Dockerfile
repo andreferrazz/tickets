@@ -1,27 +1,21 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
+
 COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
 RUN npm run build
 
-# Prune dev dependencies — adapter-node's output only needs the prod closure
-RUN npm prune --omit=dev
 
+FROM nginx:1.27-alpine AS runner
 
-FROM node:22-alpine AS runner
-WORKDIR /app
+COPY --from=builder /app/build /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOST=0.0.0.0
+EXPOSE 80
 
-COPY --from=builder /app/build ./build
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-
-EXPOSE 3000
-
-CMD ["node", "build/index.js"]
+CMD ["nginx", "-g", "daemon off;"]

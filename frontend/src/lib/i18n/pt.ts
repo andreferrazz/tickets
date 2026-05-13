@@ -102,14 +102,6 @@ export const pt = {
 	'order.errorFallback': 'Falha ao carregar pedido',
 	'order.notFound': 'Pedido não encontrado',
 
-	// Fake pay
-	'fakePay.title': '💳 Abacate Pay (simulação)',
-	'fakePay.pay': 'Simular pagamento agora',
-	'fakePay.autoComplete': 'Concluir automaticamente em 3s',
-	'fakePay.autoCompleting': 'Concluindo em {n}s...',
-	'fakePay.cancel': 'Cancelar e ver pedido',
-	'fakePay.errorFallback': 'Falha ao carregar pedido',
-
 	// Invitations
 	'invitations.title': 'Convites',
 	'invitations.subtitle': 'Convide alguém para se tornar criador no Tickets.',

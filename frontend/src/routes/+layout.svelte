@@ -5,8 +5,14 @@
 	import { t } from '$lib/i18n';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { onMount } from 'svelte';
 
 	let { children } = $props();
+
+	onMount(async () => {
+		const { registerSW } = await import('virtual:pwa-register');
+		registerSW({ immediate: true });
+	});
 
 	async function logout() {
 		try {
