@@ -44,7 +44,9 @@ ENV PHX_SERVER=true
 WORKDIR /app
 
 COPY --from=builder /app/_build/prod/rel/backend ./
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 4000
 
-CMD ["bin/backend", "start"]
+CMD ["/app/entrypoint.sh"]
