@@ -66,8 +66,8 @@ config :phoenix, :plug_init_mode, :runtime
 config :backend, Backend.Mailer, adapter: Swoosh.Adapters.Local
 config :swoosh, :api_client, Swoosh.ApiClient.Finch
 
-config :backend, :frontend_url, System.get_env("FRONTEND_URL", "http://localhost:5173")
-config :backend, :corsica_origins, System.get_env("FRONTEND_URL", "http://localhost:5173")
+config :backend, :frontend_url, "http://localhost:5173"
+config :backend, :corsica_origins, "http://localhost:5173"
 
 config :backend, :abacate_pay_api_key, System.get_env("ABACATE_PAY_API_KEY", "dev-key-not-set")
 

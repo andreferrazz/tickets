@@ -23,6 +23,9 @@ end
 config :backend, BackendWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+config :backend, :frontend_url, System.get_env("FRONTEND_URL", "http://localhost:5173")
+config :backend, :corsica_origins, System.get_env("FRONTEND_URL", "http://localhost:5173")
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||
@@ -65,7 +68,8 @@ if config_env() == :prod do
     username: System.get_env("SMTP_USER"),
     password: System.get_env("SMTP_PASS"),
     tls: :always,
-    auth: :always
+    auth: :always,
+    ssl_options: [versions: [:"tlsv1.2"], verify: :verify_none]
 
   config :backend,
          :mail_from,
@@ -73,9 +77,7 @@ if config_env() == :prod do
 
   config :swoosh, :api_client, Swoosh.ApiClient.Finch
 
-  config :backend,
-         :frontend_url,
-         System.get_env("FRONTEND_URL") || raise("FRONTEND_URL env var is missing")
+  if is_nil(System.get_env("FRONTEND_URL")), do: raise("FRONTEND_URL env var is missing")
 
   config :backend,
          :abacate_pay_api_key,
