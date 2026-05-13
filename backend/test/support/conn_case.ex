@@ -27,7 +27,10 @@ defmodule BackendWeb.ConnCase do
       # Import conveniences for testing with connections
       import Plug.Conn
       import Phoenix.ConnTest
+      import Ecto.Query
       import BackendWeb.ConnCase
+
+      alias Backend.Repo
     end
   end
 

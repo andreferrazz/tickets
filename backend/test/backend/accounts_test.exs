@@ -20,7 +20,10 @@ defmodule Backend.AccountsTest do
 
     test "normalises email (trims + downcases)" do
       assert {:ok, _} = Accounts.request_code("  USER@EXAMPLE.COM  ")
-      {:ok, %{user: user}} = Accounts.verify_code("user@example.com", request_fresh_code("user@example.com"))
+
+      {:ok, %{user: user}} =
+        Accounts.verify_code("user@example.com", request_fresh_code("user@example.com"))
+
       assert user.email == "user@example.com"
     end
   end
@@ -46,7 +49,9 @@ defmodule Backend.AccountsTest do
 
     test "rejects wrong code" do
       _code = request_fresh_code("wrong@example.com")
-      assert {:error, :invalid_or_expired_code} = Accounts.verify_code("wrong@example.com", "000000")
+
+      assert {:error, :invalid_or_expired_code} =
+               Accounts.verify_code("wrong@example.com", "000000")
     end
 
     test "rejects already-used code" do

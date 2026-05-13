@@ -9,7 +9,13 @@ defmodule BackendWeb.Router do
     plug BackendWeb.AuthPlug
   end
 
-  # Public auth endpoints
+  pipeline :creator do
+    plug BackendWeb.RequireCreatorPlug
+  end
+
+  # ---------------------------------------------------------------------------
+  # Public auth endpoints (rate-limited in the controller)
+  # ---------------------------------------------------------------------------
   scope "/api/v1", BackendWeb do
     pipe_through :api
 
@@ -18,14 +24,56 @@ defmodule BackendWeb.Router do
     delete "/auth/logout", AuthController, :logout
   end
 
-  # Protected endpoints
+  # ---------------------------------------------------------------------------
+  # Authenticated — any role
+  # ---------------------------------------------------------------------------
   scope "/api/v1", BackendWeb do
     pipe_through [:api, :authenticated]
 
     get "/me", UserController, :me
+
+    get "/events", EventController, :index
+    get "/events/:id", EventController, :show
+    put "/events/:id", EventController, :update
+    delete "/events/:id", EventController, :delete
+
+    put "/ticket-types/:id", TicketTypeController, :update
+    delete "/ticket-types/:id", TicketTypeController, :delete
+
+    put "/extras/:id", ExtraItemController, :update
+    delete "/extras/:id", ExtraItemController, :delete
+
+    post "/orders", OrderController, :create
+    get "/orders", OrderController, :index
+    get "/orders/:id", OrderController, :show
   end
 
-  # LiveDashboard + Swoosh mailbox (dev only)
+  # ---------------------------------------------------------------------------
+  # Authenticated — creator/admin only
+  # ---------------------------------------------------------------------------
+  scope "/api/v1", BackendWeb do
+    pipe_through [:api, :authenticated, :creator]
+
+    post "/events", EventController, :create
+    post "/events/:event_id/ticket-types", TicketTypeController, :create
+    post "/events/:event_id/extras", ExtraItemController, :create
+
+    post "/invitations", InvitationController, :create
+    get "/invitations", InvitationController, :index
+  end
+
+  # ---------------------------------------------------------------------------
+  # Webhooks — no session auth, HMAC validated in controller
+  # ---------------------------------------------------------------------------
+  scope "/webhooks", BackendWeb do
+    pipe_through :api
+
+    post "/abacate-pay", WebhookController, :abacate_pay
+  end
+
+  # ---------------------------------------------------------------------------
+  # Dev tooling
+  # ---------------------------------------------------------------------------
   if Application.compile_env(:backend, :dev_routes) do
     import Phoenix.LiveDashboard.Router
 
@@ -36,5 +84,4 @@ defmodule BackendWeb.Router do
       forward "/mailbox", Plug.Swoosh.MailboxPreview
     end
   end
-
 end

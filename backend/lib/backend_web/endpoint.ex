@@ -44,6 +44,8 @@ defmodule BackendWeb.Endpoint do
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],
+    # Stores raw body in conn.private[:raw_body] for HMAC webhook validation.
+    body_reader: {BackendWeb.CacheBodyReader, :read_body, []},
     json_decoder: Phoenix.json_library()
 
   plug Plug.MethodOverride

@@ -29,6 +29,10 @@ config :backend, :frontend_url, "http://localhost:5173"
 config :backend, :corsica_origins, "*"
 config :swoosh, :api_client, Swoosh.ApiClient.Finch
 
+config :backend, :abacate_pay_module, Backend.AbacatePayMock
+config :backend, :abacate_pay_api_key, "test-key"
+config :backend, :abacate_pay_webhook_secret, "test-webhook-secret"
+
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
 

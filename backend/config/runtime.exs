@@ -67,13 +67,24 @@ if config_env() == :prod do
     tls: :always,
     auth: :always
 
-  config :backend, :mail_from,
-    System.get_env("MAIL_FROM") || raise("MAIL_FROM env var is missing")
+  config :backend,
+         :mail_from,
+         System.get_env("MAIL_FROM") || raise("MAIL_FROM env var is missing")
 
   config :swoosh, :api_client, Swoosh.ApiClient.Finch
 
-  config :backend, :frontend_url,
-    System.get_env("FRONTEND_URL") || raise("FRONTEND_URL env var is missing")
+  config :backend,
+         :frontend_url,
+         System.get_env("FRONTEND_URL") || raise("FRONTEND_URL env var is missing")
+
+  config :backend,
+         :abacate_pay_api_key,
+         System.get_env("ABACATE_PAY_API_KEY") || raise("ABACATE_PAY_API_KEY env var is missing")
+
+  config :backend,
+         :abacate_pay_webhook_secret,
+         System.get_env("ABACATE_PAY_WEBHOOK_SECRET") ||
+           raise("ABACATE_PAY_WEBHOOK_SECRET env var is missing")
 
   config :backend, BackendWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],

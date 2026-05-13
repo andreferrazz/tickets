@@ -5,14 +5,24 @@ defmodule BackendWeb.AuthController do
 
   @doc "POST /api/v1/auth/request-code"
   def request_code(conn, %{"email" => email}) do
-    case Accounts.request_code(email) do
-      {:ok, _code} ->
-        json(conn, %{sent: true})
+    ip = conn.remote_ip |> :inet.ntoa() |> to_string()
 
-      {:error, reason} ->
+    case Backend.RateLimit.check("request_code:#{ip}", 60, 5) do
+      {:deny, _} ->
         conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: inspect(reason)})
+        |> put_status(:too_many_requests)
+        |> json(%{error: "too many requests — try again in a minute"})
+
+      {:allow, _} ->
+        case Accounts.request_code(email) do
+          {:ok, _code} ->
+            json(conn, %{sent: true})
+
+          {:error, reason} ->
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{error: inspect(reason)})
+        end
     end
   end
 
