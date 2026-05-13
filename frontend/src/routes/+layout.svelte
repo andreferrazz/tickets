@@ -6,6 +6,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
 	let { children } = $props();
 
@@ -50,6 +51,8 @@
 <main class="container">
 	{@render children()}
 </main>
+
+<ConfirmDialog />
 
 <style>
 	.nav {

@@ -16,6 +16,8 @@ export const pt = {
 	'common.status': 'Status',
 	'common.total': 'Total',
 	'common.name': 'Nome',
+	'common.cancel': 'Cancelar',
+	'common.confirm': 'Confirmar',
 
 	// Auth
 	'auth.login.title': 'Entrar',

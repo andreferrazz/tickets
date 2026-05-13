@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { api, ApiError, formatBRL } from '$lib/api';
 	import EventForm from '$lib/components/EventForm.svelte';
+	import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';
 	import { t } from '$lib/i18n';
 	import type { TranslationKey } from '$lib/i18n/pt';
 	import { auth } from '$lib/stores/auth.svelte';
@@ -57,7 +58,12 @@
 	}
 
 	async function delTicket(tk: TicketType) {
-		if (!confirm(t('eventEdit.confirmDeleteTicket', { name: tk.name }))) return;
+		const ok = await confirmDialog({
+			message: t('eventEdit.confirmDeleteTicket', { name: tk.name }),
+			confirmText: t('common.delete'),
+			danger: true
+		});
+		if (!ok) return;
 		actionError = null;
 		try {
 			await api.deleteTicketType(tk.id);
@@ -75,7 +81,12 @@
 	}
 
 	async function delExtra(x: ExtraItem) {
-		if (!confirm(t('eventEdit.confirmDeleteExtra', { name: x.name }))) return;
+		const ok = await confirmDialog({
+			message: t('eventEdit.confirmDeleteExtra', { name: x.name }),
+			confirmText: t('common.delete'),
+			danger: true
+		});
+		if (!ok) return;
 		actionError = null;
 		try {
 			await api.deleteExtra(x.id);
@@ -87,7 +98,12 @@
 
 	async function deleteEvent() {
 		if (!event) return;
-		if (!confirm(t('eventEdit.confirmDeleteEvent', { title: event.title }))) return;
+		const ok = await confirmDialog({
+			message: t('eventEdit.confirmDeleteEvent', { title: event.title }),
+			confirmText: t('common.delete'),
+			danger: true
+		});
+		if (!ok) return;
 		actionError = null;
 		try {
 			await api.deleteEvent(event.id);
