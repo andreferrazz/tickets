@@ -28,7 +28,7 @@
 		try {
 			await onSubmit({
 				title,
-				description,
+				description: description.trim(),
 				location,
 				starts_at: new Date(starts_at).toISOString(),
 				cover_image_url: cover_image_url || null,

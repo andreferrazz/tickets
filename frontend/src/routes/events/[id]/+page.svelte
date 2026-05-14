@@ -101,7 +101,7 @@
 			{/if}
 		</div>
 
-		<p>{event.description}</p>
+		<p class="description">{event.description}</p>
 
 		<div class="two-col">
 			<section class="stack">
@@ -198,6 +198,9 @@
 {/if}
 
 <style>
+	.description {
+		white-space: pre-wrap;
+	}
 	.cover {
 		width: 100%;
 		max-height: 360px;
