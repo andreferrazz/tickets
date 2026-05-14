@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { api, ApiError, formatBRL } from '$lib/api';
 	import EventForm from '$lib/components/EventForm.svelte';
+	import FloatingField from '$lib/components/FloatingField.svelte';
 	import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';
 	import { t } from '$lib/i18n';
 	import type { TranslationKey } from '$lib/i18n/pt';
@@ -14,8 +15,20 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
-	let newTicket = $state({ name: '', price_cents: 0, quantity_total: 0 });
-	let newExtra = $state({ name: '', price_cents: 0, quantity_total: 0 });
+	let newTicket = $state({ name: '', price_cents: 0, quantity_total: undefined as number | undefined });
+	let newExtra = $state({ name: '', price_cents: 0, quantity_total: undefined as number | undefined });
+
+	function formatCentsInput(cents: number): string {
+		const c = Math.max(0, Math.trunc(cents));
+		if (c === 0) return '';
+		return (c / 100).toFixed(2);
+	}
+
+	function parseCentsInput(value: string): number {
+		const digits = value.replace(/\D/g, '');
+		if (!digits) return 0;
+		return Number(digits);
+	}
 	let actionError = $state<string | null>(null);
 
 	function reportError(e: unknown, fallbackKey: TranslationKey) {
@@ -53,7 +66,7 @@
 	async function addTicket() {
 		if (!event || !newTicket.name) return;
 		await api.createTicketType(event.id, newTicket);
-		newTicket = { name: '', price_cents: 0, quantity_total: 0 };
+		newTicket = { name: '', price_cents: 0, quantity_total: undefined as number | undefined };
 		await reload();
 	}
 
@@ -76,7 +89,7 @@
 	async function addExtra() {
 		if (!event || !newExtra.name) return;
 		await api.createExtra(event.id, newExtra);
-		newExtra = { name: '', price_cents: 0, quantity_total: 0 };
+		newExtra = { name: '', price_cents: 0, quantity_total: undefined as number | undefined };
 		await reload();
 	}
 
@@ -139,9 +152,21 @@
 			</div>
 		{/each}
 		<div class="add">
-			<input placeholder={t('common.name')} bind:value={newTicket.name} />
-			<input type="number" placeholder={t('eventEdit.priceCents')} bind:value={newTicket.price_cents} />
-			<input type="number" placeholder={t('eventEdit.qty')} bind:value={newTicket.quantity_total} />
+			<FloatingField label={t('common.name')}>
+				<input placeholder=" " bind:value={newTicket.name} />
+			</FloatingField>
+			<FloatingField label={t('eventEdit.priceCents')}>
+				<input
+					type="text"
+					inputmode="numeric"
+					placeholder=" "
+					value={formatCentsInput(newTicket.price_cents)}
+					oninput={(e) => (newTicket.price_cents = parseCentsInput(e.currentTarget.value))}
+				/>
+			</FloatingField>
+			<FloatingField label={t('eventEdit.qty')}>
+				<input type="number" placeholder=" " bind:value={newTicket.quantity_total} />
+			</FloatingField>
 			<button class="small" onclick={addTicket}>{t('eventEdit.add')}</button>
 		</div>
 	</div>
@@ -158,9 +183,21 @@
 			</div>
 		{/each}
 		<div class="add">
-			<input placeholder={t('common.name')} bind:value={newExtra.name} />
-			<input type="number" placeholder={t('eventEdit.priceCents')} bind:value={newExtra.price_cents} />
-			<input type="number" placeholder={t('eventEdit.qtyUnlimited')} bind:value={newExtra.quantity_total} />
+			<FloatingField label={t('common.name')}>
+				<input placeholder=" " bind:value={newExtra.name} />
+			</FloatingField>
+			<FloatingField label={t('eventEdit.priceCents')}>
+				<input
+					type="text"
+					inputmode="numeric"
+					placeholder=" "
+					value={formatCentsInput(newExtra.price_cents)}
+					oninput={(e) => (newExtra.price_cents = parseCentsInput(e.currentTarget.value))}
+				/>
+			</FloatingField>
+			<FloatingField label={t('eventEdit.qtyUnlimited')}>
+				<input type="number" placeholder=" " bind:value={newExtra.quantity_total} />
+			</FloatingField>
 			<button class="small" onclick={addExtra}>{t('eventEdit.add')}</button>
 		</div>
 	</div>

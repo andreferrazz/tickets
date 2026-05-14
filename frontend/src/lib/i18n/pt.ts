@@ -88,7 +88,7 @@ export const pt = {
 	'eventEdit.confirmDeleteTicket': 'Excluir "{name}"?',
 	'eventEdit.confirmDeleteExtra': 'Excluir "{name}"?',
 	'eventEdit.add': 'Adicionar',
-	'eventEdit.priceCents': 'Preço (centavos)',
+	'eventEdit.priceCents': 'Preço (R$)',
 	'eventEdit.qty': 'Qtde',
 	'eventEdit.qtyUnlimited': 'Qtde (0 = ilimitado)',
 	'eventEdit.sold': 'vendidos',
