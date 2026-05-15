@@ -44,7 +44,7 @@ defmodule Backend.AbacatePay do
   def create_checkout(items, return_url, completion_url) do
     body = %{
       items: items,
-      methods: ["PIX"],
+      methods: ["PIX", "CARD"],
       returnUrl: return_url,
       completionUrl: completion_url
     }
