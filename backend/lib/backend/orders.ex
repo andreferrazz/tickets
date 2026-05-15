@@ -155,7 +155,7 @@ defmodule Backend.Orders do
   # ---------------------------------------------------------------------------
 
   defp fetch_published_event(event_id) do
-    case Repo.one(from e in Event, where: e.id == ^event_id and is_nil(e.deleted_at)) do
+    case Repo.one(from(e in Event, where: e.id == ^event_id and is_nil(e.deleted_at))) do
       nil -> {:error, :event_not_found}
       %Event{status: "published"} = event -> {:ok, event}
       _event -> {:error, :event_not_available}
@@ -175,7 +175,7 @@ defmodule Backend.Orders do
 
   defp resolve_line(event, %{"item_type" => "ticket", "item_id" => id, "quantity" => qty})
        when is_integer(qty) and qty > 0 do
-    tt = Repo.one(from t in TicketType, where: t.id == ^id and is_nil(t.deleted_at))
+    tt = Repo.one(from(t in TicketType, where: t.id == ^id and is_nil(t.deleted_at)))
 
     cond do
       is_nil(tt) or tt.event_id != event.id -> {:error, {:invalid_item, id}}
@@ -186,7 +186,7 @@ defmodule Backend.Orders do
 
   defp resolve_line(event, %{"item_type" => "extra", "item_id" => id, "quantity" => qty})
        when is_integer(qty) and qty > 0 do
-    ex = Repo.one(from x in ExtraItem, where: x.id == ^id and is_nil(x.deleted_at))
+    ex = Repo.one(from(x in ExtraItem, where: x.id == ^id and is_nil(x.deleted_at)))
 
     cond do
       is_nil(ex) or ex.event_id != event.id ->
@@ -252,13 +252,16 @@ defmodule Backend.Orders do
   end
 
   defp ensure_products(line_items) do
-    Enum.reduce_while(line_items, {:ok, []}, fn %{type: type, record: r, quantity: qty},
-                                                {:ok, acc} ->
-      case ensure_product(type, r) do
-        {:ok, prod_id} -> {:cont, {:ok, acc ++ [%{id: prod_id, quantity: qty}]}}
-        {:error, _} = err -> {:halt, err}
+    Enum.reduce_while(
+      line_items,
+      {:ok, []},
+      fn %{type: type, record: r, quantity: qty}, {:ok, acc} ->
+        case ensure_product(type, r) do
+          {:ok, prod_id} -> {:cont, {:ok, acc ++ [%{id: prod_id, quantity: qty}]}}
+          {:error, _} = err -> {:halt, err}
+        end
       end
-    end)
+    )
   end
 
   defp ensure_product(_type, %{abacate_product_id: id}) when is_binary(id), do: {:ok, id}
