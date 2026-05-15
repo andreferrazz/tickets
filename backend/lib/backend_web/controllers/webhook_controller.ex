@@ -9,6 +9,8 @@ defmodule BackendWeb.WebhookController do
 
   use BackendWeb, :controller
 
+  require Logger
+
   alias Backend.Orders
 
   @doc "POST /webhooks/abacate-pay"
