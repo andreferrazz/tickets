@@ -15,11 +15,13 @@ defmodule BackendWeb.WebhookController do
 
   alias Backend.AbacatePay
   alias Backend.Orders
+  alias Backend.Webhooks
 
   @doc "POST /webhooks/abacate-pay"
   def abacate_pay(conn, params) do
     with :ok <- verify_url_secret(conn),
-         :ok <- verify_signature(conn) do
+         :ok <- verify_signature(conn),
+         {:ok, _event} <- Webhooks.log_event(params) do
       result = dispatch_event(params)
       handle_result(conn, result)
     else
@@ -28,6 +30,9 @@ defmodule BackendWeb.WebhookController do
 
       {:error, :invalid_signature} ->
         conn |> put_status(:unauthorized) |> json(%{error: "invalid signature"})
+
+      {:error, %Ecto.Changeset{} = cs} ->
+        conn |> put_status(:internal_server_error) |> json(%{error: inspect(cs.errors)})
     end
   end
 
@@ -58,7 +63,7 @@ defmodule BackendWeb.WebhookController do
 
   defp verify_url_secret(conn) do
     expected = Application.get_env(:backend, :abacate_pay_webhook_secret, "")
-    received = Map.get(conn.query_params, "webhookSecret", "")
+    received = Map.get(fetch_query_params(conn).query_params, "webhookSecret", "")
 
     if expected != "" and Plug.Crypto.secure_compare(expected, received) do
       :ok
