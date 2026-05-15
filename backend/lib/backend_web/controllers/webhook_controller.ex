@@ -2,23 +2,30 @@ defmodule BackendWeb.WebhookController do
   @moduledoc """
   Receives payment events from Abacate Pay.
 
-  HMAC-SHA256 validation uses the shared `abacate_pay_webhook_secret`.
-  Signature is expected in the `x-abacatepay-hmac-sha256` header as a hex
-  digest (no prefix).
+  Two-layer auth, per Abacate Pay docs:
+
+    1. A per-tenant secret in the query string (`?webhookSecret=...`),
+       compared against `:abacate_pay_webhook_secret` config.
+    2. An HMAC-SHA256 signature of the raw body using Abacate Pay's
+       fixed public key, sent in the `x-webhook-signature` header as
+       a base64 digest.
   """
 
   use BackendWeb, :controller
 
-  require Logger
-
+  alias Backend.AbacatePay
   alias Backend.Orders
 
   @doc "POST /webhooks/abacate-pay"
   def abacate_pay(conn, params) do
-    with :ok <- verify_signature(conn) do
+    with :ok <- verify_url_secret(conn),
+         :ok <- verify_signature(conn) do
       result = dispatch_event(params)
       handle_result(conn, result)
     else
+      {:error, :unauthorized} ->
+        conn |> put_status(:unauthorized) |> json(%{error: "unauthorized"})
+
       {:error, :invalid_signature} ->
         conn |> put_status(:unauthorized) |> json(%{error: "invalid signature"})
     end
@@ -49,16 +56,24 @@ defmodule BackendWeb.WebhookController do
     conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
   end
 
-  defp verify_signature(conn) do
-    secret = Application.get_env(:backend, :abacate_pay_webhook_secret, "")
-    raw_body = Map.get(conn.private, :raw_body, "")
-    [received | _] = get_req_header(conn, "x-abacatepay-hmac-sha256") ++ [""]
+  defp verify_url_secret(conn) do
+    expected = Application.get_env(:backend, :abacate_pay_webhook_secret, "")
+    received = Map.get(conn.query_params, "webhookSecret", "")
 
-    Logger.info("Received: #{received}, Secret: #{secret}")
+    if expected != "" and Plug.Crypto.secure_compare(expected, received) do
+      :ok
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  defp verify_signature(conn) do
+    raw_body = Map.get(conn.private, :raw_body, "")
+    [received | _] = get_req_header(conn, "x-webhook-signature") ++ [""]
 
     expected =
-      :crypto.mac(:hmac, :sha256, secret, raw_body)
-      |> Base.encode16(case: :lower)
+      :crypto.mac(:hmac, :sha256, AbacatePay.public_key(), raw_body)
+      |> Base.encode64()
 
     if Plug.Crypto.secure_compare(expected, received) do
       :ok
