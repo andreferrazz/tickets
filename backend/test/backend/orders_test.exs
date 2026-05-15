@@ -113,6 +113,34 @@ defmodule Backend.OrdersTest do
 
       assert {:error, :no_items} = Orders.create_order(buyer, event.id, [])
     end
+
+    test "returns missing_abacate_product when ticket type has no upstream product id" do
+      creator = make_creator()
+      buyer = make_buyer()
+
+      {:ok, event} =
+        Events.create_event(creator, %{
+          "title" => "Legacy",
+          "starts_at" => "2027-04-01T18:00:00Z",
+          "status" => "published"
+        })
+
+      # Bypass Events.create_ticket_type/3 to simulate a legacy row that never
+      # had an Abacate Pay product created for it.
+      tt =
+        Repo.insert!(%TicketType{
+          event_id: event.id,
+          name: "Legacy GA",
+          price_cents: 3000,
+          quantity_total: 5,
+          abacate_product_id: nil
+        })
+
+      assert {:error, {:missing_abacate_product, "Legacy GA"}} =
+               Orders.create_order(buyer, event.id, [
+                 %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+               ])
+    end
   end
 
   # ---------------------------------------------------------------------------

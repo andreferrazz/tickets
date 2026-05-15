@@ -21,8 +21,8 @@ defmodule Backend.Orders do
   Steps:
     1. Resolve and validate each item (stock check, price snapshot).
     2. Open a DB transaction: reserve stock, insert order + items.
-    3. Ensure each item has an Abacate Pay product.
-    4. Create Abacate Pay checkout, store the bill_id and payment URL.
+    3. Create Abacate Pay checkout from the items' existing product ids,
+       store the bill_id and payment URL.
 
   Returns `{:ok, order}` or `{:error, reason}`.
   """
@@ -243,7 +243,7 @@ defmodule Backend.Orders do
   end
 
   defp build_checkout(order, line_items) do
-    with {:ok, abacate_items} <- ensure_products(line_items) do
+    with {:ok, abacate_items} <- collect_abacate_items(line_items) do
       frontend_url = Application.get_env(:backend, :frontend_url, "http://localhost:5173")
       return_url = "#{frontend_url}/orders"
       completion_url = "#{frontend_url}/orders/#{order.id}"
@@ -251,35 +251,13 @@ defmodule Backend.Orders do
     end
   end
 
-  defp ensure_products(line_items) do
-    Enum.reduce_while(
-      line_items,
-      {:ok, []},
-      fn %{type: type, record: r, quantity: qty}, {:ok, acc} ->
-        case ensure_product(type, r) do
-          {:ok, prod_id} -> {:cont, {:ok, acc ++ [%{id: prod_id, quantity: qty}]}}
-          {:error, _} = err -> {:halt, err}
-        end
+  defp collect_abacate_items(line_items) do
+    Enum.reduce_while(line_items, {:ok, []}, fn %{record: r, quantity: qty}, {:ok, acc} ->
+      case r.abacate_product_id do
+        id when is_binary(id) -> {:cont, {:ok, acc ++ [%{id: id, quantity: qty}]}}
+        _ -> {:halt, {:error, {:missing_abacate_product, r.name}}}
       end
-    )
-  end
-
-  defp ensure_product(_type, %{abacate_product_id: id}) when is_binary(id), do: {:ok, id}
-
-  defp ensure_product(type, record) do
-    external_id = "#{type}_#{record.id}"
-
-    case abacate_pay().create_product(record.name, record.price_cents, external_id) do
-      {:ok, prod_id} ->
-        record
-        |> Ecto.Changeset.change(abacate_product_id: prod_id)
-        |> Repo.update!()
-
-        {:ok, prod_id}
-
-      error ->
-        error
-    end
+    end)
   end
 
   defp attach_checkout(order, event, %{id: checkout_id, url: payment_url}) do
