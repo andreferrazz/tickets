@@ -8,7 +8,7 @@ defmodule BackendWeb.RuntimeCors do
 
   @impl true
   def call(conn, _opts) do
-    origins = Application.get_env(:backend, :corsica_origins, "*")
+    origins = Application.fetch_env!(:backend, :corsica_origins)
 
     opts =
       Corsica.init(

@@ -68,9 +68,4 @@ config :swoosh, :api_client, Swoosh.ApiClient.Finch
 
 config :backend, :frontend_url, "http://localhost:5173"
 config :backend, :corsica_origins, "http://localhost:5173"
-
-config :backend, :abacate_pay_api_key, System.get_env("ABACATE_PAY_API_KEY", "dev-key-not-set")
-
-config :backend,
-       :abacate_pay_webhook_secret,
-       System.get_env("ABACATE_PAY_WEBHOOK_SECRET", "dev-secret")
+config :backend, :mail_from, "dev@tickets.dev"

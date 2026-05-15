@@ -27,8 +27,8 @@ defmodule Backend.Mailer do
 
   @doc "Notifies `email` that they have been invited by `inviter_email`."
   def send_invitation(email, inviter_email, token) do
-    from = Application.fetch_env!(:backend, :mail_from)
-    frontend_url = Application.get_env(:backend, :frontend_url, "http://localhost:5173")
+    from = Application.get_env(:backend, :mail_from, "")
+    frontend_url = Application.get_env(:backend, :frontend_url, "")
 
     new()
     |> to(email)

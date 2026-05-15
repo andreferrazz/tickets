@@ -23,18 +23,31 @@ end
 config :backend, BackendWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
-config :backend, :frontend_url, System.get_env("FRONTEND_URL", "http://localhost:5173")
-config :backend, :corsica_origins, System.get_env("FRONTEND_URL", "http://localhost:5173")
+get_required_env = fn key ->
+  System.get_env(key) || raise "environment variable #{key} is missing."
+end
+
+config :backend, :abacate_pay_api_key, get_required_env.("ABACATE_PAY_API_KEY")
+config :backend, :abacate_pay_webhook_secret, get_required_env.("ABACATE_PAY_WEBHOOK_SECRET")
 
 if config_env() == :prod do
-  database_url =
-    System.get_env("DATABASE_URL") ||
-      raise """
-      environment variable DATABASE_URL is missing.
-      For example: ecto://USER:PASS@HOST/DATABASE
-      """
+  # The secret key base is used to sign/encrypt cookies and other secrets.
+  # A default value is used in config/dev.exs and config/test.exs but you
+  # want to use a different value for prod and you most likely don't want
+  # to check this value into version control, so we use an environment
+  # variable instead. You can generate one by calling: mix phx.gen.secret
+  secret_key_base = get_required_env.("SECRET_KEY_BASE")
+  database_url = get_required_env.("DATABASE_URL")
+  smtp_host = get_required_env.("SMTP_HOST")
+  smtp_port = String.to_integer(get_required_env.("SMTP_PORT"))
+  smtp_user = get_required_env.("SMTP_USER")
+  smtp_pass = get_required_env.("SMTP_PASS")
+  mail_from = get_required_env.("MAIL_FROM")
+  frontend_url = get_required_env.("FRONTEND_URL")
 
-  maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
+  config :backend, :frontend_url, frontend_url
+  config :backend, :corsica_origins, frontend_url
+  config :backend, :mail_from, mail_from
 
   config :backend, Backend.Repo,
     # ssl: true,
@@ -42,55 +55,30 @@ if config_env() == :prod do
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
     # For machines with several cores, consider starting multiple pools of `pool_size`
     # pool_count: 4,
-    socket_options: maybe_ipv6
-
-  # The secret key base is used to sign/encrypt cookies and other secrets.
-  # A default value is used in config/dev.exs and config/test.exs but you
-  # want to use a different value for prod and you most likely don't want
-  # to check this value into version control, so we use an environment
-  # variable instead.
-  secret_key_base =
-    System.get_env("SECRET_KEY_BASE") ||
-      raise """
-      environment variable SECRET_KEY_BASE is missing.
-      You can generate one by calling: mix phx.gen.secret
-      """
-
-  host = System.get_env("PHX_HOST") || "example.com"
+    socket_options: if(System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: [])
 
   config :backend, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   # Mailer
   config :backend, Backend.Mailer,
     adapter: Swoosh.Adapters.SMTP,
-    relay: System.get_env("SMTP_HOST", "smtp.gmail.com"),
-    port: String.to_integer(System.get_env("SMTP_PORT", "587")),
-    username: System.get_env("SMTP_USER"),
-    password: System.get_env("SMTP_PASS"),
+    relay: smtp_host,
+    port: smtp_port,
+    username: smtp_user,
+    password: smtp_pass,
     ssl: false,
     tls: :always,
     tls_options: [verify: :verify_none],
     auth: :always
 
-  config :backend,
-         :mail_from,
-         System.get_env("MAIL_FROM") || raise("MAIL_FROM env var is missing")
-
   config :swoosh, :api_client, Swoosh.ApiClient.Finch
 
-  if is_nil(System.get_env("FRONTEND_URL")), do: raise("FRONTEND_URL env var is missing")
-
-  config :backend,
-         :abacate_pay_api_key,
-         System.get_env("ABACATE_PAY_API_KEY") || raise("ABACATE_PAY_API_KEY env var is missing")
-
-  config :backend,
-         :abacate_pay_webhook_secret,
-         System.get_env("ABACATE_PAY_WEBHOOK_SECRET") ||
-           raise("ABACATE_PAY_WEBHOOK_SECRET env var is missing")
-
   config :backend, BackendWeb.Endpoint,
-    url: [host: host, port: 443, scheme: "https"],
+    url: [
+      host: System.get_env("PHX_HOST") || "example.com",
+      port: 443,
+      scheme: "https"
+    ],
     http: [
       # Enable IPv6 and bind on all interfaces.
       # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.
