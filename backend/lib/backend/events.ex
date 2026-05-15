@@ -130,7 +130,7 @@ defmodule Backend.Events do
       attrs
       |> Map.put("event_id", event.id)
       |> TicketType.changeset()
-      |> Repo.insert()
+      |> create_with_abacate_product("ticket")
     end
   end
 
@@ -158,7 +158,7 @@ defmodule Backend.Events do
       attrs
       |> Map.put("event_id", event.id)
       |> ExtraItem.changeset()
-      |> Repo.insert()
+      |> create_with_abacate_product("extra")
     end
   end
 
@@ -225,4 +225,25 @@ defmodule Backend.Events do
       {_extra, _event} -> {:error, :forbidden}
     end
   end
+
+  # Inserts `changeset`, creates the matching Abacate Pay product, then writes
+  # the returned `prod_*` id back onto the row. Any failure rolls the row back
+  # so we never leave a record without a paired upstream product.
+  defp create_with_abacate_product(changeset, prefix) do
+    Repo.transaction(fn ->
+      with {:ok, record} <- Repo.insert(changeset),
+           external_id = "#{prefix}_#{record.id}",
+           {:ok, prod_id} <-
+             abacate_pay().create_product(record.name, record.price_cents, external_id),
+           {:ok, record} <-
+             record |> Ecto.Changeset.change(abacate_product_id: prod_id) |> Repo.update() do
+        record
+      else
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+  end
+
+  defp abacate_pay,
+    do: Application.get_env(:backend, :abacate_pay_module, Backend.AbacatePay)
 end

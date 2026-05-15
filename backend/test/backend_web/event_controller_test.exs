@@ -41,7 +41,9 @@ defmodule BackendWeb.EventControllerTest do
 
       Events.create_event(creator, %{"title" => "Draft", "starts_at" => "2027-01-02T00:00:00Z"})
 
-      titles = buyer_conn |> get("/api/v1/events") |> json_response(200) |> Enum.map(& &1["title"])
+      titles =
+        buyer_conn |> get("/api/v1/events") |> json_response(200) |> Enum.map(& &1["title"])
+
       assert "Public" in titles
       refute "Draft" in titles
     end
@@ -59,6 +61,7 @@ defmodule BackendWeb.EventControllerTest do
 
       # A draft owned by someone else must stay hidden.
       {_, other} = authed_conn(build_conn(), "creator")
+
       Events.create_event(other, %{"title" => "OtherDraft", "starts_at" => "2027-02-03T00:00:00Z"})
 
       titles = conn |> get("/api/v1/events") |> json_response(200) |> Enum.map(& &1["title"])
@@ -82,7 +85,9 @@ defmodule BackendWeb.EventControllerTest do
         "starts_at" => "2027-03-02T00:00:00Z"
       })
 
-      titles = admin_conn |> get("/api/v1/events") |> json_response(200) |> Enum.map(& &1["title"])
+      titles =
+        admin_conn |> get("/api/v1/events") |> json_response(200) |> Enum.map(& &1["title"])
+
       assert "AnyPublished" in titles
       assert "AnyDraft" in titles
     end

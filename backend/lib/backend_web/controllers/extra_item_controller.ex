@@ -16,8 +16,11 @@ defmodule BackendWeb.ExtraItemController do
       {:error, :forbidden} ->
         conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
 
-      {:error, changeset} ->
+      {:error, %Ecto.Changeset{} = changeset} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: format_errors(changeset)})
+
+      {:error, reason} ->
+        conn |> put_status(:bad_gateway) |> json(%{error: inspect(reason)})
     end
   end
 

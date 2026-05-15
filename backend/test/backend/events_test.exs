@@ -190,7 +190,7 @@ defmodule Backend.EventsTest do
   # ---------------------------------------------------------------------------
 
   describe "create_ticket_type/3" do
-    test "adds a ticket type to the owner's event" do
+    test "adds a ticket type to the owner's event and attaches an Abacate Pay product id" do
       user = creator_user()
       event = published_event(user)
 
@@ -203,6 +203,7 @@ defmodule Backend.EventsTest do
 
       assert tt.event_id == event.id
       assert tt.quantity_sold == 0
+      assert tt.abacate_product_id == "prod_test_ticket_#{tt.id}"
     end
 
     test "returns forbidden for non-owner" do
@@ -246,7 +247,7 @@ defmodule Backend.EventsTest do
   # ---------------------------------------------------------------------------
 
   describe "create_extra/3" do
-    test "adds an extra to the owner's event" do
+    test "adds an extra to the owner's event and attaches an Abacate Pay product id" do
       user = creator_user()
       event = published_event(user)
 
@@ -258,6 +259,7 @@ defmodule Backend.EventsTest do
 
       assert extra.event_id == event.id
       assert is_nil(extra.quantity_total)
+      assert extra.abacate_product_id == "prod_test_extra_#{extra.id}"
     end
   end
 
