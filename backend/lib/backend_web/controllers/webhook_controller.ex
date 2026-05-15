@@ -52,6 +52,8 @@ defmodule BackendWeb.WebhookController do
     raw_body = Map.get(conn.private, :raw_body, "")
     [received | _] = get_req_header(conn, "x-abacatepay-hmac-sha256") ++ [""]
 
+    Logger.info("Received: #{received}, Secret: #{secret}")
+
     expected =
       :crypto.mac(:hmac, :sha256, secret, raw_body)
       |> Base.encode16(case: :lower)
