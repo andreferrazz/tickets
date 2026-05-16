@@ -15,6 +15,16 @@
 		registerSW({ immediate: true });
 	});
 
+	// Force authed users to complete their profile before navigating anywhere
+	// other than the auth flow. Keys off profile_complete (not abacate_customer_id)
+	// so an Abacate outage doesn't trap users in this redirect.
+	$effect(() => {
+		if (!auth.isAuthed || !auth.user) return;
+		if (auth.user.profile_complete === true) return;
+		if (page.url.pathname.startsWith('/auth/')) return;
+		goto('/auth/profile');
+	});
+
 	async function logout() {
 		try {
 			await api.logout();

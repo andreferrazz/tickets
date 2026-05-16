@@ -32,6 +32,23 @@ export const pt = {
 	'auth.verify.verifying': 'Verificando...',
 	'auth.verify.changeEmail': 'Alterar e-mail',
 	'auth.verify.errorFallback': 'Falha na verificação',
+	'auth.profile.title': 'Complete seu cadastro',
+	'auth.profile.subtitle': 'Precisamos de alguns dados para emitir cobranças no seu nome.',
+	'auth.profile.name': 'Nome completo',
+	'auth.profile.cellphone': 'Celular',
+	'auth.profile.taxId': 'CPF ou CNPJ',
+	'auth.profile.save': 'Salvar e continuar',
+	'auth.profile.saving': 'Salvando...',
+	'auth.profile.errorFallback': 'Falha ao salvar os dados',
+	'auth.profile.errorInvalidData':
+		'Não conseguimos validar seus dados no provedor de pagamento. Verifique CPF/CNPJ e celular, e tente novamente.',
+	'auth.profile.errorUnavailable':
+		'Serviço de pagamento indisponível. Tente novamente em instantes.',
+	'auth.profile.fieldRequired': 'Campo obrigatório.',
+	'auth.profile.fieldTooShort': 'Valor muito curto.',
+	'auth.profile.fieldInvalidTaxId': 'CPF ou CNPJ inválido.',
+	'auth.profile.fieldInvalidCellphone':
+		'Celular inválido. Use um número de celular brasileiro com DDD (ex: 11 99999-9999).',
 	'invite.accepting': 'Ativando seu convite...',
 	'invite.errorTitle': 'Convite inválido',
 	'invite.errorExpired': 'Este convite expirou. Peça um novo ao seu convidante.',

@@ -14,4 +14,12 @@ defmodule Backend.AbacatePayBehaviour do
               completion_url :: String.t()
             ) ::
               {:ok, %{id: String.t(), url: String.t()}} | {:error, any()}
+
+  @callback create_customer(
+              email :: String.t(),
+              name :: String.t(),
+              cellphone :: String.t(),
+              tax_id :: String.t()
+            ) ::
+              {:ok, customer_id :: String.t()} | {:error, any()}
 end

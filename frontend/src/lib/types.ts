@@ -5,7 +5,18 @@ export interface User {
 	email: string;
 	role: Role;
 	invited_by: string | null;
+	name: string | null;
+	cellphone: string | null;
+	tax_id: string | null;
+	abacate_customer_id: string | null;
+	profile_complete: boolean;
 	created_at: string;
+}
+
+export interface ProfileUpdate {
+	name: string;
+	cellphone: string;
+	tax_id: string;
 }
 
 export interface Event {

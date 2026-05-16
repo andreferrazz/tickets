@@ -9,4 +9,8 @@ defmodule Backend.AbacatePayFailingMock do
   @impl Backend.AbacatePayBehaviour
   def create_checkout(_items, _return_url, _completion_url),
     do: {:error, :abacate_unavailable}
+
+  @impl Backend.AbacatePayBehaviour
+  def create_customer(_email, _name, _cellphone, _tax_id),
+    do: {:error, :abacate_unavailable}
 end

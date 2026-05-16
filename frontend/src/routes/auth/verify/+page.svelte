@@ -24,9 +24,15 @@
 			const res = await api.verifyCode(email, code);
 			auth.set(res.token, res.user);
 			sessionStorage.removeItem('tickets.pending_email');
-			const next = safeNext(sessionStorage.getItem('tickets.pending_next'));
-			sessionStorage.removeItem('tickets.pending_next');
-			await goto(next ?? '/');
+
+			if (!res.user.profile_complete) {
+				// Keep tickets.pending_next around so /auth/profile can consume it after save.
+				await goto('/auth/profile');
+			} else {
+				const next = safeNext(sessionStorage.getItem('tickets.pending_next'));
+				sessionStorage.removeItem('tickets.pending_next');
+				await goto(next ?? '/');
+			}
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : t('auth.verify.errorFallback');
 		} finally {

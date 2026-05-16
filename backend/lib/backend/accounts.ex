@@ -7,6 +7,7 @@ defmodule Backend.Accounts do
   """
 
   import Ecto.Query
+  require Logger
   alias Backend.Repo
   alias Backend.Accounts.{AuthCode, Session, User}
   alias Backend.Mailer
@@ -154,6 +155,52 @@ defmodule Backend.Accounts do
   end
 
   defp maybe_promote_to_creator(user), do: {:ok, user}
+
+  # ---------------------------------------------------------------------------
+  # Profile completion + Abacate Pay customer
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Registers the user as an Abacate Pay customer and persists all four fields
+  (name, cellphone, tax_id, abacate_customer_id) in a single update.
+
+  Validates input first via `User.profile_changeset/2` without touching the DB.
+  Only writes to the row when Abacate Pay returns `{:ok, cust_id}`. On failure
+  nothing is persisted — the caller is expected to surface the error and retry.
+
+  Returns:
+    * `{:ok, user}` on success.
+    * `{:error, %Ecto.Changeset{}}` when local validation fails.
+    * `{:error, :invalid_profile_data}` when Abacate Pay rejects the data (4xx).
+    * `{:error, :abacate_unavailable}` for transport or upstream 5xx failures.
+  """
+  def complete_profile(%User{} = user, attrs) do
+    changeset = User.profile_changeset(user, attrs)
+
+    with {:ok, profile} <- Ecto.Changeset.apply_action(changeset, :update),
+         {:ok, cust_id} <- create_abacate_customer(user.email, profile) do
+      changeset
+      |> Ecto.Changeset.put_change(:abacate_customer_id, cust_id)
+      |> Repo.update()
+    end
+  end
+
+  defp create_abacate_customer(email, %{name: name, cellphone: cellphone, tax_id: tax_id}) do
+    case abacate_pay().create_customer(email, name, cellphone, tax_id) do
+      {:ok, id} ->
+        {:ok, id}
+
+      {:error, reason} ->
+        Logger.warning("abacate customer create failed reason=#{inspect(reason)}")
+        {:error, classify_abacate_error(reason)}
+    end
+  end
+
+  defp classify_abacate_error({:invalid_data, _status, _msg}), do: :invalid_profile_data
+  defp classify_abacate_error(_other), do: :abacate_unavailable
+
+  defp abacate_pay,
+    do: Application.get_env(:backend, :abacate_pay_module, Backend.AbacatePay)
 
   # ---------------------------------------------------------------------------
   # Invitation acceptance (token link flow)

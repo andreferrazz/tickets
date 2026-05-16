@@ -41,6 +41,31 @@ defmodule Backend.AbacatePay do
   end
 
   @doc """
+  Creates a customer in Abacate Pay. Customers are unique per CPF/CNPJ;
+  Abacate returns the existing one when the `taxId` already exists.
+
+  Returns `{:ok, cust_id}`.
+  """
+  @impl Backend.AbacatePayBehaviour
+  def create_customer(email, name, cellphone, tax_id) do
+    body = %{email: email, name: name, cellphone: cellphone, taxId: tax_id}
+
+    case Req.post("#{@base_url}/customers/create", json: body, headers: [auth_header()]) do
+      {:ok, %{status: status, body: %{"data" => %{"id" => id}}}} when status in 200..201 ->
+        {:ok, id}
+
+      {:ok, %{status: status, body: %{"error" => msg}}} when status in 400..499 ->
+        {:error, {:invalid_data, status, msg}}
+
+      {:ok, %{status: status, body: body}} ->
+        {:error, {:upstream, status, body}}
+
+      {:error, reason} ->
+        {:error, {:transport, reason}}
+    end
+  end
+
+  @doc """
   Creates a checkout session with the given product items.
 
   Returns `{:ok, %{id: bill_id, url: payment_url}}`.

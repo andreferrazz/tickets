@@ -37,6 +37,13 @@ class AuthStore {
 		if (browser) localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user }));
 	}
 
+	setUser(user: User): void {
+		this.user = user;
+		if (browser && this.token) {
+			localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: this.token, user }));
+		}
+	}
+
 	clear(): void {
 		this.token = null;
 		this.user = null;

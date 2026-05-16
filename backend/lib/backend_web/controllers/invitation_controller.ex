@@ -31,7 +31,7 @@ defmodule BackendWeb.InvitationController do
   def accept(conn, %{"token" => token}) do
     case Invitations.accept_invitation(token) do
       {:ok, %{token: session_token, user: user}} ->
-        json(conn, %{token: session_token, user: user_json(user)})
+        json(conn, %{token: session_token, user: BackendWeb.UserController.user_json(user)})
 
       {:error, reason} when reason in [:invalid_token, :expired, :already_accepted] ->
         conn
@@ -56,16 +56,6 @@ defmodule BackendWeb.InvitationController do
       email: inv.email,
       status: inv.status,
       created_at: inv.inserted_at
-    }
-  end
-
-  defp user_json(user) do
-    %{
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      invited_by: user.invited_by,
-      created_at: user.inserted_at
     }
   end
 

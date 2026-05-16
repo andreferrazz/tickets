@@ -7,6 +7,7 @@ import type {
 	ExtraItem,
 	Invitation,
 	Order,
+	ProfileUpdate,
 	TicketType,
 	User,
 	CartLine
@@ -23,8 +24,14 @@ interface FetchOptions {
 	fetcher?: typeof fetch;
 }
 
+export type FieldErrors = Record<string, string[]>;
+
 export class ApiError extends Error {
-	constructor(public status: number, message: string) {
+	constructor(
+		public status: number,
+		message: string,
+		public fieldErrors?: FieldErrors
+	) {
 		super(message);
 	}
 }
@@ -41,17 +48,24 @@ async function request<T>(path: string, opts: FetchOptions = {}): Promise<T> {
 	});
 	if (!res.ok) {
 		let msg = `${res.status}`;
+		let fieldErrors: FieldErrors | undefined;
 		try {
 			const data = (await res.json()) as {
-				error?: string;
+				error?: string | FieldErrors;
 				errors?: { detail?: string };
 			};
-			if (data.error) msg = data.error;
-			else if (data.errors?.detail) msg = data.errors.detail;
+			if (typeof data.error === 'string') {
+				msg = data.error;
+			} else if (data.error && typeof data.error === 'object') {
+				msg = 'validation_failed';
+				fieldErrors = data.error;
+			} else if (data.errors?.detail) {
+				msg = data.errors.detail;
+			}
 		} catch {
 			/* noop */
 		}
-		throw new ApiError(res.status, msg);
+		throw new ApiError(res.status, msg, fieldErrors);
 	}
 	if (res.status === 204) return undefined as T;
 	return (await res.json()) as T;
@@ -67,6 +81,8 @@ export const api = {
 		request<AuthResponse>('/auth/verify-code', { method: 'POST', body: { email, code } }),
 	logout: () => request<{ logged_out: boolean }>('/auth/logout', { method: 'DELETE' }),
 	me: (fetcher?: typeof fetch) => request<User>('/me', { fetcher }),
+	updateProfile: (body: ProfileUpdate) =>
+		request<User>('/me/profile', { method: 'PATCH', body }),
 	listEvents: (fetcher?: typeof fetch) => request<Event[]>('/events', { fetcher }),
 	getEvent: (id: string, fetcher?: typeof fetch) =>
 		request<EventDetail>(`/events/${id}`, { fetcher }),

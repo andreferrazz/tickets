@@ -32,7 +32,7 @@ defmodule BackendWeb.AuthController do
   def verify_code(conn, %{"email" => email, "code" => code}) do
     case Accounts.verify_code(email, code) do
       {:ok, %{token: token, user: user}} ->
-        json(conn, %{token: token, user: user_json(user)})
+        json(conn, %{token: token, user: BackendWeb.UserController.user_json(user)})
 
       {:error, :invalid_or_expired_code} ->
         conn
@@ -62,15 +62,5 @@ defmodule BackendWeb.AuthController do
 
   defp bad_request(conn, msg) do
     conn |> put_status(:bad_request) |> json(%{error: msg})
-  end
-
-  defp user_json(user) do
-    %{
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      invited_by: user.invited_by,
-      created_at: user.inserted_at
-    }
   end
 end

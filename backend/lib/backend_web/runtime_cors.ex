@@ -14,7 +14,7 @@ defmodule BackendWeb.RuntimeCors do
       Corsica.init(
         origins: origins,
         allow_headers: ["content-type", "authorization"],
-        allow_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_credentials: false
       )
 

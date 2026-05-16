@@ -12,4 +12,9 @@ defmodule Backend.AbacatePayMock do
   def create_checkout(_items, _return_url, completion_url) do
     {:ok, %{id: "bill_test_#{:rand.uniform(99_999)}", url: completion_url}}
   end
+
+  @impl Backend.AbacatePayBehaviour
+  def create_customer(_email, _name, _cellphone, tax_id) do
+    {:ok, "cust_test_#{tax_id}"}
+  end
 end
