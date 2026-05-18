@@ -122,16 +122,22 @@ defmodule BackendWeb.EventControllerTest do
           "status" => "published"
         })
 
-      Events.create_ticket_type(user, event.id, %{
-        "name" => "VIP",
-        "price_cents" => 10_000,
-        "quantity_total" => 50
-      })
+      {:ok, tt} = Events.create_ticket_type(user, event.id, %{"name" => "VIP"})
+
+      {:ok, _batch} =
+        Events.create_batch(user, tt.id, %{"price_cents" => 10_000, "quantity_total" => 50})
 
       conn = get(conn, "/api/v1/events/#{event.id}")
       resp = json_response(conn, 200)
       assert resp["title"] == "Detail"
-      assert [%{"name" => "VIP"}] = resp["ticket_types"]
+
+      assert [
+               %{
+                 "name" => "VIP",
+                 "active_batch" => %{"label" => "Lote 1", "price_cents" => 10_000}
+               }
+             ] = resp["ticket_types"]
+
       assert [%{"title" => "Addons", "extras" => []}] = resp["extra_sections"]
     end
 

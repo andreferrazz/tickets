@@ -8,6 +8,9 @@ defmodule Backend.Orders.OrderItem do
   schema "order_items" do
     field :item_type, :string
     field :item_id, :binary_id
+    # Present on ticket lines; the specific batch reserved at order time.
+    # Null on extras and on rows written before batches existed.
+    field :batch_id, :binary_id
     field :item_name, :string
     field :quantity, :integer, default: 1
     field :unit_price_cents, :integer
@@ -19,7 +22,15 @@ defmodule Backend.Orders.OrderItem do
 
   def changeset(attrs) do
     %__MODULE__{}
-    |> cast(attrs, [:order_id, :item_type, :item_id, :item_name, :quantity, :unit_price_cents])
+    |> cast(attrs, [
+      :order_id,
+      :item_type,
+      :item_id,
+      :batch_id,
+      :item_name,
+      :quantity,
+      :unit_price_cents
+    ])
     |> validate_required([
       :order_id,
       :item_type,

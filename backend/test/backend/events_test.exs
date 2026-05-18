@@ -191,20 +191,14 @@ defmodule Backend.EventsTest do
   # ---------------------------------------------------------------------------
 
   describe "create_ticket_type/3" do
-    test "adds a ticket type to the owner's event and attaches an Abacate Pay product id" do
+    test "adds a ticket type to the owner's event" do
       user = creator_user()
       event = published_event(user)
 
-      assert {:ok, tt} =
-               Events.create_ticket_type(user, event.id, %{
-                 "name" => "General",
-                 "price_cents" => 2000,
-                 "quantity_total" => 200
-               })
+      assert {:ok, tt} = Events.create_ticket_type(user, event.id, %{"name" => "General"})
 
       assert tt.event_id == event.id
-      assert tt.quantity_sold == 0
-      assert tt.abacate_product_id == "prod_test_ticket_#{tt.id}"
+      assert tt.name == "General"
     end
 
     test "returns forbidden for non-owner" do
@@ -213,11 +207,95 @@ defmodule Backend.EventsTest do
       event = published_event(creator)
 
       assert {:error, :forbidden} =
-               Events.create_ticket_type(other, event.id, %{
-                 "name" => "Hack",
-                 "price_cents" => 0,
-                 "quantity_total" => 1
+               Events.create_ticket_type(other, event.id, %{"name" => "Hack"})
+    end
+  end
+
+  describe "create_batch/3" do
+    test "creates batches in sequence with their own Abacate Pay product" do
+      user = creator_user()
+      event = published_event(user)
+      {:ok, tt} = Events.create_ticket_type(user, event.id, %{"name" => "VIP"})
+
+      assert {:ok, b1} =
+               Events.create_batch(user, tt.id, %{
+                 "price_cents" => 5000,
+                 "quantity_total" => 10
                })
+
+      assert {:ok, b2} =
+               Events.create_batch(user, tt.id, %{
+                 "price_cents" => 7000,
+                 "quantity_total" => 5
+               })
+
+      assert b1.sequence == 1
+      assert b2.sequence == 2
+      assert b1.abacate_product_id == "prod_test_batch_#{b1.id}"
+      assert b2.abacate_product_id == "prod_test_batch_#{b2.id}"
+    end
+
+    test "returns forbidden for a ticket type the user doesn't own" do
+      creator = creator_user()
+      other = buyer_user()
+      event = published_event(creator)
+      {:ok, tt} = Events.create_ticket_type(creator, event.id, %{"name" => "VIP"})
+
+      assert {:error, :forbidden} =
+               Events.create_batch(other, tt.id, %{"price_cents" => 1000, "quantity_total" => 1})
+    end
+  end
+
+  describe "close_batch/2 and active_batch/1" do
+    test "close advances the active batch to the next sequence" do
+      user = creator_user()
+      event = published_event(user)
+      {:ok, tt} = Events.create_ticket_type(user, event.id, %{"name" => "VIP"})
+
+      {:ok, b1} =
+        Events.create_batch(user, tt.id, %{"price_cents" => 100, "quantity_total" => 10})
+
+      {:ok, b2} =
+        Events.create_batch(user, tt.id, %{"price_cents" => 200, "quantity_total" => 10})
+
+      assert Events.active_batch(tt).id == b1.id
+
+      {:ok, closed} = Events.close_batch(user, b1.id)
+      refute is_nil(closed.closed_at)
+      refute closed.auto_closed
+
+      assert Events.active_batch(tt).id == b2.id
+    end
+  end
+
+  describe "delete_batch/2" do
+    test "deletes a batch with no sales" do
+      user = creator_user()
+      event = published_event(user)
+      {:ok, tt} = Events.create_ticket_type(user, event.id, %{"name" => "VIP"})
+
+      {:ok, b} =
+        Events.create_batch(user, tt.id, %{"price_cents" => 100, "quantity_total" => 10})
+
+      assert {:ok, _} = Events.delete_batch(user, b.id)
+      assert is_nil(Repo.get(Backend.Events.TicketBatch, b.id))
+    end
+
+    test "refuses to delete a batch with sales" do
+      user = creator_user()
+      event = published_event(user)
+      {:ok, tt} = Events.create_ticket_type(user, event.id, %{"name" => "VIP"})
+
+      {:ok, b} =
+        Events.create_batch(user, tt.id, %{"price_cents" => 100, "quantity_total" => 10})
+
+      # Simulate a sale by bumping quantity_sold directly.
+      Repo.update_all(
+        from(x in Backend.Events.TicketBatch, where: x.id == ^b.id),
+        inc: [quantity_sold: 1]
+      )
+
+      assert {:error, :batch_has_sales} = Events.delete_batch(user, b.id)
     end
   end
 

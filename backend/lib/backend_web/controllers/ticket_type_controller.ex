@@ -8,7 +8,9 @@ defmodule BackendWeb.TicketTypeController do
   def create(conn, %{"event_id" => event_id} = params) do
     case Events.create_ticket_type(conn.assigns.current_user, event_id, params) do
       {:ok, tt} ->
-        conn |> put_status(:created) |> json(EventController.ticket_type_json(tt))
+        conn
+        |> put_status(:created)
+        |> json(EventController.ticket_type_json(Events.get_ticket_type(tt.id)))
 
       {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "event not found"})
@@ -28,7 +30,7 @@ defmodule BackendWeb.TicketTypeController do
   def update(conn, %{"id" => id} = params) do
     case Events.update_ticket_type(conn.assigns.current_user, id, params) do
       {:ok, tt} ->
-        json(conn, EventController.ticket_type_json(tt))
+        json(conn, EventController.ticket_type_json(Events.get_ticket_type(tt.id)))
 
       {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "ticket type not found"})

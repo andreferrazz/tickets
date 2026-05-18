@@ -110,18 +110,40 @@ defmodule BackendWeb.EventController do
   end
 
   def ticket_type_json(tt) do
+    batches = ordered_batches(tt)
+    active = Enum.find(batches, &is_nil(&1.closed_at))
+
     %{
       id: tt.id,
       event_id: tt.event_id,
       name: tt.name,
       description: tt.description,
-      price_cents: tt.price_cents,
-      quantity_total: tt.quantity_total,
-      quantity_sold: tt.quantity_sold,
       sales_start: tt.sales_start,
-      sales_end: tt.sales_end
+      sales_end: tt.sales_end,
+      active_batch: if(active, do: batch_json(active), else: nil),
+      batches: Enum.map(batches, &batch_json/1)
     }
   end
+
+  def batch_json(b) do
+    %{
+      id: b.id,
+      ticket_type_id: b.ticket_type_id,
+      sequence: b.sequence,
+      label: "Lote #{b.sequence}",
+      price_cents: b.price_cents,
+      quantity_total: b.quantity_total,
+      quantity_sold: b.quantity_sold,
+      closed_at: b.closed_at
+    }
+  end
+
+  defp ordered_batches(%{batches: %Ecto.Association.NotLoaded{}}), do: []
+
+  defp ordered_batches(%{batches: batches}) when is_list(batches),
+    do: Enum.sort_by(batches, & &1.sequence)
+
+  defp ordered_batches(_), do: []
 
   def extra_json(ex) do
     %{

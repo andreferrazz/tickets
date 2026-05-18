@@ -2,6 +2,7 @@ import { PUBLIC_API_URL } from '$env/static/public';
 import { auth } from '$lib/stores/auth.svelte';
 import type {
 	AuthResponse,
+	Batch,
 	Event,
 	EventDetail,
 	ExtraItem,
@@ -92,12 +93,18 @@ export const api = {
 	updateEvent: (id: string, body: Partial<Event>) =>
 		request<Event>(`/events/${id}`, { method: 'PUT', body }),
 	deleteEvent: (id: string) => request<{ deleted: true }>(`/events/${id}`, { method: 'DELETE' }),
-	createTicketType: (eventId: string, body: Partial<TicketType>) =>
+	createTicketType: (eventId: string, body: Pick<TicketType, 'name'> & Partial<TicketType>) =>
 		request<TicketType>(`/events/${eventId}/ticket-types`, { method: 'POST', body }),
 	updateTicketType: (id: string, body: Partial<TicketType>) =>
 		request<TicketType>(`/ticket-types/${id}`, { method: 'PUT', body }),
 	deleteTicketType: (id: string) =>
 		request<{ deleted: true }>(`/ticket-types/${id}`, { method: 'DELETE' }),
+	createBatch: (ticketTypeId: string, body: Pick<Batch, 'price_cents' | 'quantity_total'>) =>
+		request<Batch>(`/ticket-types/${ticketTypeId}/batches`, { method: 'POST', body }),
+	updateBatch: (id: string, body: Partial<Pick<Batch, 'price_cents' | 'quantity_total'>>) =>
+		request<Batch>(`/batches/${id}`, { method: 'PUT', body }),
+	closeBatch: (id: string) => request<Batch>(`/batches/${id}/close`, { method: 'POST', body: {} }),
+	deleteBatch: (id: string) => request<{ deleted: true }>(`/batches/${id}`, { method: 'DELETE' }),
 	createExtra: (eventId: string, body: Partial<ExtraItem> & { section_id: string }) =>
 		request<ExtraItem>(`/events/${eventId}/extras`, { method: 'POST', body }),
 	updateExtra: (id: string, body: Partial<ExtraItem>) =>

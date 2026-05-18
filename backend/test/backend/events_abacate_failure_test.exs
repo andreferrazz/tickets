@@ -5,7 +5,7 @@ defmodule Backend.EventsAbacateFailureTest do
 
   alias Backend.Accounts
   alias Backend.Events
-  alias Backend.Events.{ExtraItem, TicketType}
+  alias Backend.Events.{ExtraItem, TicketBatch}
 
   setup do
     original = Application.get_env(:backend, :abacate_pay_module)
@@ -44,18 +44,27 @@ defmodule Backend.EventsAbacateFailureTest do
       assert Repo.aggregate(from(ex in ExtraItem, where: ex.event_id == ^event.id), :count) == 0
     end
 
-    test "create_ticket_type/3 rolls back and persists no row" do
+    test "create_batch/3 rolls back and persists no batch row" do
       user = creator_user()
       event = published_event(user)
 
+      # create_ticket_type no longer talks to Abacate; only batches do. We need
+      # a real ticket type first since batches belong to one.
+      original = Application.get_env(:backend, :abacate_pay_module)
+      Application.put_env(:backend, :abacate_pay_module, Backend.AbacatePayMock)
+      {:ok, tt} = Events.create_ticket_type(user, event.id, %{"name" => "VIP"})
+      Application.put_env(:backend, :abacate_pay_module, original)
+
       assert {:error, :abacate_unavailable} =
-               Events.create_ticket_type(user, event.id, %{
-                 "name" => "VIP",
+               Events.create_batch(user, tt.id, %{
                  "price_cents" => 9999,
                  "quantity_total" => 10
                })
 
-      assert Repo.aggregate(from(tt in TicketType, where: tt.event_id == ^event.id), :count) == 0
+      assert Repo.aggregate(
+               from(b in TicketBatch, where: b.ticket_type_id == ^tt.id),
+               :count
+             ) == 0
     end
   end
 end

@@ -129,6 +129,18 @@ export const pt = {
 	'eventEdit.deleteSectionError': 'Falha ao excluir seção',
 	'eventEdit.sectionNotEmpty': 'Remova os complementos da seção antes de excluí-la.',
 	'eventEdit.saveSectionError': 'Falha ao salvar seção',
+	'eventEdit.batches': 'Lotes',
+	'eventEdit.addBatch': 'Adicionar lote',
+	'eventEdit.closeBatch': 'Encerrar lote',
+	'eventEdit.batchClosed': 'Encerrado',
+	'eventEdit.batchActive': 'Ativo',
+	'eventEdit.batchUpcoming': 'Próximo',
+	'eventEdit.confirmCloseBatch': 'Encerrar {label} agora? O próximo lote começa a vender.',
+	'eventEdit.confirmDeleteBatch': 'Excluir {label}?',
+	'eventEdit.closeBatchError': 'Falha ao encerrar lote',
+	'eventEdit.saveBatchError': 'Falha ao salvar lote',
+	'eventEdit.deleteBatchError': 'Falha ao excluir lote',
+	'eventEdit.batchHasSales': 'Não é possível excluir um lote com vendas.',
 
 	// Orders
 	'orders.title': 'Meus pedidos',

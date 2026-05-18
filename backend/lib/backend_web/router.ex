@@ -59,6 +59,10 @@ defmodule BackendWeb.Router do
     put "/ticket-types/:id", TicketTypeController, :update
     delete "/ticket-types/:id", TicketTypeController, :delete
 
+    put "/batches/:id", TicketBatchController, :update
+    post "/batches/:id/close", TicketBatchController, :close
+    delete "/batches/:id", TicketBatchController, :delete
+
     put "/extras/:id", ExtraItemController, :update
     delete "/extras/:id", ExtraItemController, :delete
 
@@ -81,6 +85,7 @@ defmodule BackendWeb.Router do
 
     post "/events", EventController, :create
     post "/events/:event_id/ticket-types", TicketTypeController, :create
+    post "/ticket-types/:ticket_type_id/batches", TicketBatchController, :create
     post "/events/:event_id/extras", ExtraItemController, :create
     post "/events/:event_id/extra-sections", ExtraItemSectionController, :create
   end

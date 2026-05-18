@@ -29,12 +29,10 @@ defmodule BackendWeb.PassControllerTest do
         "status" => "published"
       })
 
-    {:ok, tt} =
-      Events.create_ticket_type(creator, event.id, %{
-        "name" => "GA",
-        "price_cents" => 1000,
-        "quantity_total" => 10
-      })
+    {:ok, tt} = Events.create_ticket_type(creator, event.id, %{"name" => "GA"})
+
+    {:ok, _batch} =
+      Events.create_batch(creator, tt.id, %{"price_cents" => 1000, "quantity_total" => 10})
 
     buyer_email = "buyer_#{:rand.uniform(999_999)}@pass_ctrl.test"
     {:ok, code} = Accounts.request_code(buyer_email)

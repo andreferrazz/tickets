@@ -37,7 +37,10 @@
 	const total = $derived.by(() => {
 		if (!event) return 0;
 		let sum = 0;
-		for (const t of event.ticket_types) sum += (qty[`t:${t.id}`] ?? 0) * t.price_cents;
+		for (const tk of event.ticket_types) {
+			const price = tk.active_batch?.price_cents ?? 0;
+			sum += (qty[`t:${tk.id}`] ?? 0) * price;
+		}
 		for (const x of allExtras) sum += (qty[`x:${x.id}`] ?? 0) * x.price_cents;
 		return sum;
 	});
@@ -112,28 +115,44 @@
 			<section class="stack">
 				<h2>{t('event.tickets')}</h2>
 				{#each event.ticket_types as tk (tk.id)}
-					{@const remaining = tk.quantity_total - tk.quantity_sold}
-					<div class="line">
-						<div>
+					{@const active = tk.active_batch}
+					{@const visibleBatches = tk.batches.filter(
+						(b) => b.closed_at !== null || b.id === active?.id
+					)}
+					{@const remaining = active ? active.quantity_total - active.quantity_sold : 0}
+					<div class="ticket-group">
+						<div class="ticket-head">
 							<strong>{tk.name}</strong>
-							<div class="muted small">{tk.description}</div>
-							<div class="muted small">
-								{formatBRL(tk.price_cents)}
-							</div>
+							{#if tk.description}
+								<div class="muted small">{tk.description}</div>
+							{/if}
 						</div>
-						{#if remaining <= 0}
-							<span class="badge sold-out">{t('event.soldOut')}</span>
-						{:else}
-							<div class="qty">
-								<button class="secondary small" onclick={() => bump(`t:${tk.id}`, -1, remaining)}
-									>−</button
-								>
-								<span>{qty[`t:${tk.id}`] ?? 0}</span>
-								<button class="secondary small" onclick={() => bump(`t:${tk.id}`, 1, remaining)}
-									>+</button
-								>
+						{#each visibleBatches as b (b.id)}
+							{@const isActive = b.id === active?.id}
+							<div class="line batch-line">
+								<div>
+									<span class="badge">{b.label}</span>
+									<span class="muted small">{formatBRL(b.price_cents)}</span>
+								</div>
+								{#if !isActive || remaining <= 0}
+									<span class="badge sold-out">{t('event.soldOut')}</span>
+								{:else}
+									<div class="qty">
+										<button
+											class="secondary small"
+											onclick={() => bump(`t:${tk.id}`, -1, remaining)}>−</button
+										>
+										<span>{qty[`t:${tk.id}`] ?? 0}</span>
+										<button
+											class="secondary small"
+											onclick={() => bump(`t:${tk.id}`, 1, remaining)}>+</button
+										>
+									</div>
+								{/if}
 							</div>
-						{/if}
+						{:else}
+							<div class="line"><span class="badge sold-out">{t('event.soldOut')}</span></div>
+						{/each}
 					</div>
 				{:else}
 					<p class="muted">{t('event.noTickets')}</p>
@@ -184,10 +203,10 @@
 					<ul class="lines">
 						{#each event.ticket_types as tk (tk.id)}
 							{@const q = qty[`t:${tk.id}`] ?? 0}
-							{#if q > 0}
+							{#if q > 0 && tk.active_batch}
 								<li>
-									<span>{tk.name} × {q}</span>
-									<span>{formatBRL(tk.price_cents * q)}</span>
+									<span>{tk.name} ({tk.active_batch.label}) × {q}</span>
+									<span>{formatBRL(tk.active_batch.price_cents * q)}</span>
 								</li>
 							{/if}
 						{/each}
@@ -258,6 +277,16 @@
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
+	}
+	.ticket-group {
+		display: grid;
+		gap: 0.4rem;
+	}
+	.ticket-head {
+		padding: 0 0.25rem;
+	}
+	.batch-line {
+		padding: 0.5rem 0.75rem;
 	}
 	.small {
 		font-size: 0.85rem;

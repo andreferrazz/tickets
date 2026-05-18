@@ -33,16 +33,26 @@ export interface Event {
 	updated_at: string;
 }
 
+export interface Batch {
+	id: string;
+	ticket_type_id: string;
+	sequence: number;
+	label: string;
+	price_cents: number;
+	quantity_total: number;
+	quantity_sold: number;
+	closed_at: string | null;
+}
+
 export interface TicketType {
 	id: string;
 	event_id: string;
 	name: string;
 	description: string;
-	price_cents: number;
-	quantity_total: number;
-	quantity_sold: number;
 	sales_start: string | null;
 	sales_end: string | null;
+	active_batch: Batch | null;
+	batches: Batch[];
 }
 
 export interface ExtraItem {

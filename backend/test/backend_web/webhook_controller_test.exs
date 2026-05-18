@@ -73,7 +73,12 @@ defmodule BackendWeb.WebhookControllerTest do
     test "issues passes and sends tickets + extras emails", %{conn: conn} do
       {buyer, order} = paid_order_with_extras(ticket_qty: 3)
       drain_mailbox()
-      body = Jason.encode!(%{event: "checkout.completed", data: %{checkout: %{id: order.abacate_checkout_id}}})
+
+      body =
+        Jason.encode!(%{
+          event: "checkout.completed",
+          data: %{checkout: %{id: order.abacate_checkout_id}}
+        })
 
       conn = post_webhook(conn, body)
       assert json_response(conn, 200) == %{"ok" => true}
@@ -89,7 +94,12 @@ defmodule BackendWeb.WebhookControllerTest do
          %{conn: conn} do
       {buyer, order} = paid_order_with_extras(ticket_qty: 2)
       drain_mailbox()
-      body = Jason.encode!(%{event: "checkout.completed", data: %{checkout: %{id: order.abacate_checkout_id}}})
+
+      body =
+        Jason.encode!(%{
+          event: "checkout.completed",
+          data: %{checkout: %{id: order.abacate_checkout_id}}
+        })
 
       _ = post_webhook(conn, body)
       assert Repo.aggregate(from(p in Pass, where: p.order_id == ^order.id), :count) == 3
@@ -142,12 +152,10 @@ defmodule BackendWeb.WebhookControllerTest do
         "status" => "published"
       })
 
-    {:ok, tt} =
-      Events.create_ticket_type(creator, event.id, %{
-        "name" => "GA",
-        "price_cents" => 2000,
-        "quantity_total" => 100
-      })
+    {:ok, tt} = Events.create_ticket_type(creator, event.id, %{"name" => "GA"})
+
+    {:ok, _batch} =
+      Events.create_batch(creator, tt.id, %{"price_cents" => 2000, "quantity_total" => 100})
 
     {:ok, section} = Events.create_section(creator, event.id, %{"title" => "Add-ons"})
 

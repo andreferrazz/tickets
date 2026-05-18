@@ -36,12 +36,10 @@ defmodule BackendWeb.OrderControllerTest do
         "status" => "published"
       })
 
-    {:ok, tt} =
-      Events.create_ticket_type(creator, event.id, %{
-        "name" => "Standard",
-        "price_cents" => 3000,
-        "quantity_total" => 50
-      })
+    {:ok, tt} = Events.create_ticket_type(creator, event.id, %{"name" => "Standard"})
+
+    {:ok, _batch} =
+      Events.create_batch(creator, tt.id, %{"price_cents" => 3000, "quantity_total" => 50})
 
     {event, tt}
   end

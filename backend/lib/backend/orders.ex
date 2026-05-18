@@ -8,7 +8,8 @@ defmodule Backend.Orders do
 
   import Ecto.Query
   alias Backend.Repo
-  alias Backend.Events.{Event, ExtraItem, TicketType}
+  alias Backend.Events
+  alias Backend.Events.{Event, ExtraItem, TicketBatch}
   alias Backend.Orders.{Order, OrderItem}
 
   # ---------------------------------------------------------------------------
@@ -202,12 +203,14 @@ defmodule Backend.Orders do
 
   defp resolve_line(event, %{"item_type" => "ticket", "item_id" => id, "quantity" => qty})
        when is_integer(qty) and qty > 0 do
-    tt = Repo.one(from(t in TicketType, where: t.id == ^id and is_nil(t.deleted_at)))
+    tt = Events.get_ticket_type(id)
 
     cond do
-      is_nil(tt) or tt.event_id != event.id -> {:error, {:invalid_item, id}}
-      tt.quantity_total - tt.quantity_sold < qty -> {:error, {:out_of_stock, tt.name}}
-      true -> {:ok, %{type: "ticket", record: tt, quantity: qty}}
+      is_nil(tt) or tt.event_id != event.id ->
+        {:error, {:invalid_item, id}}
+
+      true ->
+        resolve_ticket_batch(tt, qty)
     end
   end
 
@@ -223,16 +226,46 @@ defmodule Backend.Orders do
         {:error, {:out_of_stock, ex.name}}
 
       true ->
-        {:ok, %{type: "extra", record: ex, quantity: qty}}
+        {:ok,
+         %{
+           type: "extra",
+           item_id: ex.id,
+           batch_id: nil,
+           name: ex.name,
+           price_cents: ex.price_cents,
+           abacate_product_id: ex.abacate_product_id,
+           quantity: qty
+         }}
     end
   end
 
   defp resolve_line(_event, line), do: {:error, {:invalid_line, inspect(line)}}
 
+  defp resolve_ticket_batch(tt, qty) do
+    case Events.active_batch(tt) do
+      nil ->
+        {:error, {:out_of_stock, tt.name}}
+
+      batch ->
+        if batch.quantity_total - batch.quantity_sold < qty do
+          {:error, {:out_of_stock, tt.name}}
+        else
+          {:ok,
+           %{
+             type: "ticket",
+             item_id: tt.id,
+             batch_id: batch.id,
+             name: tt.name,
+             price_cents: batch.price_cents,
+             abacate_product_id: batch.abacate_product_id,
+             quantity: qty
+           }}
+        end
+    end
+  end
+
   defp compute_total(line_items) do
-    Enum.reduce(line_items, 0, fn %{record: r, quantity: q}, acc ->
-      acc + r.price_cents * q
-    end)
+    Enum.reduce(line_items, 0, fn %{price_cents: p, quantity: q}, acc -> acc + p * q end)
   end
 
   defp reserve_order(user, event, total, line_items) do
@@ -242,30 +275,44 @@ defmodule Backend.Orders do
         |> Order.changeset()
         |> Repo.insert!()
 
-      Enum.each(line_items, fn %{type: type, record: r, quantity: qty} ->
+      Enum.each(line_items, fn line ->
         %{
           "order_id" => order.id,
-          "item_type" => type,
-          "item_id" => r.id,
-          "item_name" => r.name,
-          "quantity" => qty,
-          "unit_price_cents" => r.price_cents
+          "item_type" => line.type,
+          "item_id" => line.item_id,
+          "batch_id" => line.batch_id,
+          "item_name" => line.name,
+          "quantity" => line.quantity,
+          "unit_price_cents" => line.price_cents
         }
         |> OrderItem.changeset()
         |> Repo.insert!()
 
-        increment_sold(type, r.id, qty)
+        increment_sold(line)
       end)
 
       order
     end)
   end
 
-  defp increment_sold("ticket", id, qty) do
-    Repo.update_all(from(tt in TicketType, where: tt.id == ^id), inc: [quantity_sold: qty])
+  defp increment_sold(%{type: "ticket", batch_id: batch_id, quantity: qty}) do
+    {1, [batch]} =
+      Repo.update_all(
+        from(b in TicketBatch, where: b.id == ^batch_id, select: b),
+        inc: [quantity_sold: qty]
+      )
+
+    if batch.quantity_sold >= batch.quantity_total and is_nil(batch.closed_at) do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      Repo.update_all(
+        from(b in TicketBatch, where: b.id == ^batch_id),
+        set: [closed_at: now, auto_closed: true]
+      )
+    end
   end
 
-  defp increment_sold("extra", id, qty) do
+  defp increment_sold(%{type: "extra", item_id: id, quantity: qty}) do
     Repo.update_all(from(ei in ExtraItem, where: ei.id == ^id), inc: [quantity_sold: qty])
   end
 
@@ -279,10 +326,10 @@ defmodule Backend.Orders do
   end
 
   defp collect_abacate_items(line_items) do
-    Enum.reduce_while(line_items, {:ok, []}, fn %{record: r, quantity: qty}, {:ok, acc} ->
-      case r.abacate_product_id do
-        id when is_binary(id) -> {:cont, {:ok, acc ++ [%{id: id, quantity: qty}]}}
-        _ -> {:halt, {:error, {:missing_abacate_product, r.name}}}
+    Enum.reduce_while(line_items, {:ok, []}, fn line, {:ok, acc} ->
+      case line.abacate_product_id do
+        id when is_binary(id) -> {:cont, {:ok, acc ++ [%{id: id, quantity: line.quantity}]}}
+        _ -> {:halt, {:error, {:missing_abacate_product, line.name}}}
       end
     end)
   end
@@ -308,20 +355,40 @@ defmodule Backend.Orders do
 
   defp release_order_stock(order) do
     Enum.each(order.items, fn item ->
-      case item.item_type do
-        "ticket" ->
-          Repo.update_all(
-            from(tt in TicketType, where: tt.id == ^item.item_id),
-            inc: [quantity_sold: -item.quantity]
-          )
+      case {item.item_type, item.batch_id} do
+        {"ticket", batch_id} when is_binary(batch_id) ->
+          release_batch_stock(batch_id, item.quantity)
 
-        "extra" ->
+        {"extra", _} ->
           Repo.update_all(
             from(ei in ExtraItem, where: ei.id == ^item.item_id),
             inc: [quantity_sold: -item.quantity]
           )
+
+        {"ticket", nil} ->
+          # Defensive: any pre-batches order row would have been backfilled by
+          # the migration, but fall back to ticket_type if we ever see one.
+          :ok
       end
     end)
+  end
+
+  # Decrement the batch's sold count; if it was auto-closed (sellout), reopen
+  # it since stock just became available again. A manually-closed batch stays
+  # closed — the creator's close is sticky against refunds.
+  defp release_batch_stock(batch_id, qty) do
+    {1, [batch]} =
+      Repo.update_all(
+        from(b in TicketBatch, where: b.id == ^batch_id, select: b),
+        inc: [quantity_sold: -qty]
+      )
+
+    if batch.auto_closed and batch.quantity_sold < batch.quantity_total do
+      Repo.update_all(
+        from(b in TicketBatch, where: b.id == ^batch_id),
+        set: [closed_at: nil, auto_closed: false]
+      )
+    end
   end
 
   defp abacate_pay do

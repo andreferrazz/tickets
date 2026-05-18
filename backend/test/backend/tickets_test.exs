@@ -24,12 +24,10 @@ defmodule Backend.TicketsTest do
         "status" => "published"
       })
 
-    {:ok, tt} =
-      Events.create_ticket_type(creator, event.id, %{
-        "name" => "VIP",
-        "price_cents" => 7000,
-        "quantity_total" => 20
-      })
+    {:ok, tt} = Events.create_ticket_type(creator, event.id, %{"name" => "VIP"})
+
+    {:ok, _batch} =
+      Events.create_batch(creator, tt.id, %{"price_cents" => 7000, "quantity_total" => 20})
 
     {:ok, section} = Events.create_section(creator, event.id, %{"title" => "Add-ons"})
 

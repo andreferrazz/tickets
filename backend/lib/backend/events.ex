@@ -14,7 +14,7 @@ defmodule Backend.Events do
   import Ecto.Query
   require Logger
   alias Backend.Repo
-  alias Backend.Events.{Event, ExtraItem, ExtraItemSection, TicketType}
+  alias Backend.Events.{Event, ExtraItem, ExtraItemSection, TicketBatch, TicketType}
 
   # ---------------------------------------------------------------------------
   # Events
@@ -70,7 +70,9 @@ defmodule Backend.Events do
 
       event ->
         Repo.preload(event,
-          ticket_types: from(t in TicketType, where: is_nil(t.deleted_at)),
+          ticket_types:
+            {from(t in TicketType, where: is_nil(t.deleted_at)),
+             batches: from(b in TicketBatch, order_by: [asc: b.sequence])},
           extra_item_sections:
             {from(s in ExtraItemSection,
                where: is_nil(s.deleted_at),
@@ -163,7 +165,7 @@ defmodule Backend.Events do
       attrs
       |> Map.put("event_id", event.id)
       |> TicketType.changeset()
-      |> create_with_abacate_product("ticket")
+      |> Repo.insert()
     end
   end
 
@@ -179,6 +181,149 @@ defmodule Backend.Events do
     with {:ok, tt} <- fetch_owned_ticket_type(user, id) do
       soft_delete(tt, DateTime.utc_now())
     end
+  end
+
+  @doc "Returns ticket type `id` with batches preloaded by sequence (or nil)."
+  def get_ticket_type(id) do
+    Repo.one(
+      from t in TicketType,
+        where: t.id == ^id and is_nil(t.deleted_at),
+        preload: [batches: ^from(b in TicketBatch, order_by: [asc: b.sequence])]
+    )
+  end
+
+  # ---------------------------------------------------------------------------
+  # Ticket batches (lotes)
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Returns the active batch for `ticket_type` (lowest sequence with no
+  `closed_at`), or `nil` if all batches are closed. Accepts either a
+  ticket_type struct with `:batches` preloaded or a struct with just an id.
+  """
+  def active_batch(%TicketType{batches: %Ecto.Association.NotLoaded{}} = tt) do
+    active_batch_query(tt.id)
+  end
+
+  def active_batch(%TicketType{batches: batches}) when is_list(batches) do
+    batches
+    |> Enum.sort_by(& &1.sequence)
+    |> Enum.find(&is_nil(&1.closed_at))
+  end
+
+  def active_batch(%TicketType{id: id}), do: active_batch_query(id)
+
+  defp active_batch_query(ticket_type_id) do
+    Repo.one(
+      from b in TicketBatch,
+        where: b.ticket_type_id == ^ticket_type_id and is_nil(b.closed_at),
+        order_by: [asc: b.sequence],
+        limit: 1
+    )
+  end
+
+  @doc ~S"""
+  Creates a new batch (lote) on `ticket_type_id`. The sequence is auto-assigned
+  as the next integer after the highest existing sequence — labels in the UI
+  are `"Lote #{sequence}"`. Creates a dedicated Abacate Pay product for the
+  batch since each batch has its own price.
+  """
+  def create_batch(user, ticket_type_id, attrs) do
+    with {:ok, tt} <- fetch_owned_ticket_type(user, ticket_type_id) do
+      next_seq = next_batch_sequence(tt.id)
+
+      attrs
+      |> Map.put("ticket_type_id", tt.id)
+      |> Map.put("sequence", next_seq)
+      |> TicketBatch.create_changeset()
+      |> create_batch_with_abacate_product(tt)
+    end
+  end
+
+  defp next_batch_sequence(ticket_type_id) do
+    current =
+      Repo.one(
+        from b in TicketBatch,
+          where: b.ticket_type_id == ^ticket_type_id,
+          select: max(b.sequence)
+      )
+
+    (current || 0) + 1
+  end
+
+  @doc "Updates a batch's price or capacity. Checks ownership via ticket type."
+  def update_batch(user, batch_id, attrs) do
+    with {:ok, batch} <- fetch_owned_batch(user, batch_id) do
+      batch |> TicketBatch.update_changeset(attrs) |> Repo.update()
+    end
+  end
+
+  @doc """
+  Manually closes `batch_id`. Idempotent on already-closed batches. Marks the
+  closure as manual (not `auto_closed`) so a subsequent refund will not
+  re-open it — the creator's close is sticky.
+  """
+  def close_batch(user, batch_id) do
+    with {:ok, batch} <- fetch_owned_batch(user, batch_id) do
+      if batch.closed_at do
+        {:ok, batch}
+      else
+        batch
+        |> Ecto.Changeset.change(
+          closed_at: DateTime.utc_now() |> DateTime.truncate(:second),
+          auto_closed: false
+        )
+        |> Repo.update()
+      end
+    end
+  end
+
+  @doc """
+  Hard-deletes `batch_id` if no tickets have been sold from it. Returns
+  `{:error, :batch_has_sales}` otherwise — historical orders must stay
+  resolvable to a batch row.
+  """
+  def delete_batch(user, batch_id) do
+    with {:ok, batch} <- fetch_owned_batch(user, batch_id) do
+      if batch.quantity_sold > 0,
+        do: {:error, :batch_has_sales},
+        else: Repo.delete(batch)
+    end
+  end
+
+  defp fetch_owned_batch(user, id) do
+    query =
+      from b in TicketBatch,
+        join: tt in TicketType,
+        on: b.ticket_type_id == tt.id,
+        join: e in Event,
+        on: tt.event_id == e.id,
+        where: b.id == ^id and is_nil(tt.deleted_at) and is_nil(e.deleted_at),
+        select: {b, e}
+
+    case Repo.one(query) do
+      nil -> {:error, :not_found}
+      {batch, event} when user.role == "admin" or event.creator_id == user.id -> {:ok, batch}
+      {_batch, _event} -> {:error, :forbidden}
+    end
+  end
+
+  # Inserts the batch, then creates its Abacate Pay product and writes the
+  # returned `prod_*` id back. Any failure rolls the row back so we never leave
+  # a batch without a paired upstream product.
+  defp create_batch_with_abacate_product(changeset, ticket_type) do
+    Repo.transaction(fn ->
+      with {:ok, batch} <- Repo.insert(changeset),
+           label = "#{ticket_type.name} - Lote #{batch.sequence}",
+           external_id = "batch_#{batch.id}",
+           {:ok, prod_id} <- abacate_pay().create_product(label, batch.price_cents, external_id),
+           {:ok, batch} <-
+             batch |> Ecto.Changeset.change(abacate_product_id: prod_id) |> Repo.update() do
+        batch
+      else
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
   end
 
   # ---------------------------------------------------------------------------

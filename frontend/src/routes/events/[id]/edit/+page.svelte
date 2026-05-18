@@ -9,14 +9,34 @@
 	import { t } from '$lib/i18n';
 	import type { TranslationKey } from '$lib/i18n/pt';
 	import { auth } from '$lib/stores/auth.svelte';
-	import type { Event, EventDetail, ExtraItem, ExtraSection, TicketType } from '$lib/types';
+	import type {
+		Batch,
+		Event,
+		EventDetail,
+		ExtraItem,
+		ExtraSection,
+		TicketType
+	} from '$lib/types';
 	import { onMount } from 'svelte';
 
 	let event = $state<EventDetail | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
-	let newTicket = $state({ name: '', price_cents: 0, quantity_total: undefined as number | undefined });
+	let newTicket = $state({ name: '' });
+
+	type NewBatchForm = { price_cents: number; quantity_total: number | undefined };
+	let newBatches = $state<Record<string, NewBatchForm>>({});
+
+	function blankBatch(): NewBatchForm {
+		return { price_cents: 0, quantity_total: undefined };
+	}
+
+	function ensureBatchForms(ticketTypes: { id: string }[]) {
+		for (const tk of ticketTypes) {
+			if (!newBatches[tk.id]) newBatches[tk.id] = blankBatch();
+		}
+	}
 
 	type NewExtraForm = { name: string; price_cents: number; quantity_total: number | undefined };
 	let newExtras = $state<Record<string, NewExtraForm>>({});
@@ -50,7 +70,10 @@
 
 	async function reload() {
 		event = await api.getEvent(page.params.id!);
-		if (event) ensureForms(event.extra_sections);
+		if (event) {
+			ensureForms(event.extra_sections);
+			ensureBatchForms(event.ticket_types);
+		}
 	}
 
 	onMount(async () => {
@@ -80,8 +103,70 @@
 	async function addTicket() {
 		if (!event || !newTicket.name) return;
 		await api.createTicketType(event.id, newTicket);
-		newTicket = { name: '', price_cents: 0, quantity_total: undefined as number | undefined };
+		newTicket = { name: '' };
 		await reload();
+	}
+
+	async function addBatch(tk: TicketType) {
+		const form = newBatches[tk.id];
+		if (!form || !form.quantity_total || form.quantity_total <= 0) return;
+		actionError = null;
+		try {
+			await api.createBatch(tk.id, {
+				price_cents: form.price_cents,
+				quantity_total: form.quantity_total
+			});
+			newBatches[tk.id] = blankBatch();
+			await reload();
+		} catch (e) {
+			reportError(e, 'eventEdit.saveBatchError');
+		}
+	}
+
+	async function saveBatch(b: Batch, patch: Partial<Batch>) {
+		actionError = null;
+		try {
+			await api.updateBatch(b.id, patch);
+			await reload();
+		} catch (e) {
+			reportError(e, 'eventEdit.saveBatchError');
+		}
+	}
+
+	async function closeBatch(b: Batch) {
+		const ok = await confirmDialog({
+			message: t('eventEdit.confirmCloseBatch', { label: b.label }),
+			confirmText: t('eventEdit.closeBatch'),
+			danger: true
+		});
+		if (!ok) return;
+		actionError = null;
+		try {
+			await api.closeBatch(b.id);
+			await reload();
+		} catch (e) {
+			reportError(e, 'eventEdit.closeBatchError');
+		}
+	}
+
+	async function delBatch(b: Batch) {
+		const ok = await confirmDialog({
+			message: t('eventEdit.confirmDeleteBatch', { label: b.label }),
+			confirmText: t('common.delete'),
+			danger: true
+		});
+		if (!ok) return;
+		actionError = null;
+		try {
+			await api.deleteBatch(b.id);
+			await reload();
+		} catch (e) {
+			if (e instanceof ApiError && e.message === 'batch_has_sales') {
+				actionError = t('eventEdit.batchHasSales');
+			} else {
+				reportError(e, 'eventEdit.deleteBatchError');
+			}
+		}
 	}
 
 	async function saveTicket(tk: TicketType, patch: Partial<TicketType>) {
@@ -228,53 +313,95 @@
 	<div class="card stack" style="margin: 1rem 0;">
 		<h2>{t('eventEdit.ticketTypes')}</h2>
 		{#each event.ticket_types as tk (tk.id)}
-			<div class="add">
-				<FloatingField label={t('common.name')}>
-					<input
-						placeholder=" "
-						value={tk.name}
-						onchange={(e) => saveTicket(tk, { name: e.currentTarget.value })}
-					/>
-				</FloatingField>
-				<FloatingField label={t('eventEdit.priceCents')}>
-					<input
-						type="text"
-						inputmode="numeric"
-						placeholder=" "
-						value={formatCentsInput(tk.price_cents)}
-						onchange={(e) =>
-							saveTicket(tk, { price_cents: parseCentsInput(e.currentTarget.value) })}
-					/>
-				</FloatingField>
-				<FloatingField label={t('eventEdit.qty')}>
-					<input
-						type="number"
-						placeholder=" "
-						value={tk.quantity_total}
-						onchange={(e) => saveTicket(tk, { quantity_total: Number(e.currentTarget.value) })}
-					/>
-				</FloatingField>
-				<button class="danger small" onclick={() => delTicket(tk)}>{t('common.delete')}</button>
-			</div>
-			<div class="muted small" style="padding: 0 0.75rem;">
-				{tk.quantity_sold}/{tk.quantity_total} {t('eventEdit.sold')}
+			{@const batchForm = newBatches[tk.id]}
+			<div class="ticket-type">
+				<div class="add">
+					<FloatingField label={t('common.name')}>
+						<input
+							placeholder=" "
+							value={tk.name}
+							onchange={(e) => saveTicket(tk, { name: e.currentTarget.value })}
+						/>
+					</FloatingField>
+					<button class="danger small" onclick={() => delTicket(tk)}>
+						{t('common.delete')}
+					</button>
+				</div>
+
+				<h3 class="batches-head">{t('eventEdit.batches')}</h3>
+				{#each tk.batches as b (b.id)}
+					{@const isActive = tk.active_batch?.id === b.id}
+					{@const status = b.closed_at
+						? t('eventEdit.batchClosed')
+						: isActive
+							? t('eventEdit.batchActive')
+							: t('eventEdit.batchUpcoming')}
+					<div class="add batch-row">
+						<div class="batch-label">
+							<strong>{b.label}</strong>
+							<span class="muted small">{status}</span>
+						</div>
+						<FloatingField label={t('eventEdit.priceCents')}>
+							<input
+								type="text"
+								inputmode="numeric"
+								placeholder=" "
+								disabled={!!b.closed_at}
+								value={formatCentsInput(b.price_cents)}
+								onchange={(e) =>
+									saveBatch(b, { price_cents: parseCentsInput(e.currentTarget.value) })}
+							/>
+						</FloatingField>
+						<FloatingField label={t('eventEdit.qty')}>
+							<input
+								type="number"
+								placeholder=" "
+								disabled={!!b.closed_at}
+								value={b.quantity_total}
+								onchange={(e) =>
+									saveBatch(b, { quantity_total: Number(e.currentTarget.value) })}
+							/>
+						</FloatingField>
+						<div class="muted small">
+							{b.quantity_sold}/{b.quantity_total} {t('eventEdit.sold')}
+						</div>
+						{#if isActive}
+							<button class="secondary small" onclick={() => closeBatch(b)}>
+								{t('eventEdit.closeBatch')}
+							</button>
+						{:else if b.quantity_sold === 0}
+							<button class="danger small" onclick={() => delBatch(b)}>
+								{t('common.delete')}
+							</button>
+						{/if}
+					</div>
+				{/each}
+				{#if batchForm}
+					<div class="add batch-row">
+						<div class="batch-label">
+							<strong>Lote {tk.batches.length + 1}</strong>
+						</div>
+						<FloatingField label={t('eventEdit.priceCents')}>
+							<input
+								type="text"
+								inputmode="numeric"
+								placeholder=" "
+								value={formatCentsInput(batchForm.price_cents)}
+								oninput={(e) => (batchForm.price_cents = parseCentsInput(e.currentTarget.value))}
+							/>
+						</FloatingField>
+						<FloatingField label={t('eventEdit.qty')}>
+							<input type="number" placeholder=" " bind:value={batchForm.quantity_total} />
+						</FloatingField>
+						<div></div>
+						<button class="small" onclick={() => addBatch(tk)}>{t('eventEdit.addBatch')}</button>
+					</div>
+				{/if}
 			</div>
 		{/each}
 		<div class="add">
 			<FloatingField label={t('common.name')}>
 				<input placeholder=" " bind:value={newTicket.name} />
-			</FloatingField>
-			<FloatingField label={t('eventEdit.priceCents')}>
-				<input
-					type="text"
-					inputmode="numeric"
-					placeholder=" "
-					value={formatCentsInput(newTicket.price_cents)}
-					oninput={(e) => (newTicket.price_cents = parseCentsInput(e.currentTarget.value))}
-				/>
-			</FloatingField>
-			<FloatingField label={t('eventEdit.qty')}>
-				<input type="number" placeholder=" " bind:value={newTicket.quantity_total} />
 			</FloatingField>
 			<button class="small" onclick={addTicket}>{t('eventEdit.add')}</button>
 		</div>
@@ -390,6 +517,29 @@
 		grid-template-columns: 2fr 1fr 1fr auto;
 		gap: 0.5rem;
 		align-items: center;
+	}
+	.ticket-type {
+		padding: 0.75rem;
+		background: var(--surface-2);
+		border-radius: var(--radius);
+		display: grid;
+		gap: 0.5rem;
+	}
+	.ticket-type > .add:first-child {
+		grid-template-columns: 1fr auto;
+	}
+	.batches-head {
+		margin: 0.25rem 0 0;
+		font-size: 0.9rem;
+		font-weight: 600;
+	}
+	.batch-row {
+		grid-template-columns: auto 1fr 1fr auto auto;
+	}
+	.batch-label {
+		display: flex;
+		flex-direction: column;
+		min-width: 5rem;
 	}
 	.section-head {
 		display: flex;
