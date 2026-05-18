@@ -28,6 +28,7 @@ defmodule Backend.Orders do
   """
   def create_order(user, event_id, cart_items) do
     with {:ok, event} <- fetch_published_event(event_id),
+         :ok <- ensure_has_ticket(cart_items),
          {:ok, line_items} <- resolve_items(event, cart_items),
          total = compute_total(line_items),
          {:ok, order} <- reserve_order(user, event, total, line_items) do
@@ -161,6 +162,20 @@ defmodule Backend.Orders do
       _event -> {:error, :event_not_available}
     end
   end
+
+  defp ensure_has_ticket([]), do: {:error, :no_items}
+
+  defp ensure_has_ticket(cart_items) do
+    if Enum.any?(cart_items, &ticket_line?/1),
+      do: :ok,
+      else: {:error, :ticket_required}
+  end
+
+  defp ticket_line?(%{"item_type" => "ticket", "quantity" => q})
+       when is_integer(q) and q > 0,
+       do: true
+
+  defp ticket_line?(_), do: false
 
   defp resolve_items(_event, []), do: {:error, :no_items}
 

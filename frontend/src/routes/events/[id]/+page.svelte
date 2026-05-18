@@ -31,6 +31,9 @@
 		return out;
 	});
 
+	const hasTicket = $derived(lines.some((l) => l.item_type === 'ticket'));
+	const hasExtraOnly = $derived(lines.length > 0 && !hasTicket);
+
 	const total = $derived.by(() => {
 		if (!event) return 0;
 		let sum = 0;
@@ -60,7 +63,7 @@
 	}
 
 	async function buy() {
-		if (!event || lines.length === 0) return;
+		if (!event || lines.length === 0 || !hasTicket) return;
 		if (!auth.isAuthed) {
 			await goto(`/auth/login?next=/events/${event.id}`);
 			return;
@@ -195,10 +198,13 @@
 					<span>{t('common.total')}</span>
 					<strong>{formatBRL(total)}</strong>
 				</div>
+				{#if hasExtraOnly}
+					<p class="muted small">{t('event.ticketRequired')}</p>
+				{/if}
 				{#if buyError}
 					<div class="error">{buyError}</div>
 				{/if}
-				<button disabled={lines.length === 0 || busy} onclick={buy}>
+				<button disabled={lines.length === 0 || !hasTicket || busy} onclick={buy}>
 					{busy ? t('event.buying') : t('event.buy')}
 				</button>
 			</aside>

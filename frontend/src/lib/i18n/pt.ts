@@ -73,6 +73,7 @@ export const pt = {
 	'event.noTickets': 'Nenhum ingresso disponível.',
 	'event.orderSummary': 'Resumo do pedido',
 	'event.noItems': 'Nenhum item selecionado.',
+	'event.ticketRequired': 'Selecione pelo menos um ingresso para comprar complementos.',
 	'event.buy': 'Comprar',
 	'event.buying': 'Criando pedido...',
 	'event.errorFallback': 'Falha ao carregar evento',

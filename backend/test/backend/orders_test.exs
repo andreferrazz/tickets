@@ -114,6 +114,30 @@ defmodule Backend.OrdersTest do
       assert {:error, :no_items} = Orders.create_order(buyer, event.id, [])
     end
 
+    test "returns ticket_required when cart has only extra items" do
+      creator = make_creator()
+      buyer = make_buyer()
+      {event, _tt} = published_event_with_tickets(creator)
+
+      {:ok, section} =
+        Events.create_section(creator, event.id, %{"title" => "Add-ons"})
+
+      {:ok, extra} =
+        Events.create_extra(creator, event.id, %{
+          "name" => "T-Shirt",
+          "price_cents" => 4000,
+          "section_id" => section.id
+        })
+
+      assert {:error, :ticket_required} =
+               Orders.create_order(buyer, event.id, [
+                 %{"item_type" => "extra", "item_id" => extra.id, "quantity" => 1}
+               ])
+
+      # No stock should be reserved on the extra item
+      assert Repo.get!(Backend.Events.ExtraItem, extra.id).quantity_sold == 0
+    end
+
     test "returns missing_abacate_product when ticket type has no upstream product id" do
       creator = make_creator()
       buyer = make_buyer()
