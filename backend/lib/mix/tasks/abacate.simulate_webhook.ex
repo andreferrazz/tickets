@@ -44,7 +44,10 @@ defmodule Mix.Tasks.Abacate.SimulateWebhook do
     webhook_secret =
       opts[:webhook_secret] || System.get_env("ABACATE_PAY_WEBHOOK_SECRET") || "dev-secret"
 
-    body = Jason.encode!(%{event: event, data: %{id: checkout_id}})
+    # Abacate Pay nests the checkout id under `data.checkout.id`. The
+    # controller pattern-matches on that shape; sending `data.id` (the old
+    # shape) makes the request a silent no-op.
+    body = Jason.encode!(%{event: event, data: %{checkout: %{id: checkout_id}}})
     signature = :crypto.mac(:hmac, :sha256, AbacatePay.public_key(), body) |> Base.encode64()
     url = "#{base_url}#{@path}?webhookSecret=#{URI.encode_www_form(webhook_secret)}"
 
