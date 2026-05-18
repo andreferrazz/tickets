@@ -62,6 +62,9 @@ defmodule BackendWeb.Router do
     put "/extras/:id", ExtraItemController, :update
     delete "/extras/:id", ExtraItemController, :delete
 
+    put "/extra-sections/:id", ExtraItemSectionController, :update
+    delete "/extra-sections/:id", ExtraItemSectionController, :delete
+
     post "/orders", OrderController, :create
     get "/orders", OrderController, :index
     get "/orders/:id", OrderController, :show
@@ -76,6 +79,7 @@ defmodule BackendWeb.Router do
     post "/events", EventController, :create
     post "/events/:event_id/ticket-types", TicketTypeController, :create
     post "/events/:event_id/extras", ExtraItemController, :create
+    post "/events/:event_id/extra-sections", ExtraItemSectionController, :create
   end
 
   # ---------------------------------------------------------------------------

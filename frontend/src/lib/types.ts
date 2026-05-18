@@ -48,6 +48,7 @@ export interface TicketType {
 export interface ExtraItem {
 	id: string;
 	event_id: string;
+	section_id: string;
 	name: string;
 	description: string;
 	price_cents: number;
@@ -55,9 +56,18 @@ export interface ExtraItem {
 	quantity_sold: number;
 }
 
+export interface ExtraSection {
+	id: string;
+	event_id: string;
+	title: string;
+	description: string | null;
+	position: number;
+	extras: ExtraItem[];
+}
+
 export interface EventDetail extends Event {
 	ticket_types: TicketType[];
-	extras: ExtraItem[];
+	extra_sections: ExtraSection[];
 }
 
 export type OrderStatus = 'pending' | 'paid' | 'expired' | 'refunded';

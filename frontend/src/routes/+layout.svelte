@@ -7,6 +7,7 @@
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import PromptDialog from '$lib/components/PromptDialog.svelte';
 
 	let { children } = $props();
 
@@ -65,6 +66,7 @@
 </main>
 
 <ConfirmDialog />
+<PromptDialog />
 
 <style>
 	.nav {

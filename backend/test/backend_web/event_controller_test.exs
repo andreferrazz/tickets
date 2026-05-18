@@ -112,7 +112,7 @@ defmodule BackendWeb.EventControllerTest do
   end
 
   describe "GET /api/v1/events/:id" do
-    test "returns event with ticket_types and extras", %{conn: conn} do
+    test "returns event with ticket_types and extra_sections", %{conn: conn} do
       {conn, user} = authed_conn(conn, "creator")
 
       {:ok, event} =
@@ -132,7 +132,7 @@ defmodule BackendWeb.EventControllerTest do
       resp = json_response(conn, 200)
       assert resp["title"] == "Detail"
       assert [%{"name" => "VIP"}] = resp["ticket_types"]
-      assert resp["extras"] == []
+      assert [%{"title" => "Addons", "extras" => []}] = resp["extra_sections"]
     end
 
     test "returns 404 for unknown event", %{conn: conn} do

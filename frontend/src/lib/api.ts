@@ -5,6 +5,7 @@ import type {
 	Event,
 	EventDetail,
 	ExtraItem,
+	ExtraSection,
 	Invitation,
 	Order,
 	ProfileUpdate,
@@ -96,12 +97,18 @@ export const api = {
 		request<TicketType>(`/ticket-types/${id}`, { method: 'PUT', body }),
 	deleteTicketType: (id: string) =>
 		request<{ deleted: true }>(`/ticket-types/${id}`, { method: 'DELETE' }),
-	createExtra: (eventId: string, body: Partial<ExtraItem>) =>
+	createExtra: (eventId: string, body: Partial<ExtraItem> & { section_id: string }) =>
 		request<ExtraItem>(`/events/${eventId}/extras`, { method: 'POST', body }),
 	updateExtra: (id: string, body: Partial<ExtraItem>) =>
 		request<ExtraItem>(`/extras/${id}`, { method: 'PUT', body }),
 	deleteExtra: (id: string) =>
 		request<{ deleted: true }>(`/extras/${id}`, { method: 'DELETE' }),
+	createExtraSection: (eventId: string, body: Partial<ExtraSection>) =>
+		request<ExtraSection>(`/events/${eventId}/extra-sections`, { method: 'POST', body }),
+	updateExtraSection: (id: string, body: Partial<ExtraSection>) =>
+		request<ExtraSection>(`/extra-sections/${id}`, { method: 'PUT', body }),
+	deleteExtraSection: (id: string) =>
+		request<{ deleted: true }>(`/extra-sections/${id}`, { method: 'DELETE' }),
 	createOrder: (event_id: string, items: CartLine[]) =>
 		request<Order>('/orders', { method: 'POST', body: { event_id, items } }),
 	listOrders: (fetcher?: typeof fetch) => request<Order[]>('/orders', { fetcher }),

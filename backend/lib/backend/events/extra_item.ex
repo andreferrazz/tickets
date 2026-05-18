@@ -15,20 +15,21 @@ defmodule Backend.Events.ExtraItem do
     field :deleted_at, :utc_datetime_usec
 
     belongs_to :event, Backend.Events.Event
+    belongs_to :section, Backend.Events.ExtraItemSection, foreign_key: :section_id
 
     timestamps(type: :utc_datetime, updated_at: false)
   end
 
   def changeset(attrs) do
     %__MODULE__{}
-    |> cast(attrs, [:event_id, :name, :description, :price_cents, :quantity_total])
-    |> validate_required([:event_id, :name, :price_cents])
+    |> cast(attrs, [:event_id, :section_id, :name, :description, :price_cents, :quantity_total])
+    |> validate_required([:event_id, :section_id, :name, :price_cents])
     |> validate_number(:price_cents, greater_than_or_equal_to: 0)
   end
 
   def update_changeset(extra, attrs) do
     extra
-    |> cast(attrs, [:name, :description, :price_cents, :quantity_total])
+    |> cast(attrs, [:section_id, :name, :description, :price_cents, :quantity_total])
     |> validate_required([:name, :price_cents])
     |> validate_number(:price_cents, greater_than_or_equal_to: 0)
   end

@@ -14,7 +14,7 @@ defmodule Backend.Events do
   import Ecto.Query
   require Logger
   alias Backend.Repo
-  alias Backend.Events.{Event, ExtraItem, TicketType}
+  alias Backend.Events.{Event, ExtraItem, ExtraItemSection, TicketType}
 
   # ---------------------------------------------------------------------------
   # Events
@@ -71,16 +71,42 @@ defmodule Backend.Events do
       event ->
         Repo.preload(event,
           ticket_types: from(t in TicketType, where: is_nil(t.deleted_at)),
-          extras: from(x in ExtraItem, where: is_nil(x.deleted_at))
+          extra_item_sections:
+            {from(s in ExtraItemSection,
+               where: is_nil(s.deleted_at),
+               order_by: [asc: s.position, asc: s.inserted_at]
+             ),
+             extras:
+               from(x in ExtraItem, where: is_nil(x.deleted_at), order_by: [asc: x.inserted_at])}
         )
     end
   end
 
-  @doc "Creates an event owned by `user`."
+  @doc """
+  Creates an event owned by `user`. Inserts a default addon section so every
+  event satisfies the invariant that it has at least one section.
+  """
   def create_event(user, attrs) do
-    attrs
-    |> Map.put("creator_id", user.id)
-    |> Event.changeset()
+    changeset =
+      attrs
+      |> Map.put("creator_id", user.id)
+      |> Event.changeset()
+
+    Repo.transaction(fn ->
+      case Repo.insert(changeset) do
+        {:ok, event} ->
+          {:ok, _section} = insert_default_section(event.id)
+          event
+
+        {:error, cs} ->
+          Repo.rollback(cs)
+      end
+    end)
+  end
+
+  defp insert_default_section(event_id) do
+    %{"event_id" => event_id, "title" => "Addons", "position" => 0}
+    |> ExtraItemSection.changeset()
     |> Repo.insert()
   end
 
@@ -112,6 +138,13 @@ defmodule Backend.Events do
 
         Repo.update_all(
           from(x in ExtraItem, where: x.event_id == ^event.id and is_nil(x.deleted_at)),
+          set: [deleted_at: now]
+        )
+
+        Repo.update_all(
+          from(s in ExtraItemSection,
+            where: s.event_id == ^event.id and is_nil(s.deleted_at)
+          ),
           set: [deleted_at: now]
         )
 
@@ -152,14 +185,52 @@ defmodule Backend.Events do
   # Extra items
   # ---------------------------------------------------------------------------
 
-  @doc "Creates an extra item for `event_id`. Checks ownership."
+  @doc """
+  Creates an extra item for `event_id`. Requires a `section_id` (string key)
+  that belongs to the same event. Checks ownership.
+  """
   def create_extra(user, event_id, attrs) do
-    with {:ok, event} <- fetch_owned_event(user, event_id) do
+    with {:ok, event} <- fetch_owned_event(user, event_id),
+         {:ok, attrs} <- resolve_extra_section(event, attrs) do
       attrs
       |> Map.put("event_id", event.id)
       |> ExtraItem.changeset()
       |> create_with_abacate_product("extra")
     end
+  end
+
+  # If section_id is omitted, default to the event's earliest live section so
+  # creators can add addons without a separate section-create step.
+  defp resolve_extra_section(event, attrs) do
+    case Map.get(attrs, "section_id") || Map.get(attrs, :section_id) do
+      nil ->
+        case default_section_id(event.id) do
+          nil -> {:error, :section_not_found}
+          id -> {:ok, Map.put(attrs, "section_id", id)}
+        end
+
+      id ->
+        if section_belongs_to_event?(id, event.id),
+          do: {:ok, Map.put(attrs, "section_id", id)},
+          else: {:error, :section_not_found}
+    end
+  end
+
+  defp default_section_id(event_id) do
+    Repo.one(
+      from s in ExtraItemSection,
+        where: s.event_id == ^event_id and is_nil(s.deleted_at),
+        order_by: [asc: s.position, asc: s.inserted_at],
+        limit: 1,
+        select: s.id
+    )
+  end
+
+  defp section_belongs_to_event?(section_id, event_id) do
+    Repo.exists?(
+      from s in ExtraItemSection,
+        where: s.id == ^section_id and s.event_id == ^event_id and is_nil(s.deleted_at)
+    )
   end
 
   @doc "Updates extra item `id`. Checks ownership."
@@ -173,6 +244,62 @@ defmodule Backend.Events do
   def delete_extra(user, id) do
     with {:ok, extra} <- fetch_owned_extra(user, id) do
       soft_delete(extra, DateTime.utc_now())
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Extra item sections
+  # ---------------------------------------------------------------------------
+
+  @doc "Creates an addon section for `event_id`. Checks ownership."
+  def create_section(user, event_id, attrs) do
+    with {:ok, event} <- fetch_owned_event(user, event_id) do
+      attrs
+      |> Map.put("event_id", event.id)
+      |> ExtraItemSection.changeset()
+      |> Repo.insert()
+    end
+  end
+
+  @doc "Updates section `id`. Checks ownership."
+  def update_section(user, id, attrs) do
+    with {:ok, section} <- fetch_owned_section(user, id) do
+      section |> ExtraItemSection.update_changeset(attrs) |> Repo.update()
+    end
+  end
+
+  @doc """
+  Soft-deletes section `id`. Returns `{:error, :section_not_empty}` if the
+  section still owns any non-soft-deleted extras — the creator must remove or
+  move them first.
+  """
+  def delete_section(user, id) do
+    with {:ok, section} <- fetch_owned_section(user, id) do
+      if section_has_live_extras?(section.id),
+        do: {:error, :section_not_empty},
+        else: soft_delete(section, DateTime.utc_now())
+    end
+  end
+
+  defp section_has_live_extras?(section_id) do
+    Repo.exists?(
+      from x in ExtraItem,
+        where: x.section_id == ^section_id and is_nil(x.deleted_at)
+    )
+  end
+
+  defp fetch_owned_section(user, id) do
+    query =
+      from s in ExtraItemSection,
+        join: e in Event,
+        on: s.event_id == e.id,
+        where: s.id == ^id and is_nil(s.deleted_at) and is_nil(e.deleted_at),
+        select: {s, e}
+
+    case Repo.one(query) do
+      nil -> {:error, :not_found}
+      {section, event} when user.role == "admin" or event.creator_id == user.id -> {:ok, section}
+      {_section, _event} -> {:error, :forbidden}
     end
   end
 

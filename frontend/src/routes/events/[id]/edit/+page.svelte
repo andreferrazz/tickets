@@ -5,10 +5,11 @@
 	import EventForm from '$lib/components/EventForm.svelte';
 	import FloatingField from '$lib/components/FloatingField.svelte';
 	import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';
+	import { prompt as promptDialog } from '$lib/stores/prompt.svelte';
 	import { t } from '$lib/i18n';
 	import type { TranslationKey } from '$lib/i18n/pt';
 	import { auth } from '$lib/stores/auth.svelte';
-	import type { Event, EventDetail, ExtraItem, TicketType } from '$lib/types';
+	import type { Event, EventDetail, ExtraItem, ExtraSection, TicketType } from '$lib/types';
 	import { onMount } from 'svelte';
 
 	let event = $state<EventDetail | null>(null);
@@ -16,7 +17,19 @@
 	let error = $state<string | null>(null);
 
 	let newTicket = $state({ name: '', price_cents: 0, quantity_total: undefined as number | undefined });
-	let newExtra = $state({ name: '', price_cents: 0, quantity_total: undefined as number | undefined });
+
+	type NewExtraForm = { name: string; price_cents: number; quantity_total: number | undefined };
+	let newExtras = $state<Record<string, NewExtraForm>>({});
+
+	function blankExtra(): NewExtraForm {
+		return { name: '', price_cents: 0, quantity_total: undefined };
+	}
+
+	function ensureForms(sections: { id: string }[]) {
+		for (const s of sections) {
+			if (!newExtras[s.id]) newExtras[s.id] = blankExtra();
+		}
+	}
 
 	function formatCentsInput(cents: number): string {
 		const c = Math.max(0, Math.trunc(cents));
@@ -37,6 +50,7 @@
 
 	async function reload() {
 		event = await api.getEvent(page.params.id!);
+		if (event) ensureForms(event.extra_sections);
 	}
 
 	onMount(async () => {
@@ -86,11 +100,65 @@
 		}
 	}
 
-	async function addExtra() {
-		if (!event || !newExtra.name) return;
-		await api.createExtra(event.id, newExtra);
-		newExtra = { name: '', price_cents: 0, quantity_total: undefined as number | undefined };
-		await reload();
+	async function addSection() {
+		if (!event) return;
+		const title = await promptDialog({
+			message: t('eventEdit.newSectionPrompt'),
+			placeholder: t('eventEdit.newSectionPlaceholder'),
+			confirmText: t('eventEdit.create')
+		});
+		if (!title) return;
+		actionError = null;
+		try {
+			await api.createExtraSection(event.id, { title });
+			await reload();
+		} catch (e) {
+			reportError(e, 'eventEdit.saveSectionError');
+		}
+	}
+
+	async function saveSection(s: ExtraSection, patch: Partial<ExtraSection>) {
+		actionError = null;
+		try {
+			await api.updateExtraSection(s.id, patch);
+			await reload();
+		} catch (e) {
+			reportError(e, 'eventEdit.saveSectionError');
+		}
+	}
+
+	async function delSection(s: ExtraSection) {
+		const ok = await confirmDialog({
+			message: t('eventEdit.confirmDeleteSection', { title: s.title }),
+			confirmText: t('common.delete'),
+			danger: true
+		});
+		if (!ok) return;
+		actionError = null;
+		try {
+			await api.deleteExtraSection(s.id);
+			await reload();
+		} catch (e) {
+			if (e instanceof ApiError && e.message === 'section_not_empty') {
+				actionError = t('eventEdit.sectionNotEmpty');
+			} else {
+				reportError(e, 'eventEdit.deleteSectionError');
+			}
+		}
+	}
+
+	async function addExtra(sectionId: string) {
+		if (!event) return;
+		const form = newExtras[sectionId];
+		if (!form || !form.name) return;
+		actionError = null;
+		try {
+			await api.createExtra(event.id, { ...form, section_id: sectionId });
+			newExtras[sectionId] = blankExtra();
+			await reload();
+		} catch (e) {
+			reportError(e, 'eventEdit.saveSectionError');
+		}
 	}
 
 	async function delExtra(x: ExtraItem) {
@@ -171,42 +239,73 @@
 		</div>
 	</div>
 
-	<div class="card stack" style="margin: 1rem 0;">
-		<h2>{t('eventEdit.addons')}</h2>
-		{#each event.extras as x (x.id)}
-			<div class="row-line">
-				<div>
-					<strong>{x.name}</strong>
-					<span class="muted small"> — {formatBRL(x.price_cents)}</span>
-				</div>
-				<button class="danger small" onclick={() => delExtra(x)}>{t('common.delete')}</button>
+	<h2 style="margin: 1.5rem 0 0.5rem;">{t('eventEdit.addons')}</h2>
+
+	{#each event.extra_sections as s (s.id)}
+		{@const form = newExtras[s.id]}
+		{#if form}
+		<div class="card stack" style="margin: 1rem 0;">
+			<div class="section-head">
+				<FloatingField label={t('eventEdit.sectionTitle')}>
+					<input
+						placeholder=" "
+						value={s.title}
+						onchange={(e) => saveSection(s, { title: e.currentTarget.value })}
+					/>
+				</FloatingField>
+				<button class="danger small" onclick={() => delSection(s)}>
+					{t('eventEdit.deleteSection')}
+				</button>
 			</div>
-		{/each}
-		<div class="add">
-			<FloatingField label={t('common.name')}>
-				<input placeholder=" " bind:value={newExtra.name} />
-			</FloatingField>
-			<FloatingField label={t('eventEdit.priceCents')}>
-				<input
-					type="text"
-					inputmode="numeric"
+			<FloatingField label={t('eventEdit.sectionDescription')}>
+				<textarea
 					placeholder=" "
-					value={formatCentsInput(newExtra.price_cents)}
-					oninput={(e) => (newExtra.price_cents = parseCentsInput(e.currentTarget.value))}
-				/>
+					rows="2"
+					value={s.description ?? ''}
+					onchange={(e) => saveSection(s, { description: e.currentTarget.value })}
+				></textarea>
 			</FloatingField>
-			<FloatingField label={t('eventEdit.qtyUnlimited')}>
-				<input type="number" placeholder=" " bind:value={newExtra.quantity_total} />
-			</FloatingField>
-			<button class="small" onclick={addExtra}>{t('eventEdit.add')}</button>
+
+			{#each s.extras as x (x.id)}
+				<div class="row-line">
+					<div>
+						<strong>{x.name}</strong>
+						<span class="muted small"> — {formatBRL(x.price_cents)}</span>
+					</div>
+					<button class="danger small" onclick={() => delExtra(x)}>{t('common.delete')}</button>
+				</div>
+			{/each}
+			<div class="add">
+				<FloatingField label={t('common.name')}>
+					<input placeholder=" " bind:value={form.name} />
+				</FloatingField>
+				<FloatingField label={t('eventEdit.priceCents')}>
+					<input
+						type="text"
+						inputmode="numeric"
+						placeholder=" "
+						value={formatCentsInput(form.price_cents)}
+						oninput={(e) => (form.price_cents = parseCentsInput(e.currentTarget.value))}
+					/>
+				</FloatingField>
+				<FloatingField label={t('eventEdit.qtyUnlimited')}>
+					<input type="number" placeholder=" " bind:value={form.quantity_total} />
+				</FloatingField>
+				<button class="small" onclick={() => addExtra(s.id)}>{t('eventEdit.add')}</button>
+			</div>
 		</div>
-	</div>
+		{/if}
+	{/each}
+
+	<button class="secondary" onclick={addSection}>{t('eventEdit.addSection')}</button>
 
 	{#if actionError}
 		<div class="error" style="margin: 1rem 0;">{actionError}</div>
 	{/if}
 
-	<button class="danger" onclick={deleteEvent}>{t('eventEdit.deleteEvent')}</button>
+	<button class="danger" style="margin-top: 1.5rem;" onclick={deleteEvent}>
+		{t('eventEdit.deleteEvent')}
+	</button>
 {/if}
 
 <style>
@@ -226,6 +325,14 @@
 		grid-template-columns: 2fr 1fr 1fr auto;
 		gap: 0.5rem;
 		align-items: center;
+	}
+	.section-head {
+		display: flex;
+		gap: 0.5rem;
+		align-items: flex-start;
+	}
+	.section-head :global(label.float) {
+		flex: 1;
 	}
 	@media (max-width: 600px) {
 		.add {

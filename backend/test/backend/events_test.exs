@@ -90,7 +90,8 @@ defmodule Backend.EventsTest do
       found = Events.get_event(event.id)
       assert found.id == event.id
       assert [%TicketType{name: "VIP"}] = found.ticket_types
-      assert found.extras == []
+      # Every event has a default "Addons" section auto-created on insert.
+      assert [%{title: "Addons", extras: []}] = found.extra_item_sections
     end
 
     test "returns nil for unknown id" do
@@ -273,7 +274,134 @@ defmodule Backend.EventsTest do
       row = Repo.get!(ExtraItem, extra.id)
       refute is_nil(row.deleted_at)
       reloaded = Events.get_event(event.id)
-      assert Enum.empty?(reloaded.extras)
+      assert Enum.flat_map(reloaded.extra_item_sections, & &1.extras) == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Extra item sections
+  # ---------------------------------------------------------------------------
+
+  alias Backend.Events.ExtraItemSection
+
+  defp default_section(event_id) do
+    Repo.one!(from s in ExtraItemSection, where: s.event_id == ^event_id, limit: 1)
+  end
+
+  describe "create_event/2 + default section" do
+    test "auto-creates one default 'Addons' section" do
+      user = creator_user()
+
+      {:ok, event} =
+        Events.create_event(user, %{"title" => "X", "starts_at" => "2027-01-01T00:00:00Z"})
+
+      assert %ExtraItemSection{title: "Addons", position: 0} = default_section(event.id)
+    end
+  end
+
+  describe "create_section/3" do
+    test "owner can create a section" do
+      user = creator_user()
+      event = published_event(user)
+
+      assert {:ok, section} =
+               Events.create_section(user, event.id, %{
+                 "title" => "Meals",
+                 "description" => "Optional add-ons for hungry attendees",
+                 "position" => 1
+               })
+
+      assert section.event_id == event.id
+      assert section.title == "Meals"
+    end
+
+    test "non-owner gets forbidden" do
+      creator = creator_user()
+      other = buyer_user()
+      event = published_event(creator)
+      assert {:error, :forbidden} = Events.create_section(other, event.id, %{"title" => "X"})
+    end
+  end
+
+  describe "update_section/3" do
+    test "owner can rename their section" do
+      user = creator_user()
+      event = published_event(user)
+      {:ok, s} = Events.create_section(user, event.id, %{"title" => "Old"})
+      assert {:ok, updated} = Events.update_section(user, s.id, %{"title" => "New"})
+      assert updated.title == "New"
+    end
+
+    test "non-owner gets forbidden" do
+      creator = creator_user()
+      other = buyer_user()
+      event = published_event(creator)
+      {:ok, s} = Events.create_section(creator, event.id, %{"title" => "X"})
+      assert {:error, :forbidden} = Events.update_section(other, s.id, %{"title" => "Y"})
+    end
+  end
+
+  describe "delete_section/2" do
+    test "owner can delete an empty section" do
+      user = creator_user()
+      event = published_event(user)
+      {:ok, s} = Events.create_section(user, event.id, %{"title" => "Empty"})
+      assert {:ok, _} = Events.delete_section(user, s.id)
+      assert Repo.get!(ExtraItemSection, s.id).deleted_at != nil
+    end
+
+    test "blocks deletion when section still has live extras" do
+      user = creator_user()
+      event = published_event(user)
+      {:ok, s} = Events.create_section(user, event.id, %{"title" => "T-Shirts"})
+
+      {:ok, _extra} =
+        Events.create_extra(user, event.id, %{
+          "name" => "Tee",
+          "price_cents" => 100,
+          "section_id" => s.id
+        })
+
+      assert {:error, :section_not_empty} = Events.delete_section(user, s.id)
+    end
+
+    test "delete_event cascades deleted_at to sections" do
+      user = creator_user()
+      event = published_event(user)
+      {:ok, s} = Events.create_section(user, event.id, %{"title" => "Extras"})
+      assert {:ok, _} = Events.delete_event(user, event.id)
+      assert Repo.get!(ExtraItemSection, s.id).deleted_at != nil
+    end
+  end
+
+  describe "create_extra/3 with sections" do
+    test "rejects a section_id that belongs to a different event" do
+      user = creator_user()
+      event_a = published_event(user)
+      event_b = published_event(user)
+      {:ok, s_b} = Events.create_section(user, event_b.id, %{"title" => "Other"})
+
+      assert {:error, :section_not_found} =
+               Events.create_extra(user, event_a.id, %{
+                 "name" => "Tee",
+                 "price_cents" => 100,
+                 "section_id" => s_b.id
+               })
+    end
+
+    test "places the extra in the requested section" do
+      user = creator_user()
+      event = published_event(user)
+      {:ok, s} = Events.create_section(user, event.id, %{"title" => "Meals"})
+
+      {:ok, extra} =
+        Events.create_extra(user, event.id, %{
+          "name" => "Lunch",
+          "price_cents" => 2500,
+          "section_id" => s.id
+        })
+
+      assert extra.section_id == s.id
     end
   end
 end

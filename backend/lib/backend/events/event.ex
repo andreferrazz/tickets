@@ -18,6 +18,7 @@ defmodule Backend.Events.Event do
     belongs_to :creator, Backend.Accounts.User
     has_many :ticket_types, Backend.Events.TicketType
     has_many :extras, Backend.Events.ExtraItem
+    has_many :extra_item_sections, Backend.Events.ExtraItemSection
 
     timestamps(type: :utc_datetime)
   end

@@ -15,6 +15,8 @@
 
 	let qty = $state<Record<string, number>>({});
 
+	const allExtras = $derived(event ? event.extra_sections.flatMap((s) => s.extras) : []);
+
 	const lines = $derived.by(() => {
 		if (!event) return [] as CartLine[];
 		const out: CartLine[] = [];
@@ -22,7 +24,7 @@
 			const q = qty[`t:${t.id}`] ?? 0;
 			if (q > 0) out.push({ item_type: 'ticket', item_id: t.id, quantity: q });
 		}
-		for (const x of event.extras) {
+		for (const x of allExtras) {
 			const q = qty[`x:${x.id}`] ?? 0;
 			if (q > 0) out.push({ item_type: 'extra', item_id: x.id, quantity: q });
 		}
@@ -33,7 +35,7 @@
 		if (!event) return 0;
 		let sum = 0;
 		for (const t of event.ticket_types) sum += (qty[`t:${t.id}`] ?? 0) * t.price_cents;
-		for (const x of event.extras) sum += (qty[`x:${x.id}`] ?? 0) * x.price_cents;
+		for (const x of allExtras) sum += (qty[`x:${x.id}`] ?? 0) * x.price_cents;
 		return sum;
 	});
 
@@ -130,30 +132,37 @@
 					<p class="muted">{t('event.noTickets')}</p>
 				{/each}
 
-				{#if event.extras.length}
-					<h2 style="margin-top: 1rem;">{t('event.addons')}</h2>
-					{#each event.extras as x (x.id)}
-						{@const remaining = x.quantity_total === null
-							? 999
-							: x.quantity_total - x.quantity_sold}
-						<div class="line">
-							<div>
-								<strong>{x.name}</strong>
-								<div class="muted small">{x.description}</div>
-								<div class="muted small">{formatBRL(x.price_cents)}</div>
+				{#each event.extra_sections as s (s.id)}
+					{#if s.extras.length}
+						<h2 style="margin-top: 1rem;">{s.title}</h2>
+						{#if s.description}
+							<p class="muted">{s.description}</p>
+						{/if}
+						{#each s.extras as x (x.id)}
+							{@const remaining = x.quantity_total === null
+								? 999
+								: x.quantity_total - x.quantity_sold}
+							<div class="line">
+								<div>
+									<strong>{x.name}</strong>
+									<div class="muted small">{x.description}</div>
+									<div class="muted small">{formatBRL(x.price_cents)}</div>
+								</div>
+								<div class="qty">
+									<button
+										class="secondary small"
+										onclick={() => bump(`x:${x.id}`, -1, remaining)}>−</button
+									>
+									<span>{qty[`x:${x.id}`] ?? 0}</span>
+									<button
+										class="secondary small"
+										onclick={() => bump(`x:${x.id}`, 1, remaining)}>+</button
+									>
+								</div>
 							</div>
-							<div class="qty">
-								<button class="secondary small" onclick={() => bump(`x:${x.id}`, -1, remaining)}
-									>−</button
-								>
-								<span>{qty[`x:${x.id}`] ?? 0}</span>
-								<button class="secondary small" onclick={() => bump(`x:${x.id}`, 1, remaining)}
-									>+</button
-								>
-							</div>
-						</div>
-					{/each}
-				{/if}
+						{/each}
+					{/if}
+				{/each}
 			</section>
 
 			<aside class="summary card">
@@ -171,7 +180,7 @@
 								</li>
 							{/if}
 						{/each}
-						{#each event.extras as x (x.id)}
+						{#each allExtras as x (x.id)}
 							{@const q = qty[`x:${x.id}`] ?? 0}
 							{#if q > 0}
 								<li>

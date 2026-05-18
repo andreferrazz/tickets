@@ -113,6 +113,18 @@ export const pt = {
 	'eventEdit.deleteEventError': 'Falha ao excluir evento',
 	'eventEdit.deleteTicketError': 'Falha ao excluir tipo de ingresso',
 	'eventEdit.deleteExtraError': 'Falha ao excluir complemento',
+	'eventEdit.addSection': 'Adicionar seção',
+	'eventEdit.sectionTitle': 'Título da seção',
+	'eventEdit.sectionDescription': 'Descrição (opcional)',
+	'eventEdit.newSectionPrompt': 'Título da nova seção',
+	'eventEdit.newSectionPlaceholder': 'Ex.: Camisetas, Refeições, Transporte',
+	'eventEdit.create': 'Criar',
+	'eventEdit.defaultSectionTitle': 'Complementos',
+	'eventEdit.deleteSection': 'Excluir seção',
+	'eventEdit.confirmDeleteSection': 'Excluir a seção "{title}"?',
+	'eventEdit.deleteSectionError': 'Falha ao excluir seção',
+	'eventEdit.sectionNotEmpty': 'Remova os complementos da seção antes de excluí-la.',
+	'eventEdit.saveSectionError': 'Falha ao salvar seção',
 
 	// Orders
 	'orders.title': 'Meus pedidos',

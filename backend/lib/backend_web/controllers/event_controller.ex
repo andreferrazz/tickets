@@ -37,7 +37,7 @@ defmodule BackendWeb.EventController do
   def create(conn, params) do
     case Events.create_event(conn.assigns.current_user, params) do
       {:ok, event} ->
-        event = Backend.Repo.preload(event, [:ticket_types, :extras])
+        event = Backend.Repo.preload(event, [:ticket_types, extra_item_sections: :extras])
         conn |> put_status(:created) |> json(event_detail_json(event))
 
       {:error, changeset} ->
@@ -49,7 +49,7 @@ defmodule BackendWeb.EventController do
   def update(conn, %{"id" => id} = params) do
     case Events.update_event(conn.assigns.current_user, id, params) do
       {:ok, event} ->
-        event = Backend.Repo.preload(event, [:ticket_types, :extras])
+        event = Backend.Repo.preload(event, [:ticket_types, extra_item_sections: :extras])
         json(conn, event_detail_json(event))
 
       {:error, :not_found} ->
@@ -94,8 +94,19 @@ defmodule BackendWeb.EventController do
     event_json(event)
     |> Map.merge(%{
       ticket_types: Enum.map(event.ticket_types, &ticket_type_json/1),
-      extras: Enum.map(event.extras, &extra_json/1)
+      extra_sections: Enum.map(event.extra_item_sections, &extra_section_json/1)
     })
+  end
+
+  def extra_section_json(s) do
+    %{
+      id: s.id,
+      event_id: s.event_id,
+      title: s.title,
+      description: s.description,
+      position: s.position,
+      extras: Enum.map(s.extras, &extra_json/1)
+    }
   end
 
   def ticket_type_json(tt) do
@@ -116,6 +127,7 @@ defmodule BackendWeb.EventController do
     %{
       id: ex.id,
       event_id: ex.event_id,
+      section_id: ex.section_id,
       name: ex.name,
       description: ex.description,
       price_cents: ex.price_cents,
