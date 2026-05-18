@@ -113,7 +113,7 @@
 							<strong>{tk.name}</strong>
 							<div class="muted small">{tk.description}</div>
 							<div class="muted small">
-								{formatBRL(tk.price_cents)} · {remaining} {t('event.left')}
+								{formatBRL(tk.price_cents)}
 							</div>
 						</div>
 						<div class="qty">
