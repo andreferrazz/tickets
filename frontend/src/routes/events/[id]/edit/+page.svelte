@@ -84,6 +84,16 @@
 		await reload();
 	}
 
+	async function saveTicket(tk: TicketType, patch: Partial<TicketType>) {
+		actionError = null;
+		try {
+			await api.updateTicketType(tk.id, patch);
+			await reload();
+		} catch (e) {
+			reportError(e, 'eventEdit.saveTicketError');
+		}
+	}
+
 	async function delTicket(tk: TicketType) {
 		const ok = await confirmDialog({
 			message: t('eventEdit.confirmDeleteTicket', { name: tk.name }),
@@ -144,6 +154,16 @@
 			} else {
 				reportError(e, 'eventEdit.deleteSectionError');
 			}
+		}
+	}
+
+	async function saveExtra(x: ExtraItem, patch: Partial<ExtraItem>) {
+		actionError = null;
+		try {
+			await api.updateExtra(x.id, patch);
+			await reload();
+		} catch (e) {
+			reportError(e, 'eventEdit.saveExtraError');
 		}
 	}
 
@@ -208,15 +228,36 @@
 	<div class="card stack" style="margin: 1rem 0;">
 		<h2>{t('eventEdit.ticketTypes')}</h2>
 		{#each event.ticket_types as tk (tk.id)}
-			<div class="row-line">
-				<div>
-					<strong>{tk.name}</strong>
-					<span class="muted small">
-						— {formatBRL(tk.price_cents)} · {tk.quantity_sold}/{tk.quantity_total}
-						{t('eventEdit.sold')}</span
-					>
-				</div>
+			<div class="add">
+				<FloatingField label={t('common.name')}>
+					<input
+						placeholder=" "
+						value={tk.name}
+						onchange={(e) => saveTicket(tk, { name: e.currentTarget.value })}
+					/>
+				</FloatingField>
+				<FloatingField label={t('eventEdit.priceCents')}>
+					<input
+						type="text"
+						inputmode="numeric"
+						placeholder=" "
+						value={formatCentsInput(tk.price_cents)}
+						onchange={(e) =>
+							saveTicket(tk, { price_cents: parseCentsInput(e.currentTarget.value) })}
+					/>
+				</FloatingField>
+				<FloatingField label={t('eventEdit.qty')}>
+					<input
+						type="number"
+						placeholder=" "
+						value={tk.quantity_total}
+						onchange={(e) => saveTicket(tk, { quantity_total: Number(e.currentTarget.value) })}
+					/>
+				</FloatingField>
 				<button class="danger small" onclick={() => delTicket(tk)}>{t('common.delete')}</button>
+			</div>
+			<div class="muted small" style="padding: 0 0.75rem;">
+				{tk.quantity_sold}/{tk.quantity_total} {t('eventEdit.sold')}
 			</div>
 		{/each}
 		<div class="add">
@@ -267,11 +308,35 @@
 			</FloatingField>
 
 			{#each s.extras as x (x.id)}
-				<div class="row-line">
-					<div>
-						<strong>{x.name}</strong>
-						<span class="muted small"> — {formatBRL(x.price_cents)}</span>
-					</div>
+				<div class="add">
+					<FloatingField label={t('common.name')}>
+						<input
+							placeholder=" "
+							value={x.name}
+							onchange={(e) => saveExtra(x, { name: e.currentTarget.value })}
+						/>
+					</FloatingField>
+					<FloatingField label={t('eventEdit.priceCents')}>
+						<input
+							type="text"
+							inputmode="numeric"
+							placeholder=" "
+							value={formatCentsInput(x.price_cents)}
+							onchange={(e) =>
+								saveExtra(x, { price_cents: parseCentsInput(e.currentTarget.value) })}
+						/>
+					</FloatingField>
+					<FloatingField label={t('eventEdit.qtyUnlimited')}>
+						<input
+							type="number"
+							placeholder=" "
+							value={x.quantity_total ?? ''}
+							onchange={(e) => {
+								const v = e.currentTarget.value;
+								saveExtra(x, { quantity_total: v === '' ? null : Number(v) });
+							}}
+						/>
+					</FloatingField>
 					<button class="danger small" onclick={() => delExtra(x)}>{t('common.delete')}</button>
 				</div>
 			{/each}
