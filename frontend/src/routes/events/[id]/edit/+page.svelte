@@ -53,7 +53,6 @@
 
 	function formatCentsInput(cents: number): string {
 		const c = Math.max(0, Math.trunc(cents));
-		if (c === 0) return '';
 		return (c / 100).toFixed(2);
 	}
 
