@@ -159,6 +159,10 @@ button.danger {
 	background: #1e3a8a;
 	color: #dbeafe;
 }
+.badge.sold-out {
+	background: #7f1d1d;
+	color: #fecaca;
+}
 
 .error {
 	background: #7f1d1d;

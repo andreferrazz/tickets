@@ -71,6 +71,7 @@ export const pt = {
 	'event.tickets': 'Ingressos',
 	'event.addons': 'Complementos',
 	'event.noTickets': 'Nenhum ingresso disponível.',
+	'event.soldOut': 'Esgotado',
 	'event.orderSummary': 'Resumo do pedido',
 	'event.noItems': 'Nenhum item selecionado.',
 	'event.ticketRequired': 'Selecione pelo menos um ingresso para comprar complementos.',

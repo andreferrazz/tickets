@@ -121,15 +121,19 @@
 								{formatBRL(tk.price_cents)}
 							</div>
 						</div>
-						<div class="qty">
-							<button class="secondary small" onclick={() => bump(`t:${tk.id}`, -1, remaining)}
-								>−</button
-							>
-							<span>{qty[`t:${tk.id}`] ?? 0}</span>
-							<button class="secondary small" onclick={() => bump(`t:${tk.id}`, 1, remaining)}
-								>+</button
-							>
-						</div>
+						{#if remaining <= 0}
+							<span class="badge sold-out">{t('event.soldOut')}</span>
+						{:else}
+							<div class="qty">
+								<button class="secondary small" onclick={() => bump(`t:${tk.id}`, -1, remaining)}
+									>−</button
+								>
+								<span>{qty[`t:${tk.id}`] ?? 0}</span>
+								<button class="secondary small" onclick={() => bump(`t:${tk.id}`, 1, remaining)}
+									>+</button
+								>
+							</div>
+						{/if}
 					</div>
 				{:else}
 					<p class="muted">{t('event.noTickets')}</p>
@@ -151,17 +155,21 @@
 									<div class="muted small">{x.description}</div>
 									<div class="muted small">{formatBRL(x.price_cents)}</div>
 								</div>
-								<div class="qty">
-									<button
-										class="secondary small"
-										onclick={() => bump(`x:${x.id}`, -1, remaining)}>−</button
-									>
-									<span>{qty[`x:${x.id}`] ?? 0}</span>
-									<button
-										class="secondary small"
-										onclick={() => bump(`x:${x.id}`, 1, remaining)}>+</button
-									>
-								</div>
+								{#if remaining <= 0}
+									<span class="badge sold-out">{t('event.soldOut')}</span>
+								{:else}
+									<div class="qty">
+										<button
+											class="secondary small"
+											onclick={() => bump(`x:${x.id}`, -1, remaining)}>−</button
+										>
+										<span>{qty[`x:${x.id}`] ?? 0}</span>
+										<button
+											class="secondary small"
+											onclick={() => bump(`x:${x.id}`, 1, remaining)}>+</button
+										>
+									</div>
+								{/if}
 							</div>
 						{/each}
 					{/if}
