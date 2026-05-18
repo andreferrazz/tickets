@@ -5,20 +5,20 @@ defmodule Backend.BrazilianCellphoneTest do
 
   describe "normalize/1 happy paths" do
     test "accepts a bare 11-digit mobile" do
-      assert {:ok, "+5511999999999"} = BrazilianCellphone.normalize("11999999999")
+      assert {:ok, "11999999999"} = BrazilianCellphone.normalize("11999999999")
     end
 
-    test "accepts an E.164 string with the + sign" do
-      assert {:ok, "+5511999999999"} = BrazilianCellphone.normalize("+5511999999999")
+    test "accepts an E.164 string with the + sign and strips the country code" do
+      assert {:ok, "11999999999"} = BrazilianCellphone.normalize("+5511999999999")
     end
 
-    test "accepts a number with the country code but no +" do
-      assert {:ok, "+5531998765432"} = BrazilianCellphone.normalize("5531998765432")
+    test "accepts a number with the country code but no + and strips it" do
+      assert {:ok, "31998765432"} = BrazilianCellphone.normalize("5531998765432")
     end
 
     test "ignores spaces, parentheses, and dashes" do
-      assert {:ok, "+5511987654321"} = BrazilianCellphone.normalize("(11) 98765-4321")
-      assert {:ok, "+5511987654321"} = BrazilianCellphone.normalize("+55 11 98765-4321")
+      assert {:ok, "11987654321"} = BrazilianCellphone.normalize("(11) 98765-4321")
+      assert {:ok, "11987654321"} = BrazilianCellphone.normalize("+55 11 98765-4321")
     end
   end
 

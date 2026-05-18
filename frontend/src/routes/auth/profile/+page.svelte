@@ -104,7 +104,7 @@
 				bind:value={cellphone}
 				required
 				autocomplete="tel"
-				placeholder="+55 11 99999-9999"
+				placeholder="(11) 99999-9999"
 				aria-invalid={fieldError('cellphone') ? 'true' : undefined}
 			/>
 			{#if fieldError('cellphone')}

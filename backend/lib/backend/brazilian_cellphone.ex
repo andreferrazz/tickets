@@ -3,19 +3,21 @@ defmodule Backend.BrazilianCellphone do
   Strict validator/normalizer for Brazilian mobile numbers.
 
   Accepts user input in any format (with or without country code, spaces,
-  parentheses, or dashes) and returns the value in E.164 (`+55DDDXXXXXXXXX`)
-  when it represents a Brazilian mobile. Only mobiles are accepted: after
-  stripping the optional country code we require exactly 11 digits with the
-  mobile `9` prefix right after the DDD.
+  parentheses, or dashes) and returns the value as DDD + number
+  (`DDDXXXXXXXXX`, 11 digits) when it represents a Brazilian mobile. The
+  country code is stripped — downstream callers (e.g. Abacate Pay) expect
+  the local format. Only mobiles are accepted: after stripping the optional
+  country code we require exactly 11 digits with the mobile `9` prefix right
+  after the DDD.
 
   Used by `Backend.Accounts.User.profile_changeset/2` so obvious typos fail
   locally before any Abacate Pay call.
   """
 
   @doc """
-  Normalizes `input` to `+55DDDXXXXXXXXX` when it is a Brazilian mobile.
+  Normalizes `input` to `DDDXXXXXXXXX` (11 digits) when it is a Brazilian mobile.
 
-  Returns `{:ok, e164}` or `:error`.
+  Returns `{:ok, digits}` or `:error`.
   """
   def normalize(input) when is_binary(input) do
     input
@@ -30,7 +32,7 @@ defmodule Backend.BrazilianCellphone do
   defp strip_country_code(other), do: other
 
   defp validate_mobile(<<d1, _d2, ?9, _rest::binary-size(8)>> = digits) when d1 in ?1..?9 do
-    {:ok, "+55" <> digits}
+    {:ok, digits}
   end
 
   defp validate_mobile(_), do: :error

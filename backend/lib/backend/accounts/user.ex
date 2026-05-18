@@ -32,9 +32,10 @@ defmodule Backend.Accounts.User do
   Changeset for the post-signup profile step: name, cellphone, tax_id.
 
   Trims `name`, strips non-digits from `tax_id`, normalizes `cellphone` to
-  E.164 (`+55DDDXXXXXXXXX`) for Brazilian mobiles, and validates the tax_id
-  is a checksum-valid CPF (11 digits) or CNPJ (14 digits). Catching bad
-  values here avoids a round-trip to Abacate Pay for obvious typos.
+  DDD + number (`DDDXXXXXXXXX`, 11 digits, no country code) for Brazilian
+  mobiles, and validates the tax_id is a checksum-valid CPF (11 digits) or
+  CNPJ (14 digits). Catching bad values here avoids a round-trip to Abacate
+  Pay for obvious typos.
   """
   def profile_changeset(user, attrs) do
     user

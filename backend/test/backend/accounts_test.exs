@@ -86,7 +86,7 @@ defmodule Backend.AccountsTest do
                })
 
       assert updated.name == "Maria Silva"
-      assert updated.cellphone == "+5511999999999"
+      assert updated.cellphone == "11999999999"
       assert updated.tax_id == "11144477735"
       assert updated.abacate_customer_id == "cust_test_11144477735"
       assert Backend.Accounts.User.profile_complete?(updated)
@@ -103,7 +103,7 @@ defmodule Backend.AccountsTest do
                })
 
       assert updated.name == "Joao"
-      assert updated.cellphone == "+5511999999999"
+      assert updated.cellphone == "11999999999"
       assert updated.tax_id == "11144477735"
     end
 
