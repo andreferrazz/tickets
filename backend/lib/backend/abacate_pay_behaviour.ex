@@ -11,7 +11,8 @@ defmodule Backend.AbacatePayBehaviour do
   @callback create_checkout(
               items :: [%{id: String.t(), quantity: integer()}],
               return_url :: String.t(),
-              completion_url :: String.t()
+              completion_url :: String.t(),
+              customer_id :: String.t() | nil
             ) ::
               {:ok, %{id: String.t(), url: String.t()}} | {:error, any()}
 

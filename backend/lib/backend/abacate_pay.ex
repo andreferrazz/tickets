@@ -71,13 +71,15 @@ defmodule Backend.AbacatePay do
   Returns `{:ok, %{id: bill_id, url: payment_url}}`.
   """
   @impl Backend.AbacatePayBehaviour
-  def create_checkout(items, return_url, completion_url) do
-    body = %{
-      items: items,
-      methods: ["PIX", "CARD"],
-      returnUrl: return_url,
-      completionUrl: completion_url
-    }
+  def create_checkout(items, return_url, completion_url, customer_id) do
+    body =
+      %{
+        items: items,
+        methods: ["PIX", "CARD"],
+        returnUrl: return_url,
+        completionUrl: completion_url
+      }
+      |> maybe_put(:customerId, customer_id)
 
     case Req.post("#{@base_url}/checkouts/create", json: body, headers: [auth_header()]) do
       {:ok, %{status: 200, body: %{"data" => %{"id" => id, "url" => url}}}} ->
@@ -90,4 +92,7 @@ defmodule Backend.AbacatePay do
         {:error, reason}
     end
   end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 end

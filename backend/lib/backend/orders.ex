@@ -31,7 +31,7 @@ defmodule Backend.Orders do
          {:ok, line_items} <- resolve_items(event, cart_items),
          total = compute_total(line_items),
          {:ok, order} <- reserve_order(user, event, total, line_items) do
-      case build_checkout(order, line_items) do
+      case build_checkout(order, line_items, user.abacate_customer_id) do
         {:ok, checkout} ->
           {:ok, attach_checkout(order, event, checkout)}
 
@@ -242,12 +242,12 @@ defmodule Backend.Orders do
     Repo.update_all(from(ei in ExtraItem, where: ei.id == ^id), inc: [quantity_sold: qty])
   end
 
-  defp build_checkout(order, line_items) do
+  defp build_checkout(order, line_items, customer_id) do
     with {:ok, abacate_items} <- collect_abacate_items(line_items) do
       frontend_url = Application.get_env(:backend, :frontend_url, "http://localhost:5173")
       return_url = "#{frontend_url}/orders"
       completion_url = "#{frontend_url}/orders/#{order.id}"
-      abacate_pay().create_checkout(abacate_items, return_url, completion_url)
+      abacate_pay().create_checkout(abacate_items, return_url, completion_url, customer_id)
     end
   end
 
