@@ -37,7 +37,7 @@ defmodule BackendWeb.WebhookController do
     end
   end
 
-  defp dispatch_event(%{"event" => "checkout.completed", "data" => %{"id" => id}}) do
+  defp dispatch_event(%{"event" => "checkout.completed", "data" => %{"checkout" => %{"id" => id}}}) do
     with {:ok, order} <- Orders.mark_paid_by_checkout(id),
          order = order |> Backend.Repo.preload([:user, :items]) |> Orders.with_event_title(),
          {:ok, passes, status} <- Tickets.issue_for_order(order) do
@@ -46,7 +46,7 @@ defmodule BackendWeb.WebhookController do
     end
   end
 
-  defp dispatch_event(%{"event" => "checkout.refunded", "data" => %{"id" => id}}) do
+  defp dispatch_event(%{"event" => "checkout.refunded", "data" => %{"checkout" => %{"id" => id}}}) do
     Orders.mark_refunded_by_checkout(id)
   end
 

@@ -73,7 +73,7 @@ defmodule BackendWeb.WebhookControllerTest do
     test "issues passes and sends tickets + extras emails", %{conn: conn} do
       {buyer, order} = paid_order_with_extras(ticket_qty: 3)
       drain_mailbox()
-      body = Jason.encode!(%{event: "checkout.completed", data: %{id: order.abacate_checkout_id}})
+      body = Jason.encode!(%{event: "checkout.completed", data: %{checkout: %{id: order.abacate_checkout_id}}})
 
       conn = post_webhook(conn, body)
       assert json_response(conn, 200) == %{"ok" => true}
@@ -89,7 +89,7 @@ defmodule BackendWeb.WebhookControllerTest do
          %{conn: conn} do
       {buyer, order} = paid_order_with_extras(ticket_qty: 2)
       drain_mailbox()
-      body = Jason.encode!(%{event: "checkout.completed", data: %{id: order.abacate_checkout_id}})
+      body = Jason.encode!(%{event: "checkout.completed", data: %{checkout: %{id: order.abacate_checkout_id}}})
 
       _ = post_webhook(conn, body)
       assert Repo.aggregate(from(p in Pass, where: p.order_id == ^order.id), :count) == 3

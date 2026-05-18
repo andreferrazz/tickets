@@ -27,8 +27,10 @@ get_required_env = fn key ->
   System.get_env(key) || raise "environment variable #{key} is missing."
 end
 
-config :backend, :abacate_pay_api_key, get_required_env.("ABACATE_PAY_API_KEY")
-config :backend, :abacate_pay_webhook_secret, get_required_env.("ABACATE_PAY_WEBHOOK_SECRET")
+if config_env() != :test do
+  config :backend, :abacate_pay_api_key, get_required_env.("ABACATE_PAY_API_KEY")
+  config :backend, :abacate_pay_webhook_secret, get_required_env.("ABACATE_PAY_WEBHOOK_SECRET")
+end
 
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.
