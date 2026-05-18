@@ -8,6 +8,7 @@ import type {
 	ExtraSection,
 	Invitation,
 	Order,
+	Pass,
 	ProfileUpdate,
 	TicketType,
 	User,
@@ -114,6 +115,8 @@ export const api = {
 	listOrders: (fetcher?: typeof fetch) => request<Order[]>('/orders', { fetcher }),
 	getOrder: (id: string, fetcher?: typeof fetch) =>
 		request<Order>(`/orders/${id}`, { fetcher }),
+	getOrderPasses: (id: string, fetcher?: typeof fetch) =>
+		request<Pass[]>(`/orders/${id}/passes`, { fetcher }),
 	listInvitations: (fetcher?: typeof fetch) =>
 		request<Invitation[]>('/invitations', { fetcher }),
 	createInvitation: (email: string) =>

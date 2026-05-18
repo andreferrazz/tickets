@@ -1,7 +1,7 @@
 defmodule BackendWeb.OrderControllerTest do
   use BackendWeb.ConnCase, async: true
 
-  alias Backend.{Accounts, Events, Orders}
+  alias Backend.{Accounts, Events, Orders, Tickets}
 
   defp authed_conn(conn, role \\ "buyer") do
     email = "#{role}_#{:rand.uniform(999_999)}@order_ctrl.test"
@@ -134,6 +134,60 @@ defmodule BackendWeb.OrderControllerTest do
 
       _ = other_user
       conn = get(other_conn, "/api/v1/orders/#{order.id}")
+      assert json_response(conn, 404)
+    end
+  end
+
+  describe "GET /api/v1/orders/:id/passes" do
+    test "returns the buyer's passes with base64 QR PNGs", %{conn: conn} do
+      {conn, user} = authed_conn(conn)
+      {event, tt} = setup_event_with_ticket()
+
+      {:ok, order} =
+        Orders.create_order(user, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 2}
+        ])
+
+      {:ok, _passes, :created} = Tickets.issue_for_order(order)
+
+      conn = get(conn, "/api/v1/orders/#{order.id}/passes")
+      passes = json_response(conn, 200)
+
+      assert length(passes) == 2
+
+      Enum.each(passes, fn p ->
+        assert p["kind"] == "ticket"
+        assert is_binary(p["token"])
+        assert is_binary(p["qr_png_base64"])
+        # PNG signature decoded from base64
+        assert <<137, "PNG", _::binary>> = Base.decode64!(p["qr_png_base64"])
+      end)
+    end
+
+    test "returns empty list before passes are issued", %{conn: conn} do
+      {conn, user} = authed_conn(conn)
+      {event, tt} = setup_event_with_ticket()
+
+      {:ok, order} =
+        Orders.create_order(user, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      conn = get(conn, "/api/v1/orders/#{order.id}/passes")
+      assert json_response(conn, 200) == []
+    end
+
+    test "returns 404 for another user's order", %{conn: conn} do
+      {other_conn, _other} = authed_conn(conn)
+      {_buyer_conn, buyer} = authed_conn(conn)
+      {event, tt} = setup_event_with_ticket()
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      conn = get(other_conn, "/api/v1/orders/#{order.id}/passes")
       assert json_response(conn, 404)
     end
   end

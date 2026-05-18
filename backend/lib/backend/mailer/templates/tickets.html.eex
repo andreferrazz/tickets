@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <body style="font-family: sans-serif; color: #222;">
+    <h1>Seus ingressos — <%= event_title %></h1>
+    <p>Seu pagamento foi confirmado. 🎉</p>
+    <p>Apresente o QR Code abaixo na entrada do evento. Cada ingresso tem seu próprio código.</p>
+
+    <%= for pass <- passes do %>
+      <div style="border:1px solid #ccc;padding:16px;margin:16px 0;border-radius:8px;">
+        <h2 style="margin:0 0 8px 0;font-size:18px;"><%= pass.item_name %></h2>
+        <img src="cid:<%= pass.token %>" alt="QR Code" width="240" height="240" style="display:block;" />
+      </div>
+    <% end %>
+
+    <p>Detalhes do pedido:
+      <a href="<%= order_url %>"><%= order_url %></a>
+    </p>
+    <p style="color:#888;">— Equipe Tickets</p>
+  </body>
+</html>

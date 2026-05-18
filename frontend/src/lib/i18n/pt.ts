@@ -142,6 +142,14 @@ export const pt = {
 	'order.continueToPay': 'Concluir pagamento',
 	'order.paidAt': 'Pago em',
 	'order.paymentConfirmed': '✅ Pagamento confirmado. Seus ingressos estão reservados.',
+	'order.qrEmailed':
+		'Seus QR Codes foram enviados para o seu email. Cada ingresso tem o seu próprio código, e os itens extras (se houver) vêm em um email separado.',
+	'order.passesTitle': 'Seus QR Codes',
+	'order.passesHint': 'Apresente cada código na entrada do evento.',
+	'order.passesTicketsTitle': 'Ingressos',
+	'order.passesExtrasTitle': 'Extras',
+	'order.passExtras': 'Extras',
+	'order.passCheckedIn': 'Já validado',
 	'order.errorFallback': 'Falha ao carregar pedido',
 	'order.notFound': 'Pedido não encontrado',
 

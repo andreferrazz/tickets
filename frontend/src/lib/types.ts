@@ -82,6 +82,15 @@ export interface OrderItem {
 	unit_price_cents: number;
 }
 
+export interface Pass {
+	id: string;
+	kind: 'ticket' | 'extra';
+	item_name: string;
+	token: string;
+	checked_in_at: string | null;
+	qr_png_base64: string;
+}
+
 export interface Order {
 	id: string;
 	user_id: string;

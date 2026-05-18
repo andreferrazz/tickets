@@ -1,8 +1,8 @@
 defmodule BackendWeb.WebhookControllerTest do
   use BackendWeb.ConnCase, async: true
 
-  alias Backend.AbacatePay
-  alias Backend.Repo
+  alias Backend.{Accounts, AbacatePay, Events, Orders, Repo}
+  alias Backend.Tickets.Pass
   alias Backend.Webhooks.Event
 
   @path "/webhooks/abacate-pay"
@@ -67,5 +67,107 @@ defmodule BackendWeb.WebhookControllerTest do
       assert json_response(conn, 401) == %{"error" => "invalid signature"}
       assert Repo.all(Event) == []
     end
+  end
+
+  describe "checkout.completed side effects" do
+    test "issues passes and sends tickets + extras emails", %{conn: conn} do
+      {buyer, order} = paid_order_with_extras(ticket_qty: 3)
+      drain_mailbox()
+      body = Jason.encode!(%{event: "checkout.completed", data: %{id: order.abacate_checkout_id}})
+
+      conn = post_webhook(conn, body)
+      assert json_response(conn, 200) == %{"ok" => true}
+
+      assert Repo.aggregate(from(p in Pass, where: p.order_id == ^order.id), :count) == 4
+
+      subjects = collect_subjects_for(buyer.email)
+      assert Enum.any?(subjects, &String.starts_with?(&1, "Seus ingressos"))
+      assert Enum.any?(subjects, &String.starts_with?(&1, "Seus extras"))
+    end
+
+    test "is idempotent: replaying the webhook does not duplicate passes or emails",
+         %{conn: conn} do
+      {buyer, order} = paid_order_with_extras(ticket_qty: 2)
+      drain_mailbox()
+      body = Jason.encode!(%{event: "checkout.completed", data: %{id: order.abacate_checkout_id}})
+
+      _ = post_webhook(conn, body)
+      assert Repo.aggregate(from(p in Pass, where: p.order_id == ^order.id), :count) == 3
+      drain_mailbox()
+
+      _ = post_webhook(conn, body)
+      assert Repo.aggregate(from(p in Pass, where: p.order_id == ^order.id), :count) == 3
+      assert collect_subjects_for(buyer.email) == []
+    end
+  end
+
+  defp drain_mailbox do
+    receive do
+      {:email, _} -> drain_mailbox()
+    after
+      0 -> :ok
+    end
+  end
+
+  defp collect_subjects_for(email_addr, acc \\ []) do
+    receive do
+      {:email, %Swoosh.Email{} = email} ->
+        if Enum.any?(email.to, fn {_, addr} -> addr == email_addr end) do
+          collect_subjects_for(email_addr, [email.subject | acc])
+        else
+          collect_subjects_for(email_addr, acc)
+        end
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
+
+  defp paid_order_with_extras(opts) do
+    ticket_qty = Keyword.fetch!(opts, :ticket_qty)
+
+    creator_email = "creator_#{:rand.uniform(999_999)}@webhook.test"
+    {:ok, code} = Accounts.request_code(creator_email)
+    {:ok, %{user: creator}} = Accounts.verify_code(creator_email, code)
+
+    Repo.update_all(from(u in Accounts.User, where: u.id == ^creator.id),
+      set: [role: "creator"]
+    )
+
+    creator = Repo.get!(Accounts.User, creator.id)
+
+    {:ok, event} =
+      Events.create_event(creator, %{
+        "title" => "Webhook Fest",
+        "starts_at" => "2027-11-01T18:00:00Z",
+        "status" => "published"
+      })
+
+    {:ok, tt} =
+      Events.create_ticket_type(creator, event.id, %{
+        "name" => "GA",
+        "price_cents" => 2000,
+        "quantity_total" => 100
+      })
+
+    {:ok, section} = Events.create_section(creator, event.id, %{"title" => "Add-ons"})
+
+    {:ok, extra} =
+      Events.create_extra(creator, event.id, %{
+        "name" => "Drink",
+        "price_cents" => 500,
+        "section_id" => section.id
+      })
+
+    buyer_email = "buyer_#{:rand.uniform(999_999)}@webhook.test"
+    {:ok, code} = Accounts.request_code(buyer_email)
+    {:ok, %{user: buyer}} = Accounts.verify_code(buyer_email, code)
+
+    {:ok, order} =
+      Orders.create_order(buyer, event.id, [
+        %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => ticket_qty},
+        %{"item_type" => "extra", "item_id" => extra.id, "quantity" => 1}
+      ])
+
+    {buyer, order}
   end
 end

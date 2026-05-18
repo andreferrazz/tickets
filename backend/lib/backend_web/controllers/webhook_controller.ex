@@ -15,6 +15,7 @@ defmodule BackendWeb.WebhookController do
 
   alias Backend.AbacatePay
   alias Backend.Orders
+  alias Backend.Tickets
   alias Backend.Webhooks
 
   @doc "POST /webhooks/abacate-pay"
@@ -37,9 +38,10 @@ defmodule BackendWeb.WebhookController do
   end
 
   defp dispatch_event(%{"event" => "checkout.completed", "data" => %{"id" => id}}) do
-    with {:ok, order} <- Orders.mark_paid_by_checkout(id) do
-      order = Backend.Repo.preload(order, :user)
-      Backend.Mailer.send_order_confirmation(order.user.email, order)
+    with {:ok, order} <- Orders.mark_paid_by_checkout(id),
+         order = order |> Backend.Repo.preload([:user, :items]) |> Orders.with_event_title(),
+         {:ok, passes, status} <- Tickets.issue_for_order(order) do
+      if status == :created, do: deliver_pass_emails(order, passes)
       {:ok, order}
     end
   end
@@ -49,6 +51,20 @@ defmodule BackendWeb.WebhookController do
   end
 
   defp dispatch_event(_), do: :ok
+
+  defp deliver_pass_emails(order, passes) do
+    {ticket_passes, extra_passes} = Enum.split_with(passes, &(&1.kind == "ticket"))
+    Backend.Mailer.send_tickets_email(order.user.email, order, ticket_passes)
+
+    case extra_passes do
+      [extra_pass | _] ->
+        extras_items = Enum.filter(order.items, &(&1.item_type == "extra"))
+        Backend.Mailer.send_extras_email(order.user.email, order, extra_pass, extras_items)
+
+      [] ->
+        :ok
+    end
+  end
 
   defp handle_result(conn, {:ok, _}), do: json(conn, %{ok: true})
   defp handle_result(conn, :ok), do: json(conn, %{ok: true})

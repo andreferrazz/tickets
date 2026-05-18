@@ -45,7 +45,8 @@ defmodule Backend.MixProject do
       {:swoosh, "~> 1.16"},
       {:gen_smtp, "~> 1.2"},
       {:req, "~> 0.5"},
-      {:corsica, "~> 2.1"}
+      {:corsica, "~> 2.1"},
+      {:eqrcode, "~> 0.2.1"}
     ]
   end
 

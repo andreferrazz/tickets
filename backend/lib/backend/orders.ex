@@ -64,6 +64,18 @@ defmodule Backend.Orders do
     Repo.preload(orders, :items)
   end
 
+  @doc """
+  Populates `event_title` on `order` by joining the events table. Returns the
+  order unchanged when the event cannot be found (defensive; should not happen
+  in practice since orders FK to events).
+  """
+  def with_event_title(%Order{event_id: event_id} = order) do
+    case Repo.one(from(e in Event, where: e.id == ^event_id, select: e.title)) do
+      nil -> order
+      title -> %{order | event_title: title}
+    end
+  end
+
   @doc "Returns a single order belonging to `user`, or `{:error, :not_found}`."
   def get_order(user, order_id) do
     result =

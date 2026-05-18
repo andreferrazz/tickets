@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <body style="font-family: sans-serif; color: #222;">
+    <h1>Seus extras — <%= event_title %></h1>
+    <p>O QR Code abaixo cobre todos os itens extras do seu pedido. Apresente-o no evento para retirá-los.</p>
+
+    <div style="border:1px solid #ccc;padding:16px;margin:16px 0;border-radius:8px;">
+      <img src="cid:<%= pass.token %>" alt="QR Code" width="240" height="240" style="display:block;" />
+    </div>
+
+    <h2 style="font-size:16px;">Itens incluídos:</h2>
+    <ul>
+      <%= for item <- items do %>
+        <li><%= item.item_name %> × <%= item.quantity %></li>
+      <% end %>
+    </ul>
+
+    <p>Detalhes do pedido:
+      <a href="<%= order_url %>"><%= order_url %></a>
+    </p>
+    <p style="color:#888;">— Equipe Tickets</p>
+  </body>
+</html>

@@ -2,6 +2,7 @@ defmodule BackendWeb.OrderController do
   use BackendWeb, :controller
 
   alias Backend.Orders
+  alias Backend.Tickets
 
   @doc "POST /api/v1/orders"
   def create(conn, %{"event_id" => event_id, "items" => items}) do
@@ -53,6 +54,22 @@ defmodule BackendWeb.OrderController do
     end
   end
 
+  @doc """
+  GET /api/v1/orders/:id/passes
+
+  Returns the QR passes for the buyer's order. The QR PNG is embedded as a
+  base64 data string so the page can render `<img src="data:image/png;...">`
+  without a second authenticated request per image.
+  """
+  def passes(conn, %{"id" => id}) do
+    with {:ok, order} <- Orders.get_order(conn.assigns.current_user, id) do
+      passes = Tickets.list_for_order(order)
+      json(conn, Enum.map(passes, &pass_json/1))
+    else
+      {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "order not found"})
+    end
+  end
+
   # ---------------------------------------------------------------------------
 
   def order_json(order) do
@@ -67,6 +84,17 @@ defmodule BackendWeb.OrderController do
       paid_at: order.paid_at,
       created_at: order.inserted_at,
       items: Enum.map(order.items, &order_item_json/1)
+    }
+  end
+
+  defp pass_json(pass) do
+    %{
+      id: pass.id,
+      kind: pass.kind,
+      item_name: pass.item_name,
+      token: pass.token,
+      checked_in_at: pass.checked_in_at,
+      qr_png_base64: pass |> Tickets.qr_png() |> Base.encode64()
     }
   end
 
