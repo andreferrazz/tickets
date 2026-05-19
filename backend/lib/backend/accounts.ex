@@ -225,12 +225,28 @@ defmodule Backend.Accounts do
            {:ok, user} <- apply_invitation_role(user, invitation),
            {:ok, _membership} <- attach_membership(invitation, user),
            {:ok, _} <- mark_invitation_accepted(invitation),
-           {:ok, token} <- create_session(user) do
-        %{token: token, user: user}
+           {:ok, token} <- create_session(user),
+           {:ok, organization} <- load_invitation_org(invitation) do
+        %{
+          token: token,
+          user: user,
+          organization: %{
+            id: organization.id,
+            name: organization.name,
+            role: invitation.role
+          }
+        }
       else
         {:error, reason} -> Repo.rollback(reason)
       end
     end)
+  end
+
+  defp load_invitation_org(invitation) do
+    case Repo.get(Backend.Organizations.Organization, invitation.organization_id) do
+      nil -> {:error, :organization_missing}
+      org -> {:ok, org}
+    end
   end
 
   defp apply_invitation_role(%User{role: "buyer"} = user, invitation) do

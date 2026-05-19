@@ -60,8 +60,12 @@ defmodule BackendWeb.InvitationController do
   @doc "POST /api/v1/invitations/accept — public; consumes a tokenized link"
   def accept(conn, %{"token" => token}) do
     case Invitations.accept_invitation(token) do
-      {:ok, %{token: session_token, user: user}} ->
-        json(conn, %{token: session_token, user: BackendWeb.UserController.user_json(user)})
+      {:ok, %{token: session_token, user: user, organization: org}} ->
+        json(conn, %{
+          token: session_token,
+          user: BackendWeb.UserController.user_json(user),
+          organization: org
+        })
 
       {:error, reason} when reason in [:invalid_token, :expired, :already_accepted] ->
         conn

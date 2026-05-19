@@ -11,6 +11,7 @@ import type {
 	ExtraSection,
 	Invitation,
 	Order,
+	Organization,
 	Pass,
 	ProfileUpdate,
 	SeatPick,
@@ -149,7 +150,11 @@ export const api = {
 	createInvitation: (email: string) =>
 		request<Invitation>('/invitations', { method: 'POST', body: { email } }),
 	acceptInvitation: (token: string) =>
-		request<AuthResponse>('/invitations/accept', { method: 'POST', body: { token } })
+		request<AuthResponse>('/invitations/accept', { method: 'POST', body: { token } }),
+	updateOrganization: (id: string, body: { name: string }) =>
+		request<Organization>(`/organizations/${id}`, { method: 'PATCH', body }),
+	deleteOrganization: (id: string) =>
+		request<{ deleted: true }>(`/organizations/${id}`, { method: 'DELETE' })
 };
 
 export function formatBRL(cents: number): string {

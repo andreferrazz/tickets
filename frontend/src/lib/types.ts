@@ -153,9 +153,26 @@ export interface Invitation {
 	created_at: string;
 }
 
+export interface Organization {
+	id: string;
+	name: string;
+	created_at?: string;
+	updated_at?: string;
+}
+
+export type OrgRole = 'leader' | 'participant';
+
+export interface InvitedOrganization {
+	id: string;
+	name: string;
+	role: OrgRole;
+}
+
 export interface AuthResponse {
 	token: string;
 	user: User;
+	/** Present only when this auth response came from accepting an invitation. */
+	organization?: InvitedOrganization;
 }
 
 export interface CartLine {

@@ -126,6 +126,9 @@ defmodule BackendWeb.InvitationControllerTest do
       assert is_binary(resp["token"])
       assert resp["user"]["email"] == "acceptme@example.com"
       assert resp["user"]["role"] == "creator"
+      assert resp["organization"]["id"] == inv.organization_id
+      assert resp["organization"]["role"] == "leader"
+      assert is_binary(resp["organization"]["name"])
       assert Organizations.leader?(resp["user"]["id"], inv.organization_id)
     end
 
