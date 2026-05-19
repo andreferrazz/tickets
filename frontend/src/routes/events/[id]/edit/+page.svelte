@@ -463,6 +463,15 @@
 							}}
 						/>
 					</FloatingField>
+					<label class="check">
+						<input
+							type="checkbox"
+							checked={x.show_remaining}
+							onchange={(e) =>
+								saveExtra(x, { show_remaining: e.currentTarget.checked })}
+						/>
+						{t('eventEdit.showRemaining')}
+					</label>
 					<button class="danger small" onclick={() => delExtra(x)}>{t('common.delete')}</button>
 				</div>
 			{/each}

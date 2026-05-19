@@ -174,6 +174,11 @@
 									<strong>{x.name}</strong>
 									<div class="muted small">{x.description}</div>
 									<div class="muted small">{formatBRL(x.price_cents)}</div>
+									{#if x.show_remaining && x.quantity_total !== null && remaining > 0}
+										<div class="muted small">
+											{t('event.remainingCount', { count: remaining })}
+										</div>
+									{/if}
 								</div>
 								{#if remaining <= 0}
 									<span class="badge sold-out">{t('event.soldOut')}</span>

@@ -64,6 +64,7 @@ export interface ExtraItem {
 	price_cents: number;
 	quantity_total: number | null;
 	quantity_sold: number;
+	show_remaining: boolean;
 }
 
 export interface ExtraSection {

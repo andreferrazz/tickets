@@ -154,7 +154,8 @@ defmodule BackendWeb.EventController do
       description: ex.description,
       price_cents: ex.price_cents,
       quantity_total: ex.quantity_total,
-      quantity_sold: ex.quantity_sold
+      quantity_sold: ex.quantity_sold,
+      show_remaining: ex.show_remaining
     }
   end
 
