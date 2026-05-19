@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { fromLocalInputValue, toLocalInputValue } from '$lib/datetime';
 	import { t } from '$lib/i18n';
 	import type { Event } from '$lib/types';
 
@@ -13,7 +14,7 @@
 	let title = $state(initial.title ?? '');
 	let description = $state(initial.description ?? '');
 	let location = $state(initial.location ?? '');
-	let starts_at = $state(initial.starts_at ? initial.starts_at.slice(0, 16) : '');
+	let starts_at = $state(initial.starts_at ? toLocalInputValue(initial.starts_at) : '');
 	let cover_image_url = $state(initial.cover_image_url ?? '');
 	let status = $state<'draft' | 'published'>(
 		initial.status === 'published' ? 'published' : 'draft'
@@ -30,7 +31,7 @@
 				title,
 				description: description.trim(),
 				location,
-				starts_at: new Date(starts_at).toISOString(),
+				starts_at: fromLocalInputValue(starts_at),
 				cover_image_url: cover_image_url || null,
 				status
 			});

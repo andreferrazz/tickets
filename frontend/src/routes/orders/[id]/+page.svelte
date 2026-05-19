@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { api, ApiError, formatBRL, formatDate } from '$lib/api';
+	import { api, ApiError, formatBRL } from '$lib/api';
+	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import type { Order, Pass } from '$lib/types';
@@ -46,7 +47,7 @@
 		<h1>{t('order.title')}</h1>
 		<span class="badge {order.status}">{tStatus(order.status)}</span>
 	</div>
-	<p class="muted">{order.event_title} · {formatDate(order.created_at)}</p>
+	<p class="muted">{order.event_title} · {formatDateTime(order.created_at)}</p>
 
 	{#if justPaid}
 		<div class="notice">{t('order.paymentConfirmed')}</div>
@@ -74,7 +75,7 @@
 	{/if}
 
 	{#if order.paid_at}
-		<p class="muted" style="margin-top: 1rem;">{t('order.paidAt')} {formatDate(order.paid_at)}</p>
+		<p class="muted" style="margin-top: 1rem;">{t('order.paidAt')} {formatDateTime(order.paid_at)}</p>
 		<div class="notice" style="margin-top: 1rem;">{t('order.qrEmailed')}</div>
 
 		{#if ticketPasses.length > 0}
@@ -93,7 +94,7 @@
 							<div class="pass-label">{passLabel(p)}</div>
 							{#if p.checked_in_at}
 								<div class="pass-checked">
-									{t('order.passCheckedIn')} · {formatDate(p.checked_in_at)}
+									{t('order.passCheckedIn')} · {formatDateTime(p.checked_in_at)}
 								</div>
 							{/if}
 						</div>
@@ -118,7 +119,7 @@
 							<div class="pass-label">{passLabel(p)}</div>
 							{#if p.checked_in_at}
 								<div class="pass-checked">
-									{t('order.passCheckedIn')} · {formatDate(p.checked_in_at)}
+									{t('order.passCheckedIn')} · {formatDateTime(p.checked_in_at)}
 								</div>
 							{/if}
 						</div>

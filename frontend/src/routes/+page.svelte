@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { api, ApiError, formatDate } from '$lib/api';
+	import { api, ApiError } from '$lib/api';
+	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import type { Event } from '$lib/types';
 	import { onMount } from 'svelte';
@@ -59,7 +60,7 @@
 						<span class="badge {ev.status}">{tStatus(ev.status)}</span>
 					{/if}
 					<h3>{ev.title}</h3>
-					<p class="muted small">{formatDate(ev.starts_at)}</p>
+					<p class="muted small">{formatDateTime(ev.starts_at)}</p>
 					<p class="muted small">{ev.location}</p>
 				</div>
 			</a>

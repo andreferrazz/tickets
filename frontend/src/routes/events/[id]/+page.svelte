@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { api, ApiError, formatBRL, formatDate } from '$lib/api';
+	import { api, ApiError, formatBRL } from '$lib/api';
+	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import type { CartLine, EventDetail } from '$lib/types';
@@ -102,7 +103,7 @@
 			<div>
 				<span class="badge {event.status}">{tStatus(event.status)}</span>
 				<h1>{event.title}</h1>
-				<p class="muted">{formatDate(event.starts_at)} · {event.location}</p>
+				<p class="muted">{formatDateTime(event.starts_at)} · {event.location}</p>
 			</div>
 			{#if canEdit}
 				<a href="/events/{event.id}/edit" class="btn secondary small">{t('common.edit')}</a>

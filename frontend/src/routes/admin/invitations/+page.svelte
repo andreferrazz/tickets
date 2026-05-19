@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { api, ApiError, formatDate } from '$lib/api';
+	import { api, ApiError } from '$lib/api';
+	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import type { Invitation } from '$lib/types';
@@ -85,7 +86,7 @@
 			<div class="line card">
 				<div>
 					<strong>{i.email}</strong>
-					<div class="muted small">{formatDate(i.created_at)}</div>
+					<div class="muted small">{formatDateTime(i.created_at)}</div>
 				</div>
 				<span class="badge {i.status === 'accepted' ? 'paid' : 'pending'}"
 					>{tStatus(i.status)}</span

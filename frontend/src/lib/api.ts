@@ -135,10 +135,3 @@ export const api = {
 export function formatBRL(cents: number): string {
 	return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
-
-export function formatDate(iso: string): string {
-	return new Date(iso).toLocaleString('pt-BR', {
-		dateStyle: 'medium',
-		timeStyle: 'short'
-	});
-}
