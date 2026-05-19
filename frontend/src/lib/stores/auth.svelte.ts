@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import type { User } from '$lib/types';
+import type { OrganizationMembership, User } from '$lib/types';
 
 const STORAGE_KEY = 'tickets.auth';
 
@@ -22,6 +22,9 @@ function load(): Persisted | null {
 class AuthStore {
 	token = $state<string | null>(null);
 	user = $state<User | null>(null);
+	memberships = $state<OrganizationMembership[] | null>(null);
+
+	#inflight: Promise<OrganizationMembership[]> | null = null;
 
 	constructor() {
 		const p = load();
@@ -34,6 +37,8 @@ class AuthStore {
 	set(token: string, user: User): void {
 		this.token = token;
 		this.user = user;
+		this.memberships = null;
+		this.#inflight = null;
 		if (browser) localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user }));
 	}
 
@@ -47,7 +52,41 @@ class AuthStore {
 	clear(): void {
 		this.token = null;
 		this.user = null;
+		this.memberships = null;
+		this.#inflight = null;
 		if (browser) localStorage.removeItem(STORAGE_KEY);
+	}
+
+	/**
+	 * Lazily fetches the user's org memberships once per session, deduping
+	 * concurrent callers. Pass `force: true` after an event that should
+	 * invalidate the cache (e.g. accepting another invitation).
+	 */
+	async loadMemberships(force = false): Promise<OrganizationMembership[]> {
+		if (!this.token) return [];
+		if (!force && this.memberships) return this.memberships;
+		if (!force && this.#inflight) return this.#inflight;
+
+		// Import lazily to avoid the api ↔ auth cycle at module-load time.
+		const { api } = await import('$lib/api');
+		this.#inflight = api
+			.myOrganizations()
+			.then((rows) => {
+				this.memberships = rows;
+				return rows;
+			})
+			.finally(() => {
+				this.#inflight = null;
+			});
+
+		return this.#inflight;
+	}
+
+	/** True when the user is a member of `orgId` or has the admin role. */
+	canManageOrg(orgId: string | null | undefined): boolean {
+		if (!orgId) return false;
+		if (this.user?.role === 'admin') return true;
+		return !!this.memberships?.some((m) => m.id === orgId);
 	}
 
 	get isAuthed(): boolean {

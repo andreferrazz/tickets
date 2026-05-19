@@ -6,8 +6,12 @@
 	import type { OrganizationMembership } from '$lib/types';
 	import { onMount } from 'svelte';
 
-	let memberships = $state<OrganizationMembership[] | null>(null);
+	type Role = OrganizationMembership['role'];
+
+	// Force a refresh so the profile page reflects org renames done elsewhere
+	// in the session. The auth store caches and exposes the result reactively.
 	let orgsError = $state<string | null>(null);
+	const memberships = $derived(auth.memberships);
 
 	onMount(async () => {
 		if (!auth.isAuthed) {
@@ -15,7 +19,7 @@
 			return;
 		}
 		try {
-			memberships = await api.myOrganizations();
+			await auth.loadMemberships(true);
 		} catch (e) {
 			orgsError = e instanceof ApiError ? e.message : t('profile.orgs.errorFallback');
 		}
@@ -31,7 +35,7 @@
 		await goto('/');
 	}
 
-	function roleLabel(role: OrganizationMembership['role']): string {
+	function roleLabel(role: Role): string {
 		return role === 'leader' ? t('profile.orgs.roleLeader') : t('profile.orgs.roleParticipant');
 	}
 </script>

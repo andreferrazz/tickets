@@ -83,8 +83,8 @@
 			return;
 		}
 		try {
-			await reload();
-			if (event && event.creator_id !== auth.user?.id && auth.user?.role !== 'admin') {
+			await Promise.all([reload(), auth.loadMemberships()]);
+			if (event && !auth.canManageOrg(event.organization_id)) {
 				await goto(`/events/${event.id}`);
 				return;
 			}

@@ -21,7 +21,8 @@ export interface ProfileUpdate {
 
 export interface Event {
 	id: string;
-	creator_id: string;
+	organization_id: string;
+	created_by_id: string | null;
 	title: string;
 	description: string;
 	tickets_description: string | null;
