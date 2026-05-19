@@ -14,7 +14,10 @@ defmodule Backend.Events do
   import Ecto.Query
   require Logger
   alias Backend.Repo
+  alias Backend.Accounts.User
   alias Backend.Events.{Event, ExtraItem, ExtraItemSection, TicketBatch, TicketType}
+  alias Backend.Orders.{Order, OrderItem}
+  alias Backend.Tickets.Pass
 
   # ---------------------------------------------------------------------------
   # Events
@@ -153,6 +156,188 @@ defmodule Backend.Events do
         event
       end)
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Stats (creator dashboard)
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Aggregates sales and check-in stats for `event_id`. Restricted to the event's
+  creator (or admin). Returns `{:error, :not_found}` for anyone else — we
+  collapse forbidden into not-found so the endpoint can't be used to probe
+  ownership.
+
+  The returned map exposes `quantity_sold` figures from `ticket_batches` and
+  `extra_items` directly; those columns reflect *reserved + paid* stock since
+  reservations decrement on refund/expire but pending orders still hold the
+  rows. Revenue, by contrast, only sums orders in `status = "paid"`.
+  """
+  def event_stats(user, event_id) do
+    case fetch_owned_event(user, event_id) do
+      {:ok, event} ->
+        event = preload_for_stats(event)
+
+        {:ok,
+         %{
+           event_id: event.id,
+           totals: totals_for(event),
+           ticket_types: ticket_type_stats(event),
+           extras: extra_stats(event),
+           recent_orders: recent_orders(event.id)
+         }}
+
+      {:error, _} ->
+        {:error, :not_found}
+    end
+  end
+
+  defp preload_for_stats(event) do
+    Repo.preload(event,
+      ticket_types:
+        {from(t in TicketType, where: is_nil(t.deleted_at), order_by: [asc: t.inserted_at]),
+         batches: from(b in TicketBatch, order_by: [asc: b.sequence])},
+      extra_item_sections:
+        {from(s in ExtraItemSection, where: is_nil(s.deleted_at), order_by: [asc: s.position]),
+         extras:
+           from(x in ExtraItem, where: is_nil(x.deleted_at), order_by: [asc: x.inserted_at])}
+    )
+  end
+
+  defp totals_for(event) do
+    %{paid: paid_orders, pending: pending_orders, revenue: revenue} = order_totals(event.id)
+    %{issued: passes_issued, checked_in: checked_in} = pass_totals(event.id)
+    {tickets_sold, tickets_capacity} = ticket_capacity(event)
+    extras_sold = Enum.sum(for s <- event.extra_item_sections, x <- s.extras, do: x.quantity_sold)
+
+    %{
+      orders_paid: paid_orders,
+      orders_pending: pending_orders,
+      revenue_cents: revenue,
+      tickets_sold: tickets_sold,
+      tickets_capacity: tickets_capacity,
+      extras_sold: extras_sold,
+      passes_issued: passes_issued,
+      passes_checked_in: checked_in
+    }
+  end
+
+  defp order_totals(event_id) do
+    rows =
+      Repo.all(
+        from o in Order,
+          where: o.event_id == ^event_id,
+          group_by: o.status,
+          select: {o.status, count(o.id), sum(o.total_cents)}
+      )
+
+    Enum.reduce(rows, %{paid: 0, pending: 0, revenue: 0}, fn
+      {"paid", count, sum}, acc -> %{acc | paid: count, revenue: acc.revenue + (sum || 0)}
+      {"pending", count, _sum}, acc -> %{acc | pending: count}
+      _, acc -> acc
+    end)
+  end
+
+  defp pass_totals(event_id) do
+    {issued, checked_in} =
+      Repo.one(
+        from p in Pass,
+          where: p.event_id == ^event_id,
+          select: {count(p.id), count(p.checked_in_at)}
+      )
+
+    %{issued: issued || 0, checked_in: checked_in || 0}
+  end
+
+  defp ticket_capacity(event) do
+    Enum.reduce(event.ticket_types, {0, 0}, fn tt, {sold, capacity} ->
+      tt_sold = Enum.sum(Enum.map(tt.batches, & &1.quantity_sold))
+      tt_cap = Enum.sum(Enum.map(tt.batches, & &1.quantity_total))
+      {sold + tt_sold, capacity + tt_cap}
+    end)
+  end
+
+  defp ticket_type_stats(event) do
+    paid_revenue = paid_revenue_by_item("ticket", event.id)
+
+    Enum.map(event.ticket_types, fn tt ->
+      %{
+        id: tt.id,
+        name: tt.name,
+        sold: Enum.sum(Enum.map(tt.batches, & &1.quantity_sold)),
+        capacity: Enum.sum(Enum.map(tt.batches, & &1.quantity_total)),
+        revenue_cents: Map.get(paid_revenue, tt.id, 0),
+        batches: Enum.map(tt.batches, &batch_stat/1)
+      }
+    end)
+  end
+
+  defp batch_stat(b) do
+    %{
+      id: b.id,
+      sequence: b.sequence,
+      label: "Lote #{b.sequence}",
+      sold: b.quantity_sold,
+      capacity: b.quantity_total,
+      price_cents: b.price_cents,
+      closed_at: b.closed_at
+    }
+  end
+
+  defp extra_stats(event) do
+    paid_revenue = paid_revenue_by_item("extra", event.id)
+
+    for section <- event.extra_item_sections, x <- section.extras do
+      %{
+        id: x.id,
+        name: x.name,
+        section_title: section.title,
+        sold: x.quantity_sold,
+        capacity: x.quantity_total,
+        revenue_cents: Map.get(paid_revenue, x.id, 0)
+      }
+    end
+  end
+
+  # Sums quantity * unit_price_cents from paid order_items grouped by item_id.
+  # We only count rows where the parent order is `paid` — pending stock holds
+  # don't generate revenue, and refunded orders shouldn't either.
+  defp paid_revenue_by_item(item_type, event_id) do
+    rows =
+      Repo.all(
+        from oi in OrderItem,
+          join: o in Order,
+          on: oi.order_id == o.id,
+          where:
+            o.event_id == ^event_id and o.status == "paid" and oi.item_type == ^item_type,
+          group_by: oi.item_id,
+          select: {oi.item_id, sum(oi.quantity * oi.unit_price_cents)}
+      )
+
+    Map.new(rows, fn {id, sum} -> {id, sum || 0} end)
+  end
+
+  defp recent_orders(event_id) do
+    Repo.all(
+      from o in Order,
+        join: u in User,
+        on: o.user_id == u.id,
+        left_join: oi in OrderItem,
+        on: oi.order_id == o.id,
+        where: o.event_id == ^event_id,
+        group_by: [o.id, u.email],
+        order_by: [desc: o.inserted_at],
+        limit: 10,
+        select: %{
+          id: o.id,
+          buyer_email: u.email,
+          status: o.status,
+          total_cents: o.total_cents,
+          paid_at: o.paid_at,
+          inserted_at: o.inserted_at,
+          item_count: coalesce(sum(oi.quantity), 0)
+        }
+    )
   end
 
   # ---------------------------------------------------------------------------

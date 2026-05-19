@@ -134,3 +134,60 @@ export interface CartLine {
 	item_id: string;
 	quantity: number;
 }
+
+export interface EventStatsTotals {
+	orders_paid: number;
+	orders_pending: number;
+	revenue_cents: number;
+	tickets_sold: number;
+	tickets_capacity: number;
+	extras_sold: number;
+	passes_issued: number;
+	passes_checked_in: number;
+}
+
+export interface BatchStats {
+	id: string;
+	sequence: number;
+	label: string;
+	sold: number;
+	capacity: number;
+	price_cents: number;
+	closed_at: string | null;
+}
+
+export interface TicketTypeStats {
+	id: string;
+	name: string;
+	sold: number;
+	capacity: number;
+	revenue_cents: number;
+	batches: BatchStats[];
+}
+
+export interface ExtraStats {
+	id: string;
+	name: string;
+	section_title: string;
+	sold: number;
+	capacity: number | null;
+	revenue_cents: number;
+}
+
+export interface RecentOrderRow {
+	id: string;
+	buyer_email: string;
+	status: OrderStatus;
+	total_cents: number;
+	paid_at: string | null;
+	created_at: string;
+	item_count: number;
+}
+
+export interface EventStats {
+	event_id: string;
+	totals: EventStatsTotals;
+	ticket_types: TicketTypeStats[];
+	extras: ExtraStats[];
+	recent_orders: RecentOrderRow[];
+}

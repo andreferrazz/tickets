@@ -511,4 +511,103 @@ defmodule Backend.EventsTest do
       assert extra.section_id == s.id
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # event_stats/2
+  # ---------------------------------------------------------------------------
+
+  describe "event_stats/2" do
+    alias Backend.Orders
+
+    defp stats_event_with_ticket(creator) do
+      event = published_event(creator)
+      {:ok, tt} = Events.create_ticket_type(creator, event.id, %{"name" => "General"})
+
+      {:ok, batch} =
+        Events.create_batch(creator, tt.id, %{"price_cents" => 5000, "quantity_total" => 10})
+
+      {event, tt, batch}
+    end
+
+    test "owner sees totals; pending order reserves stock but doesn't add revenue" do
+      creator = creator_user()
+      buyer = buyer_user()
+      {event, tt, _batch} = stats_event_with_ticket(creator)
+
+      {:ok, _order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 2}
+        ])
+
+      assert {:ok, stats} = Events.event_stats(creator, event.id)
+      assert stats.totals.orders_paid == 0
+      assert stats.totals.orders_pending == 1
+      assert stats.totals.revenue_cents == 0
+      assert stats.totals.tickets_sold == 2
+      assert stats.totals.tickets_capacity == 10
+    end
+
+    test "paid order contributes to revenue and per-ticket revenue_cents" do
+      creator = creator_user()
+      buyer = buyer_user()
+      {event, tt, _batch} = stats_event_with_ticket(creator)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 3}
+        ])
+
+      {:ok, _} = Orders.mark_paid_by_checkout(order.abacate_checkout_id)
+
+      assert {:ok, stats} = Events.event_stats(creator, event.id)
+      assert stats.totals.orders_paid == 1
+      assert stats.totals.revenue_cents == 15_000
+      assert stats.totals.tickets_sold == 3
+      [tt_stat] = stats.ticket_types
+      assert tt_stat.sold == 3
+      assert tt_stat.capacity == 10
+      assert tt_stat.revenue_cents == 15_000
+      assert [%{sold: 3, capacity: 10, price_cents: 5000}] = tt_stat.batches
+    end
+
+    test "admin can read another creator's stats" do
+      creator = creator_user()
+      admin = creator_user()
+      Repo.update_all(from(u in Accounts.User, where: u.id == ^admin.id), set: [role: "admin"])
+      admin = Repo.get!(Accounts.User, admin.id)
+
+      {event, _tt, _batch} = stats_event_with_ticket(creator)
+      assert {:ok, _stats} = Events.event_stats(admin, event.id)
+    end
+
+    test "non-owner gets :not_found (no ownership leak)" do
+      creator = creator_user()
+      stranger = creator_user()
+      {event, _tt, _batch} = stats_event_with_ticket(creator)
+
+      assert {:error, :not_found} = Events.event_stats(stranger, event.id)
+    end
+
+    test "unknown event id returns :not_found" do
+      creator = creator_user()
+      assert {:error, :not_found} = Events.event_stats(creator, Ecto.UUID.generate())
+    end
+
+    test "recent_orders lists most recent first with buyer email and item_count" do
+      creator = creator_user()
+      buyer = buyer_user()
+      {event, tt, _batch} = stats_event_with_ticket(creator)
+
+      {:ok, _o1} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 2}
+        ])
+
+      assert {:ok, stats} = Events.event_stats(creator, event.id)
+      assert [recent] = stats.recent_orders
+      assert recent.buyer_email == buyer.email
+      assert recent.item_count == 2
+      assert recent.status == "pending"
+    end
+  end
 end

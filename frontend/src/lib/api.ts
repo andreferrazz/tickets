@@ -5,6 +5,7 @@ import type {
 	Batch,
 	Event,
 	EventDetail,
+	EventStats,
 	ExtraItem,
 	ExtraSection,
 	Invitation,
@@ -89,6 +90,8 @@ export const api = {
 	listEvents: (fetcher?: typeof fetch) => request<Event[]>('/events', { fetcher }),
 	getEvent: (id: string, fetcher?: typeof fetch) =>
 		request<EventDetail>(`/events/${id}`, { fetcher }),
+	getEventStats: (id: string, fetcher?: typeof fetch) =>
+		request<EventStats>(`/events/${id}/stats`, { fetcher }),
 	createEvent: (body: Partial<Event>) => request<Event>('/events', { method: 'POST', body }),
 	updateEvent: (id: string, body: Partial<Event>) =>
 		request<Event>(`/events/${id}`, { method: 'PUT', body }),

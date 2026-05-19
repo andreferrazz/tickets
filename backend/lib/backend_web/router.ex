@@ -55,6 +55,7 @@ defmodule BackendWeb.Router do
 
     put "/events/:id", EventController, :update
     delete "/events/:id", EventController, :delete
+    get "/events/:id/stats", EventController, :stats
 
     put "/ticket-types/:id", TicketTypeController, :update
     delete "/ticket-types/:id", TicketTypeController, :delete

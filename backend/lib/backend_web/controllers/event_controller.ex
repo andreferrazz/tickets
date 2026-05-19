@@ -63,6 +63,14 @@ defmodule BackendWeb.EventController do
     end
   end
 
+  @doc "GET /api/v1/events/:id/stats — creator/admin only; 404 otherwise"
+  def stats(conn, %{"id" => id}) do
+    case Events.event_stats(conn.assigns.current_user, id) do
+      {:ok, stats} -> json(conn, stats_json(stats))
+      {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "event not found"})
+    end
+  end
+
   @doc "DELETE /api/v1/events/:id"
   def delete(conn, %{"id" => id}) do
     case Events.delete_event(conn.assigns.current_user, id) do
@@ -157,6 +165,28 @@ defmodule BackendWeb.EventController do
       quantity_total: ex.quantity_total,
       quantity_sold: ex.quantity_sold,
       show_remaining: ex.show_remaining
+    }
+  end
+
+  defp stats_json(stats) do
+    %{
+      event_id: stats.event_id,
+      totals: stats.totals,
+      ticket_types: stats.ticket_types,
+      extras: stats.extras,
+      recent_orders: Enum.map(stats.recent_orders, &recent_order_json/1)
+    }
+  end
+
+  defp recent_order_json(o) do
+    %{
+      id: o.id,
+      buyer_email: o.buyer_email,
+      status: o.status,
+      total_cents: o.total_cents,
+      paid_at: o.paid_at,
+      created_at: o.inserted_at,
+      item_count: o.item_count
     }
   end
 

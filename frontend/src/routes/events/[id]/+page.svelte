@@ -106,7 +106,12 @@
 				<p class="muted">{formatDateTime(event.starts_at)} · {event.location}</p>
 			</div>
 			{#if canEdit}
-				<a href="/events/{event.id}/edit" class="btn secondary small">{t('common.edit')}</a>
+				<div class="row creator-actions">
+					<a href="/events/{event.id}/dashboard" class="btn secondary small"
+						>{t('event.dashboard')}</a
+					>
+					<a href="/events/{event.id}/edit" class="btn secondary small">{t('common.edit')}</a>
+				</div>
 			{/if}
 		</div>
 
