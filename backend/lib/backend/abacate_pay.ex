@@ -71,12 +71,12 @@ defmodule Backend.AbacatePay do
   Returns `{:ok, %{id: bill_id, url: payment_url}}`.
   """
   @impl Backend.AbacatePayBehaviour
-  def create_checkout(items, return_url, completion_url, customer_id) do
+  def create_checkout(items, return_url, completion_url, customer_id, total_cents) do
     body =
       %{
         items: items,
         methods: ["PIX", "CARD"],
-        card: %{maxInstallments: max_card_installments()},
+        card: %{maxInstallments: max_card_installments(total_cents)},
         returnUrl: return_url,
         completionUrl: completion_url
       }
@@ -97,6 +97,16 @@ defmodule Backend.AbacatePay do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
-  defp max_card_installments,
-    do: Application.get_env(:backend, :max_card_installments, 3)
+  @doc """
+  Returns the card installment cap for a given order total.
+
+  Each installment must be worth at least R$10 (1_000 cents), capped at the
+  configured maximum (default 3). Always returns at least 1 so single-payment
+  stays available on tiny orders.
+  """
+  def max_card_installments(total_cents) do
+    cap = Application.get_env(:backend, :max_card_installments, 3)
+    by_value = div(total_cents, 1_000)
+    max(1, min(cap, by_value))
+  end
 end
