@@ -568,6 +568,15 @@
 						/>
 						{t('eventEdit.showRemaining')}
 					</label>
+					<label class="check">
+						<input
+							type="checkbox"
+							checked={x.limit_to_ticket_count}
+							onchange={(e) =>
+								saveExtra(x, { limit_to_ticket_count: e.currentTarget.checked })}
+						/>
+						{t('eventEdit.limitToTicketCount')}
+					</label>
 					<button class="danger small" onclick={() => delExtra(x)}>{t('common.delete')}</button>
 				</div>
 			{/each}

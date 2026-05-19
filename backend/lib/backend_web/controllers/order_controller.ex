@@ -31,6 +31,11 @@ defmodule BackendWeb.OrderController do
       {:error, {:out_of_stock, name}} ->
         conn |> put_status(:conflict) |> json(%{error: "out of stock: #{name}"})
 
+      {:error, {:extra_exceeds_tickets, name, _qty, _tickets}} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "extra_exceeds_tickets", name: name})
+
       {:error, {:invalid_item, id}} ->
         conn |> put_status(:bad_request) |> json(%{error: "invalid item: #{id}"})
 

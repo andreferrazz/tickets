@@ -49,6 +49,19 @@
 		}
 	});
 
+	// Capped extras must never exceed the live ticket count. When the buyer
+	// reduces tickets, trim their existing extra qty silently.
+	$effect(() => {
+		for (const x of allExtras) {
+			if (!x.limit_to_ticket_count) continue;
+			const key = `x:${x.id}`;
+			const cur = qty[key] ?? 0;
+			if (cur > ticketCount) {
+				qty = { ...qty, [key]: ticketCount };
+			}
+		}
+	});
+
 	const total = $derived.by(() => {
 		if (!event) return 0;
 		let sum = 0;
@@ -109,6 +122,8 @@
 			if (e instanceof ApiError && e.message === 'seat_taken') {
 				buyError = t('event.seatTakenConflict');
 				await refreshSeating();
+			} else if (e instanceof ApiError && e.message === 'extra_exceeds_tickets') {
+				buyError = t('event.errorExtraExceedsTickets');
 			} else {
 				buyError = e instanceof ApiError ? e.message : t('event.errorFallback');
 			}
@@ -203,31 +218,40 @@
 							<p class="muted">{s.description}</p>
 						{/if}
 						{#each s.extras as x (x.id)}
-							{@const remaining = x.quantity_total === null
+							{@const stockMax = x.quantity_total === null
 								? 999
 								: x.quantity_total - x.quantity_sold}
+							{@const remaining = x.limit_to_ticket_count
+								? Math.min(stockMax, ticketCount)
+								: stockMax}
+							{@const needsTickets = x.limit_to_ticket_count && ticketCount === 0}
 							<div class="line">
 								<div>
 									<strong>{x.name}</strong>
 									<div class="muted small">{x.description}</div>
 									<div class="muted small">{formatBRL(x.price_cents)}</div>
-									{#if x.show_remaining && x.quantity_total !== null && remaining > 0}
+									{#if x.show_remaining && x.quantity_total !== null && stockMax > 0}
 										<div class="muted small">
-											{t('event.remainingCount', { count: remaining })}
+											{t('event.remainingCount', { count: stockMax })}
 										</div>
 									{/if}
+									{#if needsTickets}
+										<div class="muted small">{t('event.extraNeedsTicket')}</div>
+									{/if}
 								</div>
-								{#if remaining <= 0}
+								{#if stockMax <= 0}
 									<span class="badge sold-out">{t('event.soldOut')}</span>
 								{:else}
 									<div class="qty">
 										<button
 											class="secondary small"
+											disabled={remaining === 0}
 											onclick={() => bump(`x:${x.id}`, -1, remaining)}>−</button
 										>
 										<span>{qty[`x:${x.id}`] ?? 0}</span>
 										<button
 											class="secondary small"
+											disabled={remaining === 0}
 											onclick={() => bump(`x:${x.id}`, 1, remaining)}>+</button
 										>
 									</div>

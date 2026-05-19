@@ -32,10 +32,27 @@ defmodule Backend.Orders do
     with {:ok, event} <- fetch_published_event(event_id),
          :ok <- ensure_has_ticket(cart_items),
          {:ok, line_items} <- resolve_items(event, cart_items),
+         :ok <- ensure_extras_within_ticket_count(line_items),
          {:ok, picks} <- Seating.validate_picks(event, seat_picks, ticket_quantity(line_items)),
          total = compute_total(line_items),
          {:ok, order} <- reserve_order(user, event, total, line_items, picks) do
       finalize_order(user, event, total, line_items, order)
+    end
+  end
+
+  # When an extra is flagged `limit_to_ticket_count`, the buyer can purchase at
+  # most one per ticket in the same order (across all ticket types). Capped
+  # extras that exceed the order's ticket count get rejected before stock is
+  # reserved.
+  defp ensure_extras_within_ticket_count(line_items) do
+    ticket_count = ticket_quantity(line_items)
+
+    case Enum.find(line_items, fn line ->
+           line.type == "extra" and Map.get(line, :limit_to_ticket_count, false) and
+             line.quantity > ticket_count
+         end) do
+      nil -> :ok
+      bad -> {:error, {:extra_exceeds_tickets, bad.name, bad.quantity, ticket_count}}
     end
   end
 
@@ -304,7 +321,8 @@ defmodule Backend.Orders do
            name: ex.name,
            price_cents: ex.price_cents,
            abacate_product_id: ex.abacate_product_id,
-           quantity: qty
+           quantity: qty,
+           limit_to_ticket_count: ex.limit_to_ticket_count
          }}
     end
   end

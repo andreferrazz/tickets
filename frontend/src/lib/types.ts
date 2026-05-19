@@ -92,6 +92,7 @@ export interface ExtraItem {
 	quantity_total: number | null;
 	quantity_sold: number;
 	show_remaining: boolean;
+	limit_to_ticket_count: boolean;
 }
 
 export interface ExtraSection {

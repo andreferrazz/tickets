@@ -76,6 +76,9 @@ export const pt = {
 	'event.orderSummary': 'Resumo do pedido',
 	'event.noItems': 'Nenhum item selecionado.',
 	'event.ticketRequired': 'Selecione pelo menos um ingresso para comprar complementos.',
+	'event.extraNeedsTicket': 'Disponível conforme a quantidade de ingressos.',
+	'event.errorExtraExceedsTickets':
+		'Você pediu mais desse complemento do que ingressos no pedido.',
 	'event.buy': 'Comprar',
 	'event.buying': 'Criando pedido...',
 	'event.errorFallback': 'Falha ao carregar evento',
@@ -156,6 +159,7 @@ export const pt = {
 	'eventEdit.qty': 'Qtde',
 	'eventEdit.qtyUnlimited': 'Qtde (vazio = ilimitado)',
 	'eventEdit.showRemaining': 'Mostrar quantidade restante',
+	'eventEdit.limitToTicketCount': 'Limitar à quantidade de ingressos',
 	'eventEdit.sold': 'vendidos',
 	'eventEdit.errorFallback': 'Falha ao carregar',
 	'eventEdit.notFound': 'Não encontrado',
