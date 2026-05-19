@@ -66,6 +66,7 @@ defmodule BackendWeb.Router do
 
     put "/extras/:id", ExtraItemController, :update
     delete "/extras/:id", ExtraItemController, :delete
+    get "/extras/:id/buyers", ExtraItemController, :buyers
 
     put "/extra-sections/:id", ExtraItemSectionController, :update
     delete "/extra-sections/:id", ExtraItemSectionController, :delete

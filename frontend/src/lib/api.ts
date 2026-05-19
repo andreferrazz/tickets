@@ -6,6 +6,7 @@ import type {
 	Event,
 	EventDetail,
 	EventStats,
+	ExtraBuyer,
 	ExtraItem,
 	ExtraSection,
 	Invitation,
@@ -114,6 +115,8 @@ export const api = {
 		request<ExtraItem>(`/extras/${id}`, { method: 'PUT', body }),
 	deleteExtra: (id: string) =>
 		request<{ deleted: true }>(`/extras/${id}`, { method: 'DELETE' }),
+	listExtraBuyers: (id: string, fetcher?: typeof fetch) =>
+		request<ExtraBuyer[]>(`/extras/${id}/buyers`, { fetcher }),
 	createExtraSection: (eventId: string, body: Partial<ExtraSection>) =>
 		request<ExtraSection>(`/events/${eventId}/extra-sections`, { method: 'POST', body }),
 	updateExtraSection: (id: string, body: Partial<ExtraSection>) =>

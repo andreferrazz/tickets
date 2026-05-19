@@ -5,12 +5,17 @@
 	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
-	import type { EventStats } from '$lib/types';
+	import type { EventStats, ExtraBuyer, ExtraStats } from '$lib/types';
 	import { onMount } from 'svelte';
 
 	let stats = $state<EventStats | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+
+	let openExtra = $state<ExtraStats | null>(null);
+	let buyers = $state<ExtraBuyer[] | null>(null);
+	let buyersLoading = $state(false);
+	let buyersError = $state<string | null>(null);
 
 	onMount(async () => {
 		if (!auth.isAuthed) {
@@ -33,6 +38,34 @@
 	function pct(sold: number, capacity: number | null): number {
 		if (!capacity || capacity <= 0) return 0;
 		return Math.min(100, Math.round((sold / capacity) * 100));
+	}
+
+	async function showBuyers(x: ExtraStats) {
+		openExtra = x;
+		buyers = null;
+		buyersError = null;
+		buyersLoading = true;
+		try {
+			buyers = await api.listExtraBuyers(x.id);
+		} catch (e) {
+			buyersError = e instanceof ApiError ? e.message : t('dashboard.errorFallback');
+		} finally {
+			buyersLoading = false;
+		}
+	}
+
+	function closeBuyers() {
+		openExtra = null;
+		buyers = null;
+		buyersError = null;
+	}
+
+	function onModalKey(e: KeyboardEvent) {
+		if (openExtra && e.key === 'Escape') closeBuyers();
+	}
+
+	function onBackdropClick(e: MouseEvent) {
+		if (e.target === e.currentTarget) closeBuyers();
 	}
 </script>
 
@@ -136,7 +169,11 @@
 			<h2>{t('dashboard.byExtra')}</h2>
 			<div class="stack">
 				{#each stats.extras as x (x.id)}
-					<div class="card row-between">
+					<button
+						type="button"
+						class="card row-between extra-row"
+						onclick={() => showBuyers(x)}
+					>
 						<div>
 							<strong>{x.name}</strong>
 							<div class="muted small">{x.section_title}</div>
@@ -149,7 +186,7 @@
 							</div>
 							<div class="muted small">{formatBRL(x.revenue_cents)}</div>
 						</div>
-					</div>
+					</button>
 				{/each}
 			</div>
 		</section>
@@ -178,6 +215,49 @@
 			</div>
 		{/if}
 	</section>
+{/if}
+
+<svelte:window on:keydown={onModalKey} />
+
+{#if openExtra}
+	<div class="backdrop" onclick={onBackdropClick} role="presentation">
+		<div class="dialog card" role="dialog" aria-modal="true" aria-labelledby="buyers-title">
+			<div class="dialog-head">
+				<h3 id="buyers-title">{t('dashboard.extraBuyers', { name: openExtra.name })}</h3>
+				<button type="button" class="secondary small" onclick={closeBuyers}>
+					{t('dashboard.close')}
+				</button>
+			</div>
+			{#if buyersLoading}
+				<p class="muted">{t('common.loading')}</p>
+			{:else if buyersError}
+				<div class="error">{buyersError}</div>
+			{:else if !buyers || buyers.length === 0}
+				<p class="muted">{t('dashboard.noBuyers')}</p>
+			{:else}
+				<div class="table-wrap">
+					<table>
+						<thead>
+							<tr>
+								<th>{t('dashboard.buyerName')}</th>
+								<th>{t('dashboard.buyerTaxId')}</th>
+								<th class="num-col">{t('dashboard.buyerQty')}</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each buyers as b (b.email)}
+								<tr>
+									<td>{b.name ?? b.email}</td>
+									<td>{b.tax_id ?? '—'}</td>
+									<td class="num-col">{b.quantity}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			{/if}
+		</div>
+	</div>
 {/if}
 
 <style>
@@ -244,6 +324,66 @@
 		font-size: 0.9rem;
 	}
 	.num {
+		text-align: right;
+	}
+	.extra-row {
+		display: flex;
+		width: 100%;
+		text-align: left;
+		font: inherit;
+		color: inherit;
+		cursor: pointer;
+	}
+	.extra-row:hover {
+		background: var(--surface-2);
+	}
+	.backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.6);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		z-index: 100;
+	}
+	.dialog {
+		max-width: 640px;
+		width: 100%;
+		max-height: 80vh;
+		display: flex;
+		flex-direction: column;
+		background: var(--surface);
+	}
+	.dialog-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 0.75rem;
+		gap: 1rem;
+	}
+	.dialog-head h3 {
+		margin: 0;
+	}
+	.table-wrap {
+		overflow: auto;
+	}
+	table {
+		width: 100%;
+		border-collapse: collapse;
+	}
+	th,
+	td {
+		padding: 0.5rem 0.75rem;
+		border-bottom: 1px solid var(--border);
+		text-align: left;
+	}
+	th {
+		font-size: 0.85rem;
+		color: var(--muted);
+		font-weight: 600;
+	}
+	.num-col {
 		text-align: right;
 	}
 </style>

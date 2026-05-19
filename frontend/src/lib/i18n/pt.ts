@@ -106,6 +106,12 @@ export const pt = {
 	'dashboard.buyer': 'Comprador',
 	'dashboard.errorFallback': 'Falha ao carregar painel',
 	'dashboard.notAuthorized': 'Você não tem acesso a este painel.',
+	'dashboard.extraBuyers': 'Compradores · {name}',
+	'dashboard.buyerName': 'Nome',
+	'dashboard.buyerTaxId': 'CPF/CNPJ',
+	'dashboard.buyerQty': 'Qtde',
+	'dashboard.noBuyers': 'Nenhum comprador ainda.',
+	'dashboard.close': 'Fechar',
 
 	// Event form
 	'eventForm.title': 'Título',

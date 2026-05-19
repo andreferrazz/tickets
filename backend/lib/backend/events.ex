@@ -317,6 +317,43 @@ defmodule Backend.Events do
     Map.new(rows, fn {id, sum} -> {id, sum || 0} end)
   end
 
+  @doc """
+  Returns the buyers of a single extra item, one row per user, with summed
+  `quantity` across their orders. Restricted to the event's creator (or admin)
+  — non-owners get `:not_found` to avoid leaking existence.
+
+  Includes both `pending` and `paid` orders, matching the `quantity_sold`
+  column shown on the dashboard card (refunded/expired orders are excluded
+  because those statuses already decremented `quantity_sold`).
+  """
+  def list_extra_buyers(user, extra_id) do
+    case fetch_owned_extra(user, extra_id) do
+      {:ok, extra} -> {:ok, query_extra_buyers(extra.id)}
+      {:error, _} -> {:error, :not_found}
+    end
+  end
+
+  defp query_extra_buyers(extra_id) do
+    Repo.all(
+      from oi in OrderItem,
+        join: o in Order,
+        on: oi.order_id == o.id,
+        join: u in User,
+        on: o.user_id == u.id,
+        where:
+          oi.item_type == "extra" and oi.item_id == ^extra_id and
+            o.status in ["pending", "paid"],
+        group_by: [u.id, u.name, u.tax_id, u.email],
+        order_by: [desc: sum(oi.quantity), asc: u.name],
+        select: %{
+          name: u.name,
+          tax_id: u.tax_id,
+          email: u.email,
+          quantity: sum(oi.quantity)
+        }
+    )
+  end
+
   defp recent_orders(event_id) do
     Repo.all(
       from o in Order,

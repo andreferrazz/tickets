@@ -191,3 +191,10 @@ export interface EventStats {
 	extras: ExtraStats[];
 	recent_orders: RecentOrderRow[];
 }
+
+export interface ExtraBuyer {
+	name: string | null;
+	tax_id: string | null;
+	email: string;
+	quantity: number;
+}
