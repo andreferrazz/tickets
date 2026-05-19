@@ -9,7 +9,10 @@ defmodule Backend.OrdersSeatingTest do
     {:ok, code} = Accounts.request_code(email)
     {:ok, %{user: user}} = Accounts.verify_code(email, code)
     Repo.update_all(from(u in Accounts.User, where: u.id == ^user.id), set: [role: "creator"])
-    Repo.get!(Accounts.User, user.id)
+    user = Repo.get!(Accounts.User, user.id)
+    {:ok, org} = Backend.Organizations.create_organization(%{name: "Org #{user.id}"})
+    {:ok, _} = Backend.Organizations.add_member(org.id, user.id, "leader")
+    user
   end
 
   defp make_buyer do
@@ -80,6 +83,7 @@ defmodule Backend.OrdersSeatingTest do
       assert Enum.all?(ticket_passes, &is_binary(&1.seat_label))
 
       labels = ticket_passes |> Enum.map(& &1.seat_label) |> Enum.sort()
+
       assert labels == [
                "Mesa Azul · Lugar 4",
                "Mesa Verde · Lugar 1",

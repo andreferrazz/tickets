@@ -38,8 +38,13 @@ defmodule BackendWeb.PassController do
 
   defp authorize(user, pass) do
     case Repo.get(Event, pass.event_id) do
-      %Event{creator_id: creator_id} when creator_id == user.id -> :ok
-      _ -> {:error, :forbidden}
+      %Event{organization_id: org_id} ->
+        if Backend.Organizations.member?(user.id, org_id),
+          do: :ok,
+          else: {:error, :forbidden}
+
+      _ ->
+        {:error, :forbidden}
     end
   end
 

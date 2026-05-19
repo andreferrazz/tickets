@@ -11,6 +11,8 @@ import type {
 	ExtraSection,
 	Invitation,
 	Order,
+	Organization,
+	OrganizationMembership,
 	Pass,
 	ProfileUpdate,
 	SeatPick,
@@ -89,6 +91,8 @@ export const api = {
 		request<AuthResponse>('/auth/verify-code', { method: 'POST', body: { email, code } }),
 	logout: () => request<{ logged_out: boolean }>('/auth/logout', { method: 'DELETE' }),
 	me: (fetcher?: typeof fetch) => request<User>('/me', { fetcher }),
+	myOrganizations: (fetcher?: typeof fetch) =>
+		request<OrganizationMembership[]>('/me/organizations', { fetcher }),
 	updateProfile: (body: ProfileUpdate) =>
 		request<User>('/me/profile', { method: 'PATCH', body }),
 	listEvents: (fetcher?: typeof fetch) => request<Event[]>('/events', { fetcher }),
@@ -146,10 +150,17 @@ export const api = {
 		request<Pass[]>(`/orders/${id}/passes`, { fetcher }),
 	listInvitations: (fetcher?: typeof fetch) =>
 		request<Invitation[]>('/invitations', { fetcher }),
-	createInvitation: (email: string) =>
-		request<Invitation>('/invitations', { method: 'POST', body: { email } }),
+	createInvitation: (email: string, organization_id?: string) =>
+		request<Invitation>('/invitations', {
+			method: 'POST',
+			body: organization_id ? { email, organization_id } : { email }
+		}),
 	acceptInvitation: (token: string) =>
-		request<AuthResponse>('/invitations/accept', { method: 'POST', body: { token } })
+		request<AuthResponse>('/invitations/accept', { method: 'POST', body: { token } }),
+	updateOrganization: (id: string, body: { name: string }) =>
+		request<Organization>(`/organizations/${id}`, { method: 'PATCH', body }),
+	deleteOrganization: (id: string) =>
+		request<{ deleted: true }>(`/organizations/${id}`, { method: 'DELETE' })
 };
 
 export function formatBRL(cents: number): string {

@@ -264,29 +264,44 @@ defmodule Backend.Orders do
   # Expiry (called by ExpiryWorker periodically)
   # ---------------------------------------------------------------------------
 
-  @doc "Marks stale pending orders as expired and releases their stock."
-  def expire_stale_orders(expiry_minutes) do
+  @doc """
+  Returns pending orders whose `inserted_at` is older than `expiry_minutes`.
+
+  The reconciler consults Abacate Pay per-order to decide what to do next
+  (fulfil if paid, expire otherwise), so this only narrows the candidate set.
+  Items are preloaded since callers will release stock.
+  """
+  def list_stale_pending_orders(expiry_minutes) do
     cutoff = DateTime.add(DateTime.utc_now(), -expiry_minutes * 60, :second)
 
-    expired =
-      Repo.all(
-        from(o in Order,
-          where: o.status == "pending" and o.inserted_at < ^cutoff,
-          preload: :items
-        )
+    Repo.all(
+      from(o in Order,
+        where: o.status == "pending" and o.inserted_at < ^cutoff,
+        preload: :items
       )
+    )
+  end
 
-    Enum.each(expired, fn order ->
-      Repo.transaction(fn ->
+  @doc """
+  Marks `order` as expired and releases the stock it had reserved. Wrapped
+  in a transaction so partial state can't leak when stock release fails.
+  Idempotent enough for the worker's purposes: re-running on an already
+  expired order is a no-op stock-wise (release on a released order
+  decrements quantity_sold by zero net for the second call) but the status
+  update will succeed regardless — callers should pass pending orders.
+  """
+  def mark_expired(%Order{} = order) do
+    order = Repo.preload(order, :items)
+
+    Repo.transaction(fn ->
+      updated =
         order
         |> Ecto.Changeset.change(status: "expired")
         |> Repo.update!()
 
-        release_order_stock(order)
-      end)
+      release_order_stock(order)
+      updated
     end)
-
-    length(expired)
   end
 
   # ---------------------------------------------------------------------------

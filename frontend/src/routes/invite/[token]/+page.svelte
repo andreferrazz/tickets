@@ -6,6 +6,9 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { onMount } from 'svelte';
 
+	const ONBOARDING_KEY = 'tickets.onboarding_org';
+	const PENDING_NEXT_KEY = 'tickets.pending_next';
+
 	let error = $state<string | null>(null);
 
 	onMount(async () => {
@@ -13,7 +16,26 @@
 		try {
 			const res = await api.acceptInvitation(token);
 			auth.set(res.token, res.user);
-			await goto('/');
+			// Admin-invited leaders land on the rename form; their org was
+			// auto-named "<email-local-part>'s Org" and they should set it
+			// before doing anything else. Participants skip straight home.
+			if (res.organization?.role === 'leader') {
+				const onboardingPath = `/onboarding/organization/${res.organization.id}`;
+				sessionStorage.setItem(
+					ONBOARDING_KEY,
+					JSON.stringify({ id: res.organization.id, name: res.organization.name })
+				);
+				// The layout's profile-completion gate redirects authed users
+				// with incomplete profiles to /auth/profile. Stash the
+				// onboarding URL so the profile page forwards us there once
+				// the user finishes their basics.
+				if (!res.user.profile_complete) {
+					sessionStorage.setItem(PENDING_NEXT_KEY, onboardingPath);
+				}
+				await goto(onboardingPath);
+			} else {
+				await goto('/');
+			}
 		} catch (e) {
 			error = mapError(e);
 		}

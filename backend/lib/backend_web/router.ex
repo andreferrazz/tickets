@@ -52,6 +52,7 @@ defmodule BackendWeb.Router do
     pipe_through [:api, :authenticated]
 
     get "/me", UserController, :me
+    get "/me/organizations", UserController, :my_organizations
     patch "/me/profile", UserController, :update_profile
 
     put "/events/:id", EventController, :update
@@ -81,6 +82,9 @@ defmodule BackendWeb.Router do
     get "/orders/:id/passes", OrderController, :passes
 
     post "/passes/validate", PassController, :validate
+
+    patch "/organizations/:id", OrganizationController, :update
+    delete "/organizations/:id", OrganizationController, :delete
   end
 
   # ---------------------------------------------------------------------------
@@ -95,14 +99,10 @@ defmodule BackendWeb.Router do
     post "/events/:event_id/extras", ExtraItemController, :create
     post "/events/:event_id/extra-sections", ExtraItemSectionController, :create
     post "/events/:event_id/seat-tables", SeatTableController, :create
-  end
 
-  # ---------------------------------------------------------------------------
-  # Authenticated — admin only
-  # ---------------------------------------------------------------------------
-  scope "/api/v1", BackendWeb do
-    pipe_through [:api, :authenticated, :admin]
-
+    # Invitations: admins create new orgs with leader invites; leaders invite
+    # participants to their existing org. Buyer-only and participant-only users
+    # are rejected by the Invitations context with :forbidden.
     post "/invitations", InvitationController, :create
     get "/invitations", InvitationController, :index
   end

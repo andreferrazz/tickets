@@ -14,7 +14,10 @@ defmodule Backend.EventsTest do
     {:ok, code} = Accounts.request_code(email)
     {:ok, %{user: user}} = Accounts.verify_code(email, code)
     Repo.update_all(from(u in Accounts.User, where: u.id == ^user.id), set: [role: "creator"])
-    Repo.get!(Accounts.User, user.id)
+    user = Repo.get!(Accounts.User, user.id)
+    {:ok, org} = Backend.Organizations.create_organization(%{name: "Org #{user.id}"})
+    {:ok, _} = Backend.Organizations.add_member(org.id, user.id, "leader")
+    user
   end
 
   defp buyer_user do
@@ -51,7 +54,8 @@ defmodule Backend.EventsTest do
 
       assert event.title == "My Fest"
       assert event.status == "draft"
-      assert event.creator_id == user.id
+      assert event.created_by_id == user.id
+      assert is_binary(event.organization_id)
     end
 
     test "returns error when title is missing" do
@@ -702,13 +706,16 @@ defmodule Backend.EventsTest do
       creator = creator_user()
       stranger = creator_user()
       buyer = buyer_user()
+
       Repo.update_all(from(u in Accounts.User, where: u.id == ^buyer.id),
         set: [name: "Alice", tax_id: "12345678901"]
       )
 
       event = published_event(creator)
       {:ok, tt} = Events.create_ticket_type(creator, event.id, %{"name" => "General"})
-      {:ok, _b} = Events.create_batch(creator, tt.id, %{"price_cents" => 1000, "quantity_total" => 10})
+
+      {:ok, _b} =
+        Events.create_batch(creator, tt.id, %{"price_cents" => 1000, "quantity_total" => 10})
 
       {:ok, x} =
         Events.create_extra(creator, event.id, %{"name" => "Shirt", "price_cents" => 500})

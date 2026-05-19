@@ -13,7 +13,14 @@ defmodule Backend.TicketsTest do
       Repo.update_all(from(u in Accounts.User, where: u.id == ^user.id), set: [role: role])
     end
 
-    Repo.get!(Accounts.User, user.id)
+    user = Repo.get!(Accounts.User, user.id)
+
+    if role == "creator" do
+      {:ok, org} = Backend.Organizations.create_organization(%{name: "Org #{user.id}"})
+      {:ok, _} = Backend.Organizations.add_member(org.id, user.id, "leader")
+    end
+
+    user
   end
 
   defp event_with_inventory(creator) do

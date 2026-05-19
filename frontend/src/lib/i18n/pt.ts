@@ -61,6 +61,18 @@ export const pt = {
 	'invite.errorFallback': 'Não foi possível aceitar o convite.',
 	'invite.goLogin': 'Ir para o login',
 
+	// Onboarding — set organization name (first step after a leader accepts an invite)
+	'onboarding.org.title': 'Nomeie sua organização',
+	'onboarding.org.subtitle':
+		'Escolha o nome que aparecerá para sua equipe e nos seus eventos. Você pode alterar depois.',
+	'onboarding.org.nameLabel': 'Nome da organização',
+	'onboarding.org.namePlaceholder': 'Ex.: Festas da Maria',
+	'onboarding.org.save': 'Salvar e continuar',
+	'onboarding.org.saving': 'Salvando...',
+	'onboarding.org.fieldRequired': 'Informe o nome da organização.',
+	'onboarding.org.errorForbidden': 'Você não tem permissão para renomear esta organização.',
+	'onboarding.org.errorFallback': 'Falha ao salvar o nome da organização.',
+
 	// Home
 	'home.title': 'Próximos eventos',
 	'home.subtitle': 'Encontre ingressos e complementos para eventos perto de você.',
@@ -249,11 +261,21 @@ export const pt = {
 	'invitations.errorFallback': 'Falha ao carregar',
 	'invitations.sendErrorFallback': 'Falha ao enviar',
 
+	// Org-scoped invitations (leader inviting participants to their org)
+	'orgInvitations.title': 'Convidar para {org}',
+	'orgInvitations.subtitle': 'Envie um link para que a pessoa entre como participante.',
+
 	// Profile
 	'profile.title': 'Perfil',
 	'profile.email': 'E-mail',
 	'profile.role': 'Função',
 	'profile.logout': 'Sair',
+	'profile.orgs.title': 'Organizações',
+	'profile.orgs.empty': 'Você ainda não faz parte de nenhuma organização.',
+	'profile.orgs.errorFallback': 'Falha ao carregar organizações.',
+	'profile.orgs.roleLeader': 'Líder',
+	'profile.orgs.roleParticipant': 'Participante',
+	'profile.orgs.manageInvites': 'Gerenciar convites',
 
 	// Status badges
 	'status.draft': 'Rascunho',

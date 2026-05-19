@@ -27,12 +27,17 @@ defmodule BackendWeb.EventController do
     end
   end
 
-  # Published events are public. Drafts/cancelled are only visible to their
-  # creator or an admin — return 404 to anyone else to avoid leaking existence.
+  # Published events are public. Drafts/cancelled are only visible to members
+  # of the event's organization (or an admin) — return 404 to anyone else to
+  # avoid leaking existence.
   defp visible?(%{status: "published"}, _user), do: true
   defp visible?(_event, nil), do: false
   defp visible?(_event, %{role: "admin"}), do: true
-  defp visible?(%{creator_id: cid}, %{id: uid}), do: cid == uid
+
+  defp visible?(%{organization_id: org_id}, %{id: uid}) when is_binary(org_id),
+    do: Backend.Organizations.member?(uid, org_id)
+
+  defp visible?(_event, _user), do: false
 
   @doc "POST /api/v1/events — creator only"
   def create(conn, params) do
@@ -40,6 +45,14 @@ defmodule BackendWeb.EventController do
       {:ok, event} ->
         event = Backend.Repo.preload(event, [:ticket_types, extra_item_sections: :extras])
         conn |> put_status(:created) |> json(event_detail_json(event))
+
+      {:error, :organization_id_required} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "organization_id required"})
+
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
 
       {:error, changeset} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: format_errors(changeset)})
@@ -115,7 +128,8 @@ defmodule BackendWeb.EventController do
   def event_json(e) do
     %{
       id: e.id,
-      creator_id: e.creator_id,
+      organization_id: e.organization_id,
+      created_by_id: e.created_by_id,
       title: e.title,
       description: e.description,
       tickets_description: e.tickets_description,

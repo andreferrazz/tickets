@@ -13,7 +13,10 @@ defmodule Backend.OrdersTest do
     {:ok, code} = Accounts.request_code(email)
     {:ok, %{user: user}} = Accounts.verify_code(email, code)
     Repo.update_all(from(u in Accounts.User, where: u.id == ^user.id), set: [role: "creator"])
-    Repo.get!(Accounts.User, user.id)
+    user = Repo.get!(Accounts.User, user.id)
+    {:ok, org} = Backend.Organizations.create_organization(%{name: "Org #{user.id}"})
+    {:ok, _} = Backend.Organizations.add_member(org.id, user.id, "leader")
+    user
   end
 
   defp make_buyer do
@@ -267,8 +270,8 @@ defmodule Backend.OrdersTest do
   # Expiry
   # ---------------------------------------------------------------------------
 
-  describe "expire_stale_orders/1" do
-    test "expires old pending orders and releases stock" do
+  describe "list_stale_pending_orders/1 + mark_expired/1" do
+    test "lists pending orders past the cutoff and expires them with stock release" do
       creator = make_creator()
       buyer = make_buyer()
       {event, tt, batch} = published_event_with_tickets(creator)
@@ -278,18 +281,32 @@ defmodule Backend.OrdersTest do
           %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 3}
         ])
 
-      # Backdating the order to simulate expiry
+      # Backdate so the order falls outside the cutoff window.
       Repo.update_all(
         from(o in Backend.Orders.Order, where: o.id == ^order.id),
         set: [inserted_at: ~U[2020-01-01 00:00:00Z]]
       )
 
-      count = Orders.expire_stale_orders(30)
-      assert count == 1
+      assert [stale] = Orders.list_stale_pending_orders(30)
+      assert stale.id == order.id
 
+      assert {:ok, expired} = Orders.mark_expired(stale)
+      assert expired.status == "expired"
       assert Repo.get!(Backend.Orders.Order, order.id).status == "expired"
-      # Stock released on the batch
       assert reload_batch(batch.id).quantity_sold == 0
+    end
+
+    test "ignores fresh pending orders" do
+      creator = make_creator()
+      buyer = make_buyer()
+      {event, tt, _batch} = published_event_with_tickets(creator)
+
+      {:ok, _order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      assert Orders.list_stale_pending_orders(30) == []
     end
   end
 

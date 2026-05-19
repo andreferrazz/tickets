@@ -143,6 +143,11 @@ defmodule Backend.Accounts do
           |> User.changeset(%{role: "creator", invited_by: invite.inviter_id})
           |> Repo.update()
 
+        case attach_membership(invite, updated) do
+          {:ok, _} -> :ok
+          {:error, reason} -> Repo.rollback(reason)
+        end
+
         invite
         |> Ecto.Changeset.change(status: "accepted")
         |> Repo.update!()
@@ -218,13 +223,30 @@ defmodule Backend.Accounts do
     Repo.transaction(fn ->
       with {:ok, user} <- find_or_create_user(invitation.email),
            {:ok, user} <- apply_invitation_role(user, invitation),
+           {:ok, _membership} <- attach_membership(invitation, user),
            {:ok, _} <- mark_invitation_accepted(invitation),
-           {:ok, token} <- create_session(user) do
-        %{token: token, user: user}
+           {:ok, token} <- create_session(user),
+           {:ok, organization} <- load_invitation_org(invitation) do
+        %{
+          token: token,
+          user: user,
+          organization: %{
+            id: organization.id,
+            name: organization.name,
+            role: invitation.role
+          }
+        }
       else
         {:error, reason} -> Repo.rollback(reason)
       end
     end)
+  end
+
+  defp load_invitation_org(invitation) do
+    case Repo.get(Backend.Organizations.Organization, invitation.organization_id) do
+      nil -> {:error, :organization_missing}
+      org -> {:ok, org}
+    end
   end
 
   defp apply_invitation_role(%User{role: "buyer"} = user, invitation) do
@@ -234,6 +256,21 @@ defmodule Backend.Accounts do
   end
 
   defp apply_invitation_role(%User{} = user, _invitation), do: {:ok, user}
+
+  defp attach_membership(invitation, user) do
+    case Backend.Organizations.add_member(
+           invitation.organization_id,
+           user.id,
+           invitation.role
+         ) do
+      {:ok, membership} -> {:ok, membership}
+      # Idempotent re-acceptance: already a member is a non-error from the
+      # caller's perspective. We still return success so the session token is
+      # still issued and the invitation marked accepted.
+      {:error, :already_member} -> {:ok, :already_member}
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
   defp mark_invitation_accepted(invitation) do
     invitation

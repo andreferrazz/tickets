@@ -24,4 +24,13 @@ defmodule Backend.AbacatePayBehaviour do
               tax_id :: String.t()
             ) ::
               {:ok, customer_id :: String.t()} | {:error, any()}
+
+  @callback get_checkout(checkout_id :: String.t()) ::
+              {:ok,
+               %{
+                 status: String.t(),
+                 payment_method: String.t() | nil,
+                 card_installments: pos_integer() | nil
+               }}
+              | {:error, any()}
 end

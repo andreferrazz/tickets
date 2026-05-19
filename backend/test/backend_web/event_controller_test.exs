@@ -12,11 +12,24 @@ defmodule BackendWeb.EventControllerTest do
     {:ok, code} = Accounts.request_code(email)
     {:ok, %{token: token, user: user}} = Accounts.verify_code(email, code)
 
-    if role != "buyer" do
-      Backend.Repo.update_all(
-        from(u in Accounts.User, where: u.id == ^user.id),
-        set: [role: role]
-      )
+    user =
+      if role != "buyer" do
+        Backend.Repo.update_all(
+          from(u in Accounts.User, where: u.id == ^user.id),
+          set: [role: role]
+        )
+
+        Backend.Repo.get!(Accounts.User, user.id)
+      else
+        user
+      end
+
+    # Creators get a backing org with themselves as leader so subsequent
+    # event-create calls infer an organization. Admins remain unattached —
+    # they bypass org checks via the global role.
+    if role == "creator" do
+      {:ok, org} = Backend.Organizations.create_organization(%{name: "Org #{user.id}"})
+      {:ok, _} = Backend.Organizations.add_member(org.id, user.id, "leader")
     end
 
     {put_req_header(conn, "authorization", "Bearer #{token}"), user}

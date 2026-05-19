@@ -21,7 +21,8 @@ export interface ProfileUpdate {
 
 export interface Event {
 	id: string;
-	creator_id: string;
+	organization_id: string;
+	created_by_id: string | null;
 	title: string;
 	description: string;
 	tickets_description: string | null;
@@ -148,14 +149,39 @@ export interface Order {
 export interface Invitation {
 	id: string;
 	inviter_id: string;
+	organization_id: string;
+	role: OrgRole;
 	email: string;
 	status: 'pending' | 'accepted';
 	created_at: string;
 }
 
+export interface Organization {
+	id: string;
+	name: string;
+	created_at?: string;
+	updated_at?: string;
+}
+
+export type OrgRole = 'leader' | 'participant';
+
+export interface InvitedOrganization {
+	id: string;
+	name: string;
+	role: OrgRole;
+}
+
+export interface OrganizationMembership {
+	id: string;
+	name: string;
+	role: OrgRole;
+}
+
 export interface AuthResponse {
 	token: string;
 	user: User;
+	/** Present only when this auth response came from accepting an invitation. */
+	organization?: InvitedOrganization;
 }
 
 export interface CartLine {

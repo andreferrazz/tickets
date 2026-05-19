@@ -74,12 +74,16 @@
 	});
 
 	const canEdit = $derived(
-		auth.isCreator && event && (event.creator_id === auth.user?.id || auth.user?.role === 'admin')
+		!!auth.isCreator && !!event && auth.canManageOrg(event.organization_id)
 	);
 
 	onMount(async () => {
 		try {
-			event = await api.getEvent(page.params.id!);
+			const [loaded] = await Promise.all([
+				api.getEvent(page.params.id!),
+				auth.isAuthed ? auth.loadMemberships() : Promise.resolve()
+			]);
+			event = loaded;
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : t('event.errorFallback');
 		} finally {

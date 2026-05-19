@@ -9,7 +9,10 @@ defmodule Backend.SeatingTest do
     {:ok, code} = Accounts.request_code(email)
     {:ok, %{user: user}} = Accounts.verify_code(email, code)
     Repo.update_all(from(u in Accounts.User, where: u.id == ^user.id), set: [role: "creator"])
-    Repo.get!(Accounts.User, user.id)
+    user = Repo.get!(Accounts.User, user.id)
+    {:ok, org} = Backend.Organizations.create_organization(%{name: "Org #{user.id}"})
+    {:ok, _} = Backend.Organizations.add_member(org.id, user.id, "leader")
+    user
   end
 
   defp make_buyer do
@@ -152,6 +155,7 @@ defmodule Backend.SeatingTest do
       event = Repo.get!(Backend.Events.Event, ctx.event.id)
 
       picks = [%{"seat_table_id" => ctx.t1.id, "seat_number" => 2}]
+
       assert {:ok, [%{seat_table_id: _, seat_number: 2}]} =
                Seating.validate_picks(event, picks, 1)
     end

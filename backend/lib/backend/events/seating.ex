@@ -198,8 +198,7 @@ defmodule Backend.Events.Seating do
     valid_ids =
       Repo.all(
         from t in SeatTable,
-          where:
-            t.id in ^table_ids and t.event_id == ^event_id and is_nil(t.deleted_at),
+          where: t.id in ^table_ids and t.event_id == ^event_id and is_nil(t.deleted_at),
           select: t.id
       )
       |> MapSet.new()

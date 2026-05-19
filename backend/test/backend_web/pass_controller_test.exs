@@ -18,6 +18,12 @@ defmodule BackendWeb.PassControllerTest do
     end
 
     user = Backend.Repo.get!(Accounts.User, user.id)
+
+    if role == "creator" do
+      {:ok, org} = Backend.Organizations.create_organization(%{name: "Org #{user.id}"})
+      {:ok, _} = Backend.Organizations.add_member(org.id, user.id, "leader")
+    end
+
     {put_req_header(conn, "authorization", "Bearer #{token}"), user}
   end
 
