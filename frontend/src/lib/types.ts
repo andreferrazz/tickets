@@ -149,6 +149,8 @@ export interface Order {
 export interface Invitation {
 	id: string;
 	inviter_id: string;
+	organization_id: string;
+	role: OrgRole;
 	email: string;
 	status: 'pending' | 'accepted';
 	created_at: string;

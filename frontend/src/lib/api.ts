@@ -150,8 +150,11 @@ export const api = {
 		request<Pass[]>(`/orders/${id}/passes`, { fetcher }),
 	listInvitations: (fetcher?: typeof fetch) =>
 		request<Invitation[]>('/invitations', { fetcher }),
-	createInvitation: (email: string) =>
-		request<Invitation>('/invitations', { method: 'POST', body: { email } }),
+	createInvitation: (email: string, organization_id?: string) =>
+		request<Invitation>('/invitations', {
+			method: 'POST',
+			body: organization_id ? { email, organization_id } : { email }
+		}),
 	acceptInvitation: (token: string) =>
 		request<AuthResponse>('/invitations/accept', { method: 'POST', body: { token } }),
 	updateOrganization: (id: string, body: { name: string }) =>

@@ -65,7 +65,16 @@
 					{#each memberships as m (m.id)}
 						<li>
 							<span class="org-name">{m.name}</span>
-							<span class="badge" class:leader={m.role === 'leader'}>{roleLabel(m.role)}</span>
+							<span class="org-meta">
+								<span class="badge" class:leader={m.role === 'leader'}
+									>{roleLabel(m.role)}</span
+								>
+								{#if m.role === 'leader'}
+									<a class="manage" href="/organizations/{m.id}/invitations"
+										>{t('profile.orgs.manageInvites')}</a
+									>
+								{/if}
+							</span>
 						</li>
 					{/each}
 				</ul>
@@ -96,6 +105,14 @@
 	}
 	.org-name {
 		font-weight: 500;
+	}
+	.org-meta {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.6rem;
+	}
+	.manage {
+		font-size: 0.85rem;
 	}
 	.badge.leader {
 		background: var(--tone-info-bg);

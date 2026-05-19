@@ -261,6 +261,10 @@ export const pt = {
 	'invitations.errorFallback': 'Falha ao carregar',
 	'invitations.sendErrorFallback': 'Falha ao enviar',
 
+	// Org-scoped invitations (leader inviting participants to their org)
+	'orgInvitations.title': 'Convidar para {org}',
+	'orgInvitations.subtitle': 'Envie um link para que a pessoa entre como participante.',
+
 	// Profile
 	'profile.title': 'Perfil',
 	'profile.email': 'E-mail',
@@ -271,6 +275,7 @@ export const pt = {
 	'profile.orgs.errorFallback': 'Falha ao carregar organizações.',
 	'profile.orgs.roleLeader': 'Líder',
 	'profile.orgs.roleParticipant': 'Participante',
+	'profile.orgs.manageInvites': 'Gerenciar convites',
 
 	// Status badges
 	'status.draft': 'Rascunho',
