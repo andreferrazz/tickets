@@ -2,8 +2,9 @@ defmodule Backend.Events do
   @moduledoc """
   Event management: CRUD for events, ticket types, and extra items.
 
-  Ownership checks are enforced here: only the event's creator (or an admin)
-  may mutate an event or its nested resources.
+  Authorization is org-scoped: only members of the event's organization (or
+  an admin) may mutate the event or its nested resources. Both leaders and
+  participants of the same organization share write access.
 
   Deletes are logical: every business resource carries a `deleted_at`
   timestamp and reads filter out rows where it is set. Soft-deleting an
@@ -15,6 +16,7 @@ defmodule Backend.Events do
   require Logger
   alias Backend.Repo
   alias Backend.Accounts.User
+  alias Backend.Organizations
 
   alias Backend.Events.{
     Event,
@@ -49,12 +51,13 @@ defmodule Backend.Events do
 
   def list_events(%{id: user_id, role: role}) do
     Logger.info("list_events", role: role, user_id: user_id)
+    org_ids = Organizations.list_organization_ids_for_user(user_id)
 
     Repo.all(
       from e in Event,
         where:
           is_nil(e.deleted_at) and
-            (e.status == "published" or e.creator_id == ^user_id),
+            (e.status == "published" or e.organization_id in ^org_ids),
         order_by: [asc: e.starts_at]
     )
   end
@@ -98,25 +101,62 @@ defmodule Backend.Events do
   end
 
   @doc """
-  Creates an event owned by `user`. Inserts a default addon section so every
-  event satisfies the invariant that it has at least one section.
+  Creates an event in an organization. The event is attributed to `user` via
+  `created_by_id` (audit). The target organization is taken from `attrs`
+  (`"organization_id"` / `:organization_id`); when omitted, falls back to the
+  user's only organization if they belong to exactly one. Admins must always
+  pass an explicit `organization_id` because they are not members of any org.
+
+  Returns `{:error, :forbidden}` if the user is neither a member of the
+  requested org nor an admin, and `{:error, :organization_id_required}` when
+  no org can be resolved.
+
+  Inserts a default addon section so every event satisfies the invariant that
+  it has at least one section.
   """
   def create_event(user, attrs) do
-    changeset =
-      attrs
-      |> Map.put("creator_id", user.id)
-      |> Event.changeset()
+    with {:ok, org_id} <- resolve_organization_id(user, attrs) do
+      changeset =
+        attrs
+        |> Map.put("organization_id", org_id)
+        |> Map.put("created_by_id", user.id)
+        |> Event.changeset()
 
-    Repo.transaction(fn ->
-      case Repo.insert(changeset) do
-        {:ok, event} ->
-          {:ok, _section} = insert_default_section(event.id)
-          event
+      Repo.transaction(fn ->
+        case Repo.insert(changeset) do
+          {:ok, event} ->
+            {:ok, _section} = insert_default_section(event.id)
+            event
 
-        {:error, cs} ->
-          Repo.rollback(cs)
-      end
-    end)
+          {:error, cs} ->
+            Repo.rollback(cs)
+        end
+      end)
+    end
+  end
+
+  defp resolve_organization_id(user, attrs) do
+    case Map.get(attrs, "organization_id") || Map.get(attrs, :organization_id) do
+      nil ->
+        infer_organization_id(user)
+
+      org_id when is_binary(org_id) ->
+        cond do
+          user.role == "admin" -> {:ok, org_id}
+          Organizations.member?(user.id, org_id) -> {:ok, org_id}
+          true -> {:error, :forbidden}
+        end
+    end
+  end
+
+  defp infer_organization_id(%{role: "admin"}), do: {:error, :organization_id_required}
+
+  defp infer_organization_id(user) do
+    case Organizations.list_organization_ids_for_user(user.id) do
+      [org_id] -> {:ok, org_id}
+      [] -> {:error, :organization_id_required}
+      _ -> {:error, :organization_id_required}
+    end
   end
 
   defp insert_default_section(event_id) do
@@ -257,8 +297,7 @@ defmodule Backend.Events do
 
     case Repo.one(query) do
       nil -> {:error, :not_found}
-      {table, event} when user.role == "admin" or event.creator_id == user.id -> {:ok, table}
-      {_table, _event} -> {:error, :forbidden}
+      {table, event} -> authorize_org_action(user, event, table)
     end
   end
 
@@ -652,8 +691,7 @@ defmodule Backend.Events do
 
     case Repo.one(query) do
       nil -> {:error, :not_found}
-      {batch, event} when user.role == "admin" or event.creator_id == user.id -> {:ok, batch}
-      {_batch, _event} -> {:error, :forbidden}
+      {batch, event} -> authorize_org_action(user, event, batch)
     end
   end
 
@@ -804,8 +842,7 @@ defmodule Backend.Events do
 
     case Repo.one(query) do
       nil -> {:error, :not_found}
-      {section, event} when user.role == "admin" or event.creator_id == user.id -> {:ok, section}
-      {_section, _event} -> {:error, :forbidden}
+      {section, event} -> authorize_org_action(user, event, section)
     end
   end
 
@@ -824,8 +861,7 @@ defmodule Backend.Events do
 
     case Repo.one(query) do
       nil -> {:error, :not_found}
-      event when user.role == "admin" or event.creator_id == user.id -> {:ok, event}
-      _event -> {:error, :forbidden}
+      event -> authorize_org_action(user, event, event)
     end
   end
 
@@ -839,8 +875,7 @@ defmodule Backend.Events do
 
     case Repo.one(query) do
       nil -> {:error, :not_found}
-      {tt, event} when user.role == "admin" or event.creator_id == user.id -> {:ok, tt}
-      {_tt, _event} -> {:error, :forbidden}
+      {tt, event} -> authorize_org_action(user, event, tt)
     end
   end
 
@@ -854,9 +889,19 @@ defmodule Backend.Events do
 
     case Repo.one(query) do
       nil -> {:error, :not_found}
-      {extra, event} when user.role == "admin" or event.creator_id == user.id -> {:ok, extra}
-      {_extra, _event} -> {:error, :forbidden}
+      {extra, event} -> authorize_org_action(user, event, extra)
     end
+  end
+
+  # Returns `{:ok, resource}` if the user is an admin or a member of the
+  # event's organization, else `{:error, :forbidden}`. Centralized so every
+  # `fetch_owned_*` helper shares the same rule.
+  defp authorize_org_action(%{role: "admin"}, _event, resource), do: {:ok, resource}
+
+  defp authorize_org_action(user, event, resource) do
+    if Organizations.member?(user.id, event.organization_id),
+      do: {:ok, resource},
+      else: {:error, :forbidden}
   end
 
   # Inserts `changeset`, creates the matching Abacate Pay product, then writes

@@ -29,6 +29,9 @@ defmodule BackendWeb.OrderControllerTest do
 
     creator = Backend.Repo.get!(Accounts.User, creator.id)
 
+    {:ok, org} = Backend.Organizations.create_organization(%{name: "Org #{creator.id}"})
+    {:ok, _} = Backend.Organizations.add_member(org.id, creator.id, "leader")
+
     {:ok, event} =
       Events.create_event(creator, %{
         "title" => "Controller Fest",

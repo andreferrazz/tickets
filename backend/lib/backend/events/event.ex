@@ -18,7 +18,8 @@ defmodule Backend.Events.Event do
     field :seats_per_table, :integer
     field :deleted_at, :utc_datetime_usec
 
-    belongs_to :creator, Backend.Accounts.User
+    belongs_to :organization, Backend.Organizations.Organization
+    belongs_to :created_by, Backend.Accounts.User, foreign_key: :created_by_id
     has_many :ticket_types, Backend.Events.TicketType
     has_many :extras, Backend.Events.ExtraItem
     has_many :extra_item_sections, Backend.Events.ExtraItemSection
@@ -29,11 +30,12 @@ defmodule Backend.Events.Event do
 
   @valid_statuses ~w(draft published cancelled)
 
-  @doc "Changeset for creating a new event (requires creator_id)."
+  @doc "Changeset for creating a new event (requires organization_id)."
   def changeset(attrs) do
     %__MODULE__{}
     |> cast(attrs, [
-      :creator_id,
+      :organization_id,
+      :created_by_id,
       :title,
       :description,
       :tickets_description,
@@ -45,12 +47,12 @@ defmodule Backend.Events.Event do
       :seat_selection_enabled,
       :seats_per_table
     ])
-    |> validate_required([:creator_id, :title, :starts_at])
+    |> validate_required([:organization_id, :created_by_id, :title, :starts_at])
     |> validate_inclusion(:status, @valid_statuses)
     |> validate_seat_config()
   end
 
-  @doc "Changeset for updating an existing event (no creator_id change)."
+  @doc "Changeset for updating an existing event (org and creator are immutable)."
   def update_changeset(event, attrs) do
     event
     |> cast(attrs, [

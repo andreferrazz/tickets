@@ -13,7 +13,10 @@ defmodule Backend.OrdersTest do
     {:ok, code} = Accounts.request_code(email)
     {:ok, %{user: user}} = Accounts.verify_code(email, code)
     Repo.update_all(from(u in Accounts.User, where: u.id == ^user.id), set: [role: "creator"])
-    Repo.get!(Accounts.User, user.id)
+    user = Repo.get!(Accounts.User, user.id)
+    {:ok, org} = Backend.Organizations.create_organization(%{name: "Org #{user.id}"})
+    {:ok, _} = Backend.Organizations.add_member(org.id, user.id, "leader")
+    user
   end
 
   defp make_buyer do
