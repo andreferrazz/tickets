@@ -81,6 +81,14 @@ export const pt = {
 	'event.errorFallback': 'Falha ao carregar evento',
 	'event.notFound': 'Evento não encontrado',
 	'event.dashboard': 'Painel',
+	'event.pickSeats': 'Escolha seus lugares',
+	'event.seatsSelected': '{selected} de {total} lugares escolhidos',
+	'event.seatTaken': 'Lugar ocupado',
+	'event.refreshAvailability': 'Atualizar disponibilidade',
+	'event.seatTakenConflict': 'Alguns lugares acabaram de ser reservados. Escolha outros.',
+	'event.noSeatTables': 'Nenhuma mesa configurada ainda.',
+	'event.seat': 'Lugar {n}',
+	'event.table': 'Mesa {name}',
 
 	// Dashboard (creator-only stats view)
 	'dashboard.title': 'Painel do evento',
@@ -124,6 +132,10 @@ export const pt = {
 	'eventForm.draft': 'Rascunho',
 	'eventForm.published': 'Publicado',
 	'eventForm.saveFailed': 'Falha ao salvar',
+	'eventForm.seatSelection': 'Permitir escolha de lugar (mesas)',
+	'eventForm.seatsPerTable': 'Lugares por mesa',
+	'eventForm.seatsHint':
+		'Cada mesa terá esse número de lugares. Você pode adicionar e nomear mesas abaixo.',
 
 	// Event new
 	'eventNew.title': 'Novo evento',
@@ -176,6 +188,21 @@ export const pt = {
 	'eventEdit.saveBatchError': 'Falha ao salvar lote',
 	'eventEdit.deleteBatchError': 'Falha ao excluir lote',
 	'eventEdit.batchHasSales': 'Não é possível excluir um lote com vendas.',
+	'eventEdit.seating': 'Mesas',
+	'eventEdit.seatingDisabledHint':
+		'Ative "Permitir escolha de lugar" no formulário acima para configurar as mesas.',
+	'eventEdit.tableName': 'Nome da mesa',
+	'eventEdit.tableNamePlaceholder': 'Ex.: Mesa Verde, Família Silva',
+	'eventEdit.addTable': 'Adicionar mesa',
+	'eventEdit.confirmDeleteTable': 'Excluir a mesa "{name}"?',
+	'eventEdit.deleteTableError': 'Falha ao excluir mesa',
+	'eventEdit.tableHasAssignments': 'A mesa tem lugares reservados. Cancele os pedidos primeiro.',
+	'eventEdit.saveTableError': 'Falha ao salvar mesa',
+	'eventEdit.seatsTaken': '{taken}/{total} ocupados',
+	'eventEdit.seatsInUse':
+		'Não é possível desativar a escolha de lugar enquanto houver reservas ativas.',
+	'eventEdit.seatsTooLow':
+		'Já existem reservas além desse número. Cancele esses pedidos para reduzir.',
 
 	// Orders
 	'orders.title': 'Meus pedidos',

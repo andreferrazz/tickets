@@ -92,6 +92,9 @@
 								height="220"
 							/>
 							<div class="pass-label">{passLabel(p)}</div>
+							{#if p.seat_label}
+								<div class="pass-seat">{p.seat_label}</div>
+							{/if}
 							{#if p.checked_in_at}
 								<div class="pass-checked">
 									{t('order.passCheckedIn')} · {formatDateTime(p.checked_in_at)}
@@ -170,6 +173,10 @@
 	}
 	.pass-label {
 		font-weight: 600;
+	}
+	.pass-seat {
+		font-size: 0.9rem;
+		color: var(--primary, #2255cc);
 	}
 	.pass-checked {
 		font-size: 0.85rem;

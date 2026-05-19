@@ -20,6 +20,8 @@
 	let status = $state<'draft' | 'published'>(
 		initial.status === 'published' ? 'published' : 'draft'
 	);
+	let seat_selection_enabled = $state<boolean>(initial.seat_selection_enabled ?? false);
+	let seats_per_table = $state<number | undefined>(initial.seats_per_table ?? undefined);
 	let error = $state<string | null>(null);
 	let busy = $state(false);
 
@@ -35,7 +37,9 @@
 				location,
 				starts_at: fromLocalInputValue(starts_at),
 				cover_image_url: cover_image_url || null,
-				status
+				status,
+				seat_selection_enabled,
+				seats_per_table: seat_selection_enabled ? (seats_per_table ?? null) : null
 			});
 		} catch (e) {
 			error = e instanceof Error ? e.message : t('eventForm.saveFailed');
@@ -77,6 +81,26 @@
 			<option value="published">{t('eventForm.published')}</option>
 		</select>
 	</div>
+	<div class="seats">
+		<label class="check">
+			<input type="checkbox" bind:checked={seat_selection_enabled} />
+			{t('eventForm.seatSelection')}
+		</label>
+		{#if seat_selection_enabled}
+			<div class="seats-row">
+				<label for="seats-per-table">{t('eventForm.seatsPerTable')}</label>
+				<input
+					id="seats-per-table"
+					type="number"
+					min="1"
+					max="200"
+					bind:value={seats_per_table}
+					required
+				/>
+			</div>
+			<p class="muted small">{t('eventForm.seatsHint')}</p>
+		{/if}
+	</div>
 	{#if error}
 		<div class="error">{error}</div>
 	{/if}
@@ -84,3 +108,24 @@
 		{busy ? t('common.saving') : submitLabel}
 	</button>
 </form>
+
+<style>
+	.seats {
+		display: grid;
+		gap: 0.5rem;
+	}
+	.seats-row {
+		display: grid;
+		grid-template-columns: auto 6rem;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.check {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.small {
+		font-size: 0.85rem;
+	}
+</style>

@@ -2,10 +2,11 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api, ApiError, formatBRL } from '$lib/api';
+	import SeatPicker from '$lib/components/SeatPicker.svelte';
 	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
-	import type { CartLine, EventDetail } from '$lib/types';
+	import type { CartLine, EventDetail, SeatPick } from '$lib/types';
 	import { onMount } from 'svelte';
 
 	let event = $state<EventDetail | null>(null);
@@ -15,6 +16,7 @@
 	let busy = $state(false);
 
 	let qty = $state<Record<string, number>>({});
+	let seatPicks = $state<SeatPick[]>([]);
 
 	const allExtras = $derived(event ? event.extra_sections.flatMap((s) => s.extras) : []);
 
@@ -34,6 +36,18 @@
 
 	const hasTicket = $derived(lines.some((l) => l.item_type === 'ticket'));
 	const hasExtraOnly = $derived(lines.length > 0 && !hasTicket);
+
+	const ticketCount = $derived(
+		lines.filter((l) => l.item_type === 'ticket').reduce((acc, l) => acc + l.quantity, 0)
+	);
+	const seatsRequired = $derived(!!event?.seat_selection_enabled && ticketCount > 0);
+	const seatsReady = $derived(!seatsRequired || seatPicks.length === ticketCount);
+
+	$effect(() => {
+		if (seatPicks.length > ticketCount) {
+			seatPicks = seatPicks.slice(0, ticketCount);
+		}
+	});
 
 	const total = $derived.by(() => {
 		if (!event) return 0;
@@ -66,8 +80,18 @@
 		qty = { ...qty, [key]: next };
 	}
 
+	async function refreshSeating() {
+		if (!event) return;
+		const fresh = await api.getEventSeating(event.id);
+		event = { ...event, seating: fresh };
+		// Drop any picks that became taken in the meantime.
+		const taken = new Map(fresh.tables.map((t) => [t.id, new Set(t.taken_seats)]));
+		seatPicks = seatPicks.filter((p) => !taken.get(p.seat_table_id)?.has(p.seat_number));
+	}
+
 	async function buy() {
 		if (!event || lines.length === 0 || !hasTicket) return;
+		if (!seatsReady) return;
 		if (!auth.isAuthed) {
 			await goto(`/auth/login?next=/events/${event.id}`);
 			return;
@@ -75,14 +99,19 @@
 		buyError = null;
 		busy = true;
 		try {
-			const order = await api.createOrder(event.id, lines);
+			const order = await api.createOrder(event.id, lines, seatPicks);
 			if (order.abacate_payment_url) {
 				window.location.href = order.abacate_payment_url;
 			} else {
 				await goto(`/orders/${order.id}`);
 			}
 		} catch (e) {
-			buyError = e instanceof ApiError ? e.message : t('event.errorFallback');
+			if (e instanceof ApiError && e.message === 'seat_taken') {
+				buyError = t('event.seatTakenConflict');
+				await refreshSeating();
+			} else {
+				buyError = e instanceof ApiError ? e.message : t('event.errorFallback');
+			}
 		} finally {
 			busy = false;
 		}
@@ -207,6 +236,18 @@
 						{/each}
 					{/if}
 				{/each}
+
+				{#if seatsRequired && event.seating}
+					<div class="card" style="margin-top: 1rem;">
+						<SeatPicker
+							seating={event.seating}
+							{ticketCount}
+							picks={seatPicks}
+							onChange={(p) => (seatPicks = p)}
+							onRefresh={refreshSeating}
+						/>
+					</div>
+				{/if}
 			</section>
 
 			<aside class="summary card">
@@ -245,7 +286,7 @@
 				{#if buyError}
 					<div class="error">{buyError}</div>
 				{/if}
-				<button disabled={lines.length === 0 || !hasTicket || busy} onclick={buy}>
+				<button disabled={lines.length === 0 || !hasTicket || !seatsReady || busy} onclick={buy}>
 					{busy ? t('event.buying') : t('event.buy')}
 				</button>
 			</aside>
