@@ -168,6 +168,12 @@ export interface InvitedOrganization {
 	role: OrgRole;
 }
 
+export interface OrganizationMembership {
+	id: string;
+	name: string;
+	role: OrgRole;
+}
+
 export interface AuthResponse {
 	token: string;
 	user: User;

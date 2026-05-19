@@ -266,6 +266,11 @@ export const pt = {
 	'profile.email': 'E-mail',
 	'profile.role': 'Função',
 	'profile.logout': 'Sair',
+	'profile.orgs.title': 'Organizações',
+	'profile.orgs.empty': 'Você ainda não faz parte de nenhuma organização.',
+	'profile.orgs.errorFallback': 'Falha ao carregar organizações.',
+	'profile.orgs.roleLeader': 'Líder',
+	'profile.orgs.roleParticipant': 'Participante',
 
 	// Status badges
 	'status.draft': 'Rascunho',

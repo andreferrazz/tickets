@@ -52,6 +52,7 @@ defmodule BackendWeb.Router do
     pipe_through [:api, :authenticated]
 
     get "/me", UserController, :me
+    get "/me/organizations", UserController, :my_organizations
     patch "/me/profile", UserController, :update_profile
 
     put "/events/:id", EventController, :update

@@ -12,6 +12,7 @@ import type {
 	Invitation,
 	Order,
 	Organization,
+	OrganizationMembership,
 	Pass,
 	ProfileUpdate,
 	SeatPick,
@@ -90,6 +91,8 @@ export const api = {
 		request<AuthResponse>('/auth/verify-code', { method: 'POST', body: { email, code } }),
 	logout: () => request<{ logged_out: boolean }>('/auth/logout', { method: 'DELETE' }),
 	me: (fetcher?: typeof fetch) => request<User>('/me', { fetcher }),
+	myOrganizations: (fetcher?: typeof fetch) =>
+		request<OrganizationMembership[]>('/me/organizations', { fetcher }),
 	updateProfile: (body: ProfileUpdate) =>
 		request<User>('/me/profile', { method: 'PATCH', body }),
 	listEvents: (fetcher?: typeof fetch) => request<Event[]>('/events', { fetcher }),

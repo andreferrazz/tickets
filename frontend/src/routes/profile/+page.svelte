@@ -1,12 +1,24 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { api } from '$lib/api';
+	import { api, ApiError } from '$lib/api';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
+	import type { OrganizationMembership } from '$lib/types';
 	import { onMount } from 'svelte';
 
-	onMount(() => {
-		if (!auth.isAuthed) goto('/auth/login');
+	let memberships = $state<OrganizationMembership[] | null>(null);
+	let orgsError = $state<string | null>(null);
+
+	onMount(async () => {
+		if (!auth.isAuthed) {
+			goto('/auth/login');
+			return;
+		}
+		try {
+			memberships = await api.myOrganizations();
+		} catch (e) {
+			orgsError = e instanceof ApiError ? e.message : t('profile.orgs.errorFallback');
+		}
 	});
 
 	async function logout() {
@@ -17,6 +29,10 @@
 		}
 		auth.clear();
 		await goto('/');
+	}
+
+	function roleLabel(role: OrganizationMembership['role']): string {
+		return role === 'leader' ? t('profile.orgs.roleLeader') : t('profile.orgs.roleParticipant');
 	}
 </script>
 
@@ -31,6 +47,27 @@
 			<div class="muted small">{t('profile.role')}</div>
 			<span class="badge published">{tStatus(auth.user.role)}</span>
 		</div>
+
+		<div>
+			<div class="muted small">{t('profile.orgs.title')}</div>
+			{#if orgsError}
+				<div class="error">{orgsError}</div>
+			{:else if memberships === null}
+				<div class="muted small">{t('common.loading')}</div>
+			{:else if memberships.length === 0}
+				<div class="muted small">{t('profile.orgs.empty')}</div>
+			{:else}
+				<ul class="orgs">
+					{#each memberships as m (m.id)}
+						<li>
+							<span class="org-name">{m.name}</span>
+							<span class="badge" class:leader={m.role === 'leader'}>{roleLabel(m.role)}</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</div>
+
 		<button class="danger" onclick={logout}>{t('profile.logout')}</button>
 	</div>
 {/if}
@@ -38,5 +75,26 @@
 <style>
 	.small {
 		font-size: 0.8rem;
+	}
+	.orgs {
+		list-style: none;
+		padding: 0;
+		margin: 0.25rem 0 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+	.orgs li {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.75rem;
+	}
+	.org-name {
+		font-weight: 500;
+	}
+	.badge.leader {
+		background: var(--tone-info-bg);
+		color: var(--tone-info-fg);
 	}
 </style>

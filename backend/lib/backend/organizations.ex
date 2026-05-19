@@ -196,6 +196,24 @@ defmodule Backend.Organizations do
 
   def list_organization_ids_for_user(_), do: []
 
+  @doc """
+  Returns `[%{organization: %Organization{}, role: role}]` for every
+  membership `user_id` holds. Useful for showing the user their
+  affiliations on the profile page.
+  """
+  def list_memberships_for_user(user_id) when is_binary(user_id) do
+    Repo.all(
+      from m in Membership,
+        join: o in Organization,
+        on: o.id == m.organization_id,
+        where: m.user_id == ^user_id,
+        order_by: [asc: o.name],
+        select: %{organization: o, role: m.role}
+    )
+  end
+
+  def list_memberships_for_user(_), do: []
+
   @doc "Returns the orgs `user_id` leads."
   def list_led_by(user_id) when is_binary(user_id) do
     Repo.all(

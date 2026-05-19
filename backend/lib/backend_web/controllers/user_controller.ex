@@ -9,6 +9,19 @@ defmodule BackendWeb.UserController do
     json(conn, user_json(conn.assigns.current_user))
   end
 
+  @doc """
+  GET /api/v1/me/organizations — the caller's memberships with role per org,
+  ordered by org name. Used by the profile page to show affiliations.
+  """
+  def my_organizations(conn, _params) do
+    rows = Backend.Organizations.list_memberships_for_user(conn.assigns.current_user.id)
+    json(conn, Enum.map(rows, &membership_json/1))
+  end
+
+  defp membership_json(%{organization: org, role: role}) do
+    %{id: org.id, name: org.name, role: role}
+  end
+
   @doc "PATCH /api/v1/me/profile — saves name/cellphone/tax_id and registers customer at Abacate Pay."
   def update_profile(conn, %{"name" => _, "cellphone" => _, "tax_id" => _} = params) do
     case Accounts.complete_profile(conn.assigns.current_user, params) do
