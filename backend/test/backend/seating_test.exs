@@ -152,6 +152,7 @@ defmodule Backend.SeatingTest do
       event = Repo.get!(Backend.Events.Event, ctx.event.id)
 
       picks = [%{"seat_table_id" => ctx.t1.id, "seat_number" => 2}]
+
       assert {:ok, [%{seat_table_id: _, seat_number: 2}]} =
                Seating.validate_picks(event, picks, 1)
     end

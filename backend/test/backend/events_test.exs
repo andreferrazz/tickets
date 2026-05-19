@@ -702,13 +702,16 @@ defmodule Backend.EventsTest do
       creator = creator_user()
       stranger = creator_user()
       buyer = buyer_user()
+
       Repo.update_all(from(u in Accounts.User, where: u.id == ^buyer.id),
         set: [name: "Alice", tax_id: "12345678901"]
       )
 
       event = published_event(creator)
       {:ok, tt} = Events.create_ticket_type(creator, event.id, %{"name" => "General"})
-      {:ok, _b} = Events.create_batch(creator, tt.id, %{"price_cents" => 1000, "quantity_total" => 10})
+
+      {:ok, _b} =
+        Events.create_batch(creator, tt.id, %{"price_cents" => 1000, "quantity_total" => 10})
 
       {:ok, x} =
         Events.create_extra(creator, event.id, %{"name" => "Shirt", "price_cents" => 500})

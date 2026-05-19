@@ -80,6 +80,7 @@ defmodule Backend.OrdersSeatingTest do
       assert Enum.all?(ticket_passes, &is_binary(&1.seat_label))
 
       labels = ticket_passes |> Enum.map(& &1.seat_label) |> Enum.sort()
+
       assert labels == [
                "Mesa Azul · Lugar 4",
                "Mesa Verde · Lugar 1",

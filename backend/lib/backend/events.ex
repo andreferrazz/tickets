@@ -15,6 +15,7 @@ defmodule Backend.Events do
   require Logger
   alias Backend.Repo
   alias Backend.Accounts.User
+
   alias Backend.Events.{
     Event,
     ExtraItem,
@@ -24,6 +25,7 @@ defmodule Backend.Events do
     TicketBatch,
     TicketType
   }
+
   alias Backend.Orders.{Order, OrderItem}
   alias Backend.Tickets.Pass
 
@@ -301,8 +303,7 @@ defmodule Backend.Events do
          batches: from(b in TicketBatch, order_by: [asc: b.sequence])},
       extra_item_sections:
         {from(s in ExtraItemSection, where: is_nil(s.deleted_at), order_by: [asc: s.position]),
-         extras:
-           from(x in ExtraItem, where: is_nil(x.deleted_at), order_by: [asc: x.inserted_at])}
+         extras: from(x in ExtraItem, where: is_nil(x.deleted_at), order_by: [asc: x.inserted_at])}
     )
   end
 
@@ -341,8 +342,7 @@ defmodule Backend.Events do
       Repo.all(
         from o in Order,
           where: o.event_id == ^event_id and o.status == "paid",
-          select:
-            {o.total_cents, o.payment_method, o.card_installments, o.platform_fee_cents}
+          select: {o.total_cents, o.payment_method, o.card_installments, o.platform_fee_cents}
       )
 
     {paid_count, revenue, fees} =
@@ -436,8 +436,7 @@ defmodule Backend.Events do
         from oi in OrderItem,
           join: o in Order,
           on: oi.order_id == o.id,
-          where:
-            o.event_id == ^event_id and o.status == "paid" and oi.item_type == ^item_type,
+          where: o.event_id == ^event_id and o.status == "paid" and oi.item_type == ^item_type,
           group_by: oi.item_id,
           select: {oi.item_id, sum(oi.quantity * oi.unit_price_cents)}
       )
@@ -883,7 +882,8 @@ defmodule Backend.Events do
   defp attach_abacate_product_unless_free(record, prefix) do
     external_id = "#{prefix}_#{record.id}"
 
-    with {:ok, prod_id} <- abacate_pay().create_product(record.name, record.price_cents, external_id) do
+    with {:ok, prod_id} <-
+           abacate_pay().create_product(record.name, record.price_cents, external_id) do
       record |> Ecto.Changeset.change(abacate_product_id: prod_id) |> Repo.update()
     end
   end
