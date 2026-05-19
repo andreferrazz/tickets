@@ -115,6 +115,9 @@
 		<div class="two-col">
 			<section class="stack">
 				<h2>{t('event.tickets')}</h2>
+				{#if event.tickets_description}
+					<p class="muted">{event.tickets_description}</p>
+				{/if}
 				{#each event.ticket_types as tk (tk.id)}
 					{@const active = tk.active_batch}
 					{@const visibleBatches = tk.batches.filter(

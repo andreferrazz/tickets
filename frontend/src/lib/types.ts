@@ -24,6 +24,7 @@ export interface Event {
 	creator_id: string;
 	title: string;
 	description: string;
+	tickets_description: string | null;
 	location: string;
 	starts_at: string;
 	ends_at: string | null;

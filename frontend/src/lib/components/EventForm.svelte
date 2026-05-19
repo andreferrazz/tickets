@@ -13,6 +13,7 @@
 
 	let title = $state(initial.title ?? '');
 	let description = $state(initial.description ?? '');
+	let tickets_description = $state(initial.tickets_description ?? '');
 	let location = $state(initial.location ?? '');
 	let starts_at = $state(initial.starts_at ? toLocalInputValue(initial.starts_at) : '');
 	let cover_image_url = $state(initial.cover_image_url ?? '');
@@ -30,6 +31,7 @@
 			await onSubmit({
 				title,
 				description: description.trim(),
+				tickets_description: tickets_description.trim() || null,
 				location,
 				starts_at: fromLocalInputValue(starts_at),
 				cover_image_url: cover_image_url || null,
@@ -51,6 +53,10 @@
 	<div>
 		<label for="desc">{t('eventForm.description')}</label>
 		<textarea id="desc" bind:value={description} rows="4"></textarea>
+	</div>
+	<div>
+		<label for="tickets-desc">{t('eventForm.ticketsDescription')}</label>
+		<textarea id="tickets-desc" bind:value={tickets_description} rows="2"></textarea>
 	</div>
 	<div>
 		<label for="loc">{t('eventForm.location')}</label>

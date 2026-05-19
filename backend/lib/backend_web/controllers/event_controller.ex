@@ -80,6 +80,7 @@ defmodule BackendWeb.EventController do
       creator_id: e.creator_id,
       title: e.title,
       description: e.description,
+      tickets_description: e.tickets_description,
       location: e.location,
       starts_at: e.starts_at,
       ends_at: e.ends_at,

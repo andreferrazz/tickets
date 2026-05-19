@@ -8,6 +8,7 @@ defmodule Backend.Events.Event do
   schema "events" do
     field :title, :string
     field :description, :string
+    field :tickets_description, :string
     field :location, :string
     field :starts_at, :utc_datetime
     field :ends_at, :utc_datetime
@@ -32,6 +33,7 @@ defmodule Backend.Events.Event do
       :creator_id,
       :title,
       :description,
+      :tickets_description,
       :location,
       :starts_at,
       :ends_at,
@@ -48,6 +50,7 @@ defmodule Backend.Events.Event do
     |> cast(attrs, [
       :title,
       :description,
+      :tickets_description,
       :location,
       :starts_at,
       :ends_at,

@@ -84,6 +84,7 @@ export const pt = {
 	// Event form
 	'eventForm.title': 'Título',
 	'eventForm.description': 'Descrição',
+	'eventForm.ticketsDescription': 'Descrição dos ingressos',
 	'eventForm.location': 'Local',
 	'eventForm.startsAt': 'Início',
 	'eventForm.coverUrl': 'URL da imagem de capa',
