@@ -86,6 +86,14 @@
 			<div class="muted small">{t('dashboard.revenueHint')}</div>
 		</div>
 		<div class="card kpi">
+			<div class="muted small">{t('dashboard.netRevenue')}</div>
+			<strong class="big">{formatBRL(stats.totals.net_revenue_cents)}</strong>
+			<div class="muted small">
+				{t('dashboard.feesDeducted', { amount: formatBRL(stats.totals.fees_cents) })}
+			</div>
+			<div class="muted small">{t('dashboard.netRevenueHint')}</div>
+		</div>
+		<div class="card kpi">
 			<div class="muted small">{t('dashboard.ticketsReserved')}</div>
 			<strong class="big">
 				{stats.totals.tickets_sold}<span class="muted">/{stats.totals.tickets_capacity}</span>

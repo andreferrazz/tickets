@@ -168,6 +168,9 @@ export interface EventStatsTotals {
 	orders_paid: number;
 	orders_pending: number;
 	revenue_cents: number;
+	gross_revenue_cents: number;
+	fees_cents: number;
+	net_revenue_cents: number;
 	tickets_sold: number;
 	tickets_capacity: number;
 	extras_sold: number;

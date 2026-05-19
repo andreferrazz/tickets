@@ -570,6 +570,93 @@ defmodule Backend.EventsTest do
       assert [%{sold: 3, capacity: 10, price_cents: 5000}] = tt_stat.batches
     end
 
+    test "fees_cents and net_revenue_cents account for the per-method Abacate fee" do
+      creator = creator_user()
+      buyer = buyer_user()
+      {event, tt, _batch} = stats_event_with_ticket(creator)
+
+      # Three paid orders: PIX, CARD 1x, CARD 6x. R$50 each (price_cents=5000).
+      orders =
+        for _ <- 1..3 do
+          {:ok, order} =
+            Orders.create_order(buyer, event.id, [
+              %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+            ])
+
+          order
+        end
+
+      [pix_order, card1x_order, card6x_order] = orders
+
+      {:ok, _} =
+        Orders.mark_paid_by_checkout(pix_order.abacate_checkout_id, %{payment_method: "PIX"})
+
+      {:ok, _} =
+        Orders.mark_paid_by_checkout(card1x_order.abacate_checkout_id, %{
+          payment_method: "CARD",
+          card_installments: 1
+        })
+
+      {:ok, _} =
+        Orders.mark_paid_by_checkout(card6x_order.abacate_checkout_id, %{
+          payment_method: "CARD",
+          card_installments: 6
+        })
+
+      assert {:ok, stats} = Events.event_stats(creator, event.id)
+
+      # PIX:     80 cents flat
+      # CARD 1x: 3.50% of 5000 + 60 = 175 + 60 = 235
+      # CARD 6x: 4.00% of 5000 + 60 = 200 + 60 = 260
+      assert stats.totals.gross_revenue_cents == 15_000
+      assert stats.totals.fees_cents == 80 + 235 + 260
+      assert stats.totals.net_revenue_cents == 15_000 - (80 + 235 + 260)
+    end
+
+    test "uses Abacate's reported platform_fee_cents over the hardcoded table" do
+      creator = creator_user()
+      buyer = buyer_user()
+      {event, tt, _batch} = stats_event_with_ticket(creator)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      # Real Abacate platformFee (e.g. 114 cents on a R$50 CARD 3x order). The
+      # hardcoded formula would predict 4% * 5000 + 60 = 260 — we want the
+      # actual reported figure to win.
+      {:ok, _} =
+        Orders.mark_paid_by_checkout(order.abacate_checkout_id, %{
+          payment_method: "CARD",
+          card_installments: 3,
+          platform_fee_cents: 114
+        })
+
+      assert {:ok, stats} = Events.event_stats(creator, event.id)
+      assert stats.totals.fees_cents == 114
+      assert stats.totals.net_revenue_cents == 5_000 - 114
+    end
+
+    test "paid order without payment_method falls back to PIX fee" do
+      creator = creator_user()
+      buyer = buyer_user()
+      {event, tt, _batch} = stats_event_with_ticket(creator)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      # No payment_info passed — mimics a legacy paid order.
+      {:ok, _} = Orders.mark_paid_by_checkout(order.abacate_checkout_id)
+
+      assert {:ok, stats} = Events.event_stats(creator, event.id)
+      assert stats.totals.gross_revenue_cents == 5_000
+      assert stats.totals.fees_cents == 80
+      assert stats.totals.net_revenue_cents == 4_920
+    end
+
     test "admin can read another creator's stats" do
       creator = creator_user()
       admin = creator_user()
