@@ -105,9 +105,13 @@ defmodule Backend.AbacatePay do
   stays available on tiny orders.
   """
   def max_card_installments(total_cents) do
-    cap = Application.get_env(:backend, :max_card_installments, 3)
-    by_value = div(total_cents, 1_000)
-    max(1, min(cap, by_value))
+    if total_cents <= 20000 do
+      1
+    else
+      cap = Application.get_env(:backend, :max_card_installments, 3)
+      by_value = div(total_cents, 1_000)
+      max(1, min(cap, by_value))
+    end
   end
 
   # Abacate Pay fee table (per the seller profile). Hardcoded here because
