@@ -38,9 +38,11 @@ defmodule BackendWeb.WebhookController do
 
   defp dispatch_event(%{
          "event" => "checkout.completed",
-         "data" => %{"checkout" => %{"id" => id}}
+         "data" => %{"checkout" => %{"id" => id}} = data
        }) do
-    with {:ok, order} <- Orders.mark_paid_by_checkout(id),
+    payment_info = extract_payment_info(data)
+
+    with {:ok, order} <- Orders.mark_paid_by_checkout(id, payment_info),
          {:ok, order, _passes} <- Orders.fulfill_paid_order(order) do
       {:ok, order}
     end
@@ -51,6 +53,22 @@ defmodule BackendWeb.WebhookController do
   end
 
   defp dispatch_event(_), do: :ok
+
+  # Abacate Pay's `checkout.completed` payload, by example:
+  #   data.payerInformation.method     -> "CARD" | "PIX"
+  #   data.checkout.installmentsCount  -> integer (cards only)
+  #   data.checkout.platformFee        -> integer cents (Abacate's actual fee)
+  # Any field may be missing on older payloads or non-standard methods;
+  # we keep things nil and let the dashboard fall back to the PIX assumption.
+  defp extract_payment_info(%{"checkout" => checkout} = data) do
+    %{
+      payment_method: get_in(data, ["payerInformation", "method"]),
+      card_installments: checkout["installmentsCount"],
+      platform_fee_cents: checkout["platformFee"]
+    }
+  end
+
+  defp extract_payment_info(_), do: %{}
 
   defp handle_result(conn, {:ok, _}), do: json(conn, %{ok: true})
   defp handle_result(conn, :ok), do: json(conn, %{ok: true})

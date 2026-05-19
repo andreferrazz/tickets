@@ -186,8 +186,15 @@ defmodule Backend.Orders do
   # Webhook callbacks
   # ---------------------------------------------------------------------------
 
-  @doc "Marks order as paid when Abacate Pay sends checkout.completed."
-  def mark_paid_by_checkout(checkout_id) do
+  @doc """
+  Marks order as paid when Abacate Pay sends checkout.completed.
+
+  `payment_info` may carry `:payment_method` (`"PIX"` or `"CARD"`) and, for
+  cards, `:card_installments`. Both are optional — when the webhook payload
+  doesn't include them, the columns stay nil and downstream fee math falls
+  back to the PIX assumption.
+  """
+  def mark_paid_by_checkout(checkout_id, payment_info \\ %{}) do
     case find_order_by_checkout(checkout_id) do
       nil ->
         {:error, :not_found}
@@ -195,13 +202,44 @@ defmodule Backend.Orders do
       order ->
         order
         |> Ecto.Changeset.change(
-          status: "paid",
-          paid_at: DateTime.utc_now() |> DateTime.truncate(:second)
+          [status: "paid", paid_at: DateTime.utc_now() |> DateTime.truncate(:second)] ++
+            payment_changes(payment_info)
         )
         |> Repo.update()
-        |> then(fn {:ok, o} -> {:ok, o} end)
     end
   end
+
+  defp payment_changes(info) when is_map(info) do
+    method = Map.get(info, :payment_method) || Map.get(info, "payment_method")
+    installments = Map.get(info, :card_installments) || Map.get(info, "card_installments")
+    fee = Map.get(info, :platform_fee_cents) || Map.get(info, "platform_fee_cents")
+
+    []
+    |> maybe_set(:payment_method, normalize_method(method))
+    |> maybe_set(:card_installments, normalize_positive_int(installments))
+    |> maybe_set(:platform_fee_cents, normalize_non_negative_int(fee))
+  end
+
+  defp payment_changes(_), do: []
+
+  defp maybe_set(kw, _key, nil), do: kw
+  defp maybe_set(kw, key, value), do: kw ++ [{key, value}]
+
+  defp normalize_method(m) when is_binary(m) do
+    case String.upcase(m) do
+      "PIX" -> "PIX"
+      "CARD" -> "CARD"
+      _ -> nil
+    end
+  end
+
+  defp normalize_method(_), do: nil
+
+  defp normalize_positive_int(n) when is_integer(n) and n > 0, do: n
+  defp normalize_positive_int(_), do: nil
+
+  defp normalize_non_negative_int(n) when is_integer(n) and n >= 0, do: n
+  defp normalize_non_negative_int(_), do: nil
 
   @doc "Marks order as refunded and releases reserved stock."
   def mark_refunded_by_checkout(checkout_id) do

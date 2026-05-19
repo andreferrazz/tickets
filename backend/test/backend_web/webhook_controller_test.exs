@@ -90,6 +90,50 @@ defmodule BackendWeb.WebhookControllerTest do
       assert Enum.any?(subjects, &String.starts_with?(&1, "Seus extras"))
     end
 
+    test "persists method, installments, and platformFee from the checkout payload",
+         %{conn: conn} do
+      {_buyer, order} = paid_order_with_extras(ticket_qty: 1)
+      drain_mailbox()
+
+      body =
+        Jason.encode!(%{
+          event: "checkout.completed",
+          data: %{
+            checkout: %{
+              id: order.abacate_checkout_id,
+              installmentsCount: 3,
+              platformFee: 114
+            },
+            payerInformation: %{method: "CARD"}
+          }
+        })
+
+      conn = post_webhook(conn, body)
+      assert json_response(conn, 200) == %{"ok" => true}
+
+      reloaded = Repo.get!(Backend.Orders.Order, order.id)
+      assert reloaded.payment_method == "CARD"
+      assert reloaded.card_installments == 3
+      assert reloaded.platform_fee_cents == 114
+    end
+
+    test "leaves payment columns nil when the webhook omits them", %{conn: conn} do
+      {_buyer, order} = paid_order_with_extras(ticket_qty: 1)
+      drain_mailbox()
+
+      body =
+        Jason.encode!(%{
+          event: "checkout.completed",
+          data: %{checkout: %{id: order.abacate_checkout_id}}
+        })
+
+      _ = post_webhook(conn, body)
+      reloaded = Repo.get!(Backend.Orders.Order, order.id)
+      assert reloaded.payment_method == nil
+      assert reloaded.card_installments == nil
+      assert reloaded.platform_fee_cents == nil
+    end
+
     test "is idempotent: replaying the webhook does not duplicate passes or emails",
          %{conn: conn} do
       {buyer, order} = paid_order_with_extras(ticket_qty: 2)

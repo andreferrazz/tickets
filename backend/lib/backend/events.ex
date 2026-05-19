@@ -307,7 +307,9 @@ defmodule Backend.Events do
   end
 
   defp totals_for(event) do
-    %{paid: paid_orders, pending: pending_orders, revenue: revenue} = order_totals(event.id)
+    %{paid: paid_orders, pending: pending_orders, revenue: revenue, fees: fees} =
+      order_totals(event.id)
+
     %{issued: passes_issued, checked_in: checked_in} = pass_totals(event.id)
     {tickets_sold, tickets_capacity} = ticket_capacity(event)
     extras_sold = Enum.sum(for s <- event.extra_item_sections, x <- s.extras, do: x.quantity_sold)
@@ -316,6 +318,9 @@ defmodule Backend.Events do
       orders_paid: paid_orders,
       orders_pending: pending_orders,
       revenue_cents: revenue,
+      gross_revenue_cents: revenue,
+      fees_cents: fees,
+      net_revenue_cents: revenue - fees,
       tickets_sold: tickets_sold,
       tickets_capacity: tickets_capacity,
       extras_sold: extras_sold,
@@ -325,20 +330,41 @@ defmodule Backend.Events do
   end
 
   defp order_totals(event_id) do
-    rows =
+    pending_count =
+      Repo.one(
+        from o in Order,
+          where: o.event_id == ^event_id and o.status == "pending",
+          select: count(o.id)
+      ) || 0
+
+    paid_rows =
       Repo.all(
         from o in Order,
-          where: o.event_id == ^event_id,
-          group_by: o.status,
-          select: {o.status, count(o.id), sum(o.total_cents)}
+          where: o.event_id == ^event_id and o.status == "paid",
+          select:
+            {o.total_cents, o.payment_method, o.card_installments, o.platform_fee_cents}
       )
 
-    Enum.reduce(rows, %{paid: 0, pending: 0, revenue: 0}, fn
-      {"paid", count, sum}, acc -> %{acc | paid: count, revenue: acc.revenue + (sum || 0)}
-      {"pending", count, _sum}, acc -> %{acc | pending: count}
-      _, acc -> acc
-    end)
+    {paid_count, revenue, fees} =
+      Enum.reduce(paid_rows, {0, 0, 0}, fn {total, method, installments, reported_fee},
+                                           {c, rev, fee_acc} ->
+        order_total = total || 0
+        order_fee = order_fee_cents(reported_fee, order_total, method, installments)
+        {c + 1, rev + order_total, fee_acc + order_fee}
+      end)
+
+    %{paid: paid_count, pending: pending_count, revenue: revenue, fees: fees}
   end
+
+  # Prefer the platformFee Abacate Pay reported on `checkout.completed` — it's
+  # the actual amount they kept. Fall back to our hardcoded table for legacy
+  # paid rows that predate platform-fee capture.
+  defp order_fee_cents(reported_fee, _total, _method, _installments)
+       when is_integer(reported_fee) and reported_fee >= 0,
+       do: reported_fee
+
+  defp order_fee_cents(_reported, total, method, installments),
+    do: Backend.AbacatePay.fee_cents(total, method, installments)
 
   defp pass_totals(event_id) do
     {issued, checked_in} =

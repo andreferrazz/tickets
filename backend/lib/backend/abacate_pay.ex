@@ -109,4 +109,40 @@ defmodule Backend.AbacatePay do
     by_value = div(total_cents, 1_000)
     max(1, min(cap, by_value))
   end
+
+  # Abacate Pay fee table (per the seller profile). Hardcoded here because
+  # Abacate does not surface fees via API. Update if the seller renegotiates.
+  @pix_fee_cents 80
+  @card_fixed_cents 60
+  @card_rate_1x_bps 350
+  @card_rate_2_to_6_bps 400
+  @card_rate_7_to_12_bps 450
+
+  @doc """
+  Returns the Abacate Pay fee, in cents, that will be deducted from the
+  organizer's payout for an order of `total_cents` paid via `payment_method`.
+
+  Methods:
+    * `"PIX"` — flat R$0,80 regardless of order total.
+    * `"CARD"` — percentage of total (varies with installments) + R$0,60.
+      Unknown or out-of-range installments fall back to the 1x rate.
+    * anything else (including `nil`) — treated as PIX, since legacy paid
+      orders predate payment-method tracking and PIX is the typical default.
+
+  Pure: no I/O, safe to call from queries.
+  """
+  def fee_cents(total_cents, payment_method, installments \\ nil)
+
+  def fee_cents(_total_cents, "PIX", _installments), do: @pix_fee_cents
+
+  def fee_cents(total_cents, "CARD", installments) when is_integer(total_cents) do
+    rate_bps = card_rate_bps(installments)
+    div(total_cents * rate_bps, 10_000) + @card_fixed_cents
+  end
+
+  def fee_cents(_total_cents, _method, _installments), do: @pix_fee_cents
+
+  defp card_rate_bps(n) when is_integer(n) and n >= 7 and n <= 12, do: @card_rate_7_to_12_bps
+  defp card_rate_bps(n) when is_integer(n) and n >= 2 and n <= 6, do: @card_rate_2_to_6_bps
+  defp card_rate_bps(_), do: @card_rate_1x_bps
 end
