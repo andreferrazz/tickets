@@ -98,6 +98,65 @@ defmodule Backend.AbacatePay do
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   @doc """
+  Retrieves a checkout by id from Abacate Pay.
+
+  Endpoint: `GET /v2/checkouts/get?id=<id>`.
+
+  Returns `{:ok, %{status: String.t(), payment_method: String.t() | nil,
+  card_installments: pos_integer() | nil}}`.
+
+  `status` is normalised to one of `"paid"`, `"pending"`, `"cancelled"`,
+  `"expired"`, `"refunded"`. Anything else is mapped to `"pending"` so the
+  reconciler treats unknown states as "not yet terminal" and retries next
+  cycle.
+  """
+  @impl Backend.AbacatePayBehaviour
+  def get_checkout(checkout_id) when is_binary(checkout_id) do
+    url = "#{@base_url}/checkouts/get"
+
+    case Req.get(url, params: [id: checkout_id], headers: [auth_header()]) do
+      {:ok, %{status: 200, body: %{"data" => data}}} when is_map(data) ->
+        {:ok,
+         %{
+           status: normalize_checkout_status(data["status"]),
+           payment_method: extract_payment_method(data),
+           card_installments: extract_card_installments(data)
+         }}
+
+      {:ok, %{status: status, body: body}} ->
+        {:error, "abacate_pay get_checkout #{status}: #{inspect(body)}"}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp normalize_checkout_status(status) when is_binary(status) do
+    case String.upcase(status) do
+      "PAID" -> "paid"
+      "PENDING" -> "pending"
+      "CANCELLED" -> "cancelled"
+      "EXPIRED" -> "expired"
+      "REFUNDED" -> "refunded"
+      _ -> "pending"
+    end
+  end
+
+  defp normalize_checkout_status(_), do: "pending"
+
+  # Abacate Pay's checkout payload doesn't surface the chosen method explicitly
+  # in the v2 spec — only `installmentsCount` is populated for card payments.
+  # Infer CARD when installments are present; leave nil otherwise so callers
+  # don't overwrite a webhook-populated value with a guess.
+  defp extract_payment_method(%{"installmentsCount" => n}) when is_integer(n) and n > 0,
+    do: "CARD"
+
+  defp extract_payment_method(_), do: nil
+
+  defp extract_card_installments(%{"installmentsCount" => n}) when is_integer(n) and n > 0, do: n
+  defp extract_card_installments(_), do: nil
+
+  @doc """
   Returns the card installment cap for a given order total.
 
   Each installment must be worth at least R$10 (1_000 cents), capped at the
