@@ -7,6 +7,10 @@ export const pt = {
 	'nav.logout': 'Sair',
 	'nav.login': 'Entrar',
 
+	// Theme toggle
+	'theme.toggleToDark': 'Tema escuro',
+	'theme.toggleToLight': 'Tema claro',
+
 	// Common
 	'common.loading': 'Carregando...',
 	'common.saving': 'Salvando...',
