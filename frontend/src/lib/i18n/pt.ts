@@ -187,6 +187,7 @@ export const pt = {
 	'eventEdit.deleteSectionError': 'Falha ao excluir seção',
 	'eventEdit.sectionNotEmpty': 'Remova os complementos da seção antes de excluí-la.',
 	'eventEdit.saveSectionError': 'Falha ao salvar seção',
+	'eventEdit.reorderSection': 'Reordenar seção',
 	'eventEdit.batches': 'Lotes',
 	'eventEdit.addBatch': 'Adicionar lote',
 	'eventEdit.closeBatch': 'Encerrar lote',

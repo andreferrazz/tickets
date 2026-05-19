@@ -446,6 +446,24 @@ defmodule Backend.EventsTest do
       {:ok, s} = Events.create_section(creator, event.id, %{"title" => "X"})
       assert {:error, :forbidden} = Events.update_section(other, s.id, %{"title" => "Y"})
     end
+
+    test "position updates reorder sections returned by get_event/1" do
+      user = creator_user()
+      event = published_event(user)
+      {:ok, a} = Events.create_section(user, event.id, %{"title" => "A"})
+      {:ok, b} = Events.create_section(user, event.id, %{"title" => "B"})
+
+      {:ok, _} = Events.update_section(user, a.id, %{"position" => 2})
+      {:ok, _} = Events.update_section(user, b.id, %{"position" => 1})
+
+      titles =
+        event.id
+        |> Events.get_event()
+        |> Map.fetch!(:extra_item_sections)
+        |> Enum.map(& &1.title)
+
+      assert ["Addons", "B", "A"] = titles
+    end
   end
 
   describe "delete_section/2" do

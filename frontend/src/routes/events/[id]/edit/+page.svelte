@@ -279,6 +279,72 @@
 		}
 	}
 
+	// Drag-and-drop reorder state. `armedHandleId` lets HTML5 DnD start only when
+	// the user presses the grip on a section card (inputs/buttons stay clickable).
+	let armedHandleId = $state<string | null>(null);
+	let draggingSectionId = $state<string | null>(null);
+	let dragOverSectionId = $state<string | null>(null);
+
+	function onSectionDragStart(e: DragEvent, sectionId: string) {
+		if (armedHandleId !== sectionId) {
+			e.preventDefault();
+			return;
+		}
+		draggingSectionId = sectionId;
+		if (e.dataTransfer) {
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', sectionId);
+		}
+	}
+
+	function onSectionDragOver(e: DragEvent, sectionId: string) {
+		if (!draggingSectionId || draggingSectionId === sectionId) return;
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		dragOverSectionId = sectionId;
+	}
+
+	function onSectionDragLeave(sectionId: string) {
+		if (dragOverSectionId === sectionId) dragOverSectionId = null;
+	}
+
+	function onSectionDrop(e: DragEvent, targetId: string) {
+		e.preventDefault();
+		const fromId = draggingSectionId;
+		draggingSectionId = null;
+		dragOverSectionId = null;
+		armedHandleId = null;
+		if (fromId && fromId !== targetId) reorderSections(fromId, targetId);
+	}
+
+	function onSectionDragEnd() {
+		draggingSectionId = null;
+		dragOverSectionId = null;
+		armedHandleId = null;
+	}
+
+	async function reorderSections(fromId: string, targetId: string) {
+		if (!event) return;
+		const sections = [...event.extra_sections];
+		const fromIdx = sections.findIndex((s) => s.id === fromId);
+		const toIdx = sections.findIndex((s) => s.id === targetId);
+		if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+		const [moved] = sections.splice(fromIdx, 1);
+		sections.splice(toIdx, 0, moved);
+		event.extra_sections = sections;
+		actionError = null;
+		try {
+			const writes = sections.flatMap((s, i) =>
+				s.position === i ? [] : [api.updateExtraSection(s.id, { position: i })]
+			);
+			await Promise.all(writes);
+			await reload();
+		} catch (e) {
+			await reload();
+			reportError(e, 'eventEdit.saveSectionError');
+		}
+	}
+
 	async function delSection(s: ExtraSection) {
 		const ok = await confirmDialog({
 			message: t('eventEdit.confirmDeleteSection', { title: s.title }),
@@ -507,8 +573,31 @@
 	{#each event.extra_sections as s (s.id)}
 		{@const form = newExtras[s.id]}
 		{#if form}
-		<div class="card stack" style="margin: 1rem 0;">
+		<div
+			class="card stack section-card"
+			class:dragging={draggingSectionId === s.id}
+			class:drag-over={dragOverSectionId === s.id && draggingSectionId !== s.id}
+			style="margin: 1rem 0;"
+			role="group"
+			draggable={armedHandleId === s.id}
+			ondragstart={(e) => onSectionDragStart(e, s.id)}
+			ondragover={(e) => onSectionDragOver(e, s.id)}
+			ondragleave={() => onSectionDragLeave(s.id)}
+			ondrop={(e) => onSectionDrop(e, s.id)}
+			ondragend={onSectionDragEnd}
+		>
 			<div class="section-head">
+				<button
+					type="button"
+					class="drag-handle"
+					aria-label={t('eventEdit.reorderSection')}
+					title={t('eventEdit.reorderSection')}
+					onpointerdown={() => (armedHandleId = s.id)}
+					onpointerup={() => (armedHandleId = null)}
+					onpointerleave={() => {
+						if (!draggingSectionId) armedHandleId = null;
+					}}
+				>⠿</button>
 				<FloatingField label={t('eventEdit.sectionTitle')}>
 					<input
 						placeholder=" "
@@ -664,6 +753,35 @@
 	}
 	.section-head :global(label.float) {
 		flex: 1;
+	}
+	.section-card {
+		transition: outline-color 120ms ease;
+	}
+	.section-card.dragging {
+		opacity: 0.55;
+	}
+	.section-card.drag-over {
+		outline: 2px dashed var(--accent, #4a8cff);
+		outline-offset: 2px;
+	}
+	.drag-handle {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 2rem;
+		height: 2rem;
+		padding: 0;
+		background: transparent;
+		border: none;
+		color: var(--text-muted, #888);
+		font-size: 1.1rem;
+		line-height: 1;
+		cursor: grab;
+		touch-action: none;
+		user-select: none;
+	}
+	.drag-handle:active {
+		cursor: grabbing;
 	}
 	@media (max-width: 600px) {
 		.add {
