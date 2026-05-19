@@ -12,7 +12,8 @@ defmodule Backend.AbacatePayBehaviour do
               items :: [%{id: String.t(), quantity: integer()}],
               return_url :: String.t(),
               completion_url :: String.t(),
-              customer_id :: String.t() | nil
+              customer_id :: String.t() | nil,
+              total_cents :: integer()
             ) ::
               {:ok, %{id: String.t(), url: String.t()}} | {:error, any()}
 

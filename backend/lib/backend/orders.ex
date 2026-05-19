@@ -9,7 +9,7 @@ defmodule Backend.Orders do
   import Ecto.Query
   alias Backend.Repo
   alias Backend.Events
-  alias Backend.Events.{Event, ExtraItem, TicketBatch}
+  alias Backend.Events.{Event, ExtraItem, Seating, TicketBatch}
   alias Backend.Orders.{Order, OrderItem}
   alias Backend.Tickets
 
@@ -28,14 +28,38 @@ defmodule Backend.Orders do
 
   Returns `{:ok, order}` or `{:error, reason}`.
   """
-  def create_order(user, event_id, cart_items) do
+  def create_order(user, event_id, cart_items, seat_picks \\ []) do
     with {:ok, event} <- fetch_published_event(event_id),
          :ok <- ensure_has_ticket(cart_items),
          {:ok, line_items} <- resolve_items(event, cart_items),
+         :ok <- ensure_extras_within_ticket_count(line_items),
+         {:ok, picks} <- Seating.validate_picks(event, seat_picks, ticket_quantity(line_items)),
          total = compute_total(line_items),
-         {:ok, order} <- reserve_order(user, event, total, line_items) do
+         {:ok, order} <- reserve_order(user, event, total, line_items, picks) do
       finalize_order(user, event, total, line_items, order)
     end
+  end
+
+  # When an extra is flagged `limit_to_ticket_count`, the buyer can purchase at
+  # most one per ticket in the same order (across all ticket types). Capped
+  # extras that exceed the order's ticket count get rejected before stock is
+  # reserved.
+  defp ensure_extras_within_ticket_count(line_items) do
+    ticket_count = ticket_quantity(line_items)
+
+    case Enum.find(line_items, fn line ->
+           line.type == "extra" and Map.get(line, :limit_to_ticket_count, false) and
+             line.quantity > ticket_count
+         end) do
+      nil -> :ok
+      bad -> {:error, {:extra_exceeds_tickets, bad.name, bad.quantity, ticket_count}}
+    end
+  end
+
+  defp ticket_quantity(line_items) do
+    line_items
+    |> Enum.filter(&(&1.type == "ticket"))
+    |> Enum.reduce(0, fn line, acc -> acc + line.quantity end)
   end
 
   # Free orders (total == 0) skip Abacate Pay entirely — there's nothing to
@@ -52,8 +76,8 @@ defmodule Backend.Orders do
     end
   end
 
-  defp finalize_order(user, event, _total, line_items, order) do
-    case build_checkout(order, line_items, user.abacate_customer_id) do
+  defp finalize_order(user, event, total, line_items, order) do
+    case build_checkout(order, line_items, user.abacate_customer_id, total) do
       {:ok, checkout} ->
         {:ok, attach_checkout(order, event, checkout)}
 
@@ -297,7 +321,8 @@ defmodule Backend.Orders do
            name: ex.name,
            price_cents: ex.price_cents,
            abacate_product_id: ex.abacate_product_id,
-           quantity: qty
+           quantity: qty,
+           limit_to_ticket_count: ex.limit_to_ticket_count
          }}
     end
   end
@@ -331,28 +356,47 @@ defmodule Backend.Orders do
     Enum.reduce(line_items, 0, fn %{price_cents: p, quantity: q}, acc -> acc + p * q end)
   end
 
-  defp reserve_order(user, event, total, line_items) do
+  defp reserve_order(user, event, total, line_items, seat_picks) do
     Repo.transaction(fn ->
       order =
         %{user_id: user.id, event_id: event.id, total_cents: total}
         |> Order.changeset()
         |> Repo.insert!()
 
-      Enum.each(line_items, fn line ->
-        %{
-          "order_id" => order.id,
-          "item_type" => line.type,
-          "item_id" => line.item_id,
-          "batch_id" => line.batch_id,
-          "item_name" => line.name,
-          "quantity" => line.quantity,
-          "unit_price_cents" => line.price_cents
-        }
-        |> OrderItem.changeset()
-        |> Repo.insert!()
+      ticket_items =
+        Enum.map(line_items, fn line ->
+          item =
+            %{
+              "order_id" => order.id,
+              "item_type" => line.type,
+              "item_id" => line.item_id,
+              "batch_id" => line.batch_id,
+              "item_name" => line.name,
+              "quantity" => line.quantity,
+              "unit_price_cents" => line.price_cents
+            }
+            |> OrderItem.changeset()
+            |> Repo.insert!()
 
-        increment_sold(line)
-      end)
+          increment_sold(line)
+
+          {line, item}
+        end)
+        |> Enum.filter(fn {line, _} -> line.type == "ticket" end)
+        |> Enum.map(fn {_, item} -> item end)
+
+      try do
+        Seating.reserve!(event, seat_picks, order, ticket_items)
+      rescue
+        e in Postgrex.Error ->
+          case e do
+            %Postgrex.Error{postgres: %{constraint: "seat_assignments_active_uniq"}} ->
+              Repo.rollback({:seat_taken, seat_picks})
+
+            other ->
+              reraise other, __STACKTRACE__
+          end
+      end
 
       order
     end)
@@ -379,12 +423,19 @@ defmodule Backend.Orders do
     Repo.update_all(from(ei in ExtraItem, where: ei.id == ^id), inc: [quantity_sold: qty])
   end
 
-  defp build_checkout(order, line_items, customer_id) do
+  defp build_checkout(order, line_items, customer_id, total_cents) do
     with {:ok, abacate_items} <- collect_abacate_items(line_items) do
       frontend_url = Application.get_env(:backend, :frontend_url, "http://localhost:5173")
       return_url = "#{frontend_url}/orders"
       completion_url = "#{frontend_url}/orders/#{order.id}"
-      abacate_pay().create_checkout(abacate_items, return_url, completion_url, customer_id)
+
+      abacate_pay().create_checkout(
+        abacate_items,
+        return_url,
+        completion_url,
+        customer_id,
+        total_cents
+      )
     end
   end
 
@@ -413,9 +464,17 @@ defmodule Backend.Orders do
   end
 
   defp cancel_order(order) do
-    order
-    |> Ecto.Changeset.change(status: "expired")
-    |> Repo.update()
+    order = Repo.preload(order, :items)
+
+    Repo.transaction(fn ->
+      {:ok, updated} =
+        order
+        |> Ecto.Changeset.change(status: "expired")
+        |> Repo.update()
+
+      release_order_stock(order)
+      updated
+    end)
   end
 
   defp find_order_by_checkout(checkout_id) do
@@ -440,6 +499,8 @@ defmodule Backend.Orders do
           :ok
       end
     end)
+
+    Seating.release_for_order(order.id)
   end
 
   # Decrement the batch's sold count; if it was auto-closed (sellout), reopen

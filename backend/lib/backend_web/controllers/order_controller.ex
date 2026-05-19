@@ -5,8 +5,10 @@ defmodule BackendWeb.OrderController do
   alias Backend.Tickets
 
   @doc "POST /api/v1/orders"
-  def create(conn, %{"event_id" => event_id, "items" => items}) do
-    case Orders.create_order(conn.assigns.current_user, event_id, items) do
+  def create(conn, %{"event_id" => event_id, "items" => items} = params) do
+    seat_picks = Map.get(params, "seat_picks", [])
+
+    case Orders.create_order(conn.assigns.current_user, event_id, items, seat_picks) do
       {:ok, order} ->
         conn |> put_status(:created) |> json(order_json(order))
 
@@ -29,8 +31,26 @@ defmodule BackendWeb.OrderController do
       {:error, {:out_of_stock, name}} ->
         conn |> put_status(:conflict) |> json(%{error: "out of stock: #{name}"})
 
+      {:error, {:extra_exceeds_tickets, name, _qty, _tickets}} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "extra_exceeds_tickets", name: name})
+
       {:error, {:invalid_item, id}} ->
         conn |> put_status(:bad_request) |> json(%{error: "invalid item: #{id}"})
+
+      {:error, {:seat_taken, _}} ->
+        conn |> put_status(:conflict) |> json(%{error: "seat_taken"})
+
+      {:error, {:seat_count_mismatch, got, expected}} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "seat_count_mismatch", got: got, expected: expected})
+
+      {:error, {:invalid_seat_pick, detail}} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "invalid_seat_pick", detail: detail})
 
       {:error, reason} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
@@ -92,6 +112,7 @@ defmodule BackendWeb.OrderController do
       id: pass.id,
       kind: pass.kind,
       item_name: pass.item_name,
+      seat_label: pass.seat_label,
       token: pass.token,
       checked_in_at: pass.checked_in_at,
       qr_png_base64: pass |> Tickets.qr_png() |> Base.encode64()

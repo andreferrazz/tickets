@@ -30,8 +30,34 @@ export interface Event {
 	ends_at: string | null;
 	cover_image_url: string | null;
 	status: 'draft' | 'published' | 'cancelled';
+	seat_selection_enabled: boolean;
+	seats_per_table: number | null;
 	created_at: string;
 	updated_at: string;
+}
+
+export interface SeatTable {
+	id: string;
+	event_id: string;
+	name: string;
+	position: number;
+}
+
+export interface SeatingTableSnapshot {
+	id: string;
+	name: string;
+	position: number;
+	taken_seats: number[];
+}
+
+export interface Seating {
+	seats_per_table: number;
+	tables: SeatingTableSnapshot[];
+}
+
+export interface SeatPick {
+	seat_table_id: string;
+	seat_number: number;
 }
 
 export interface Batch {
@@ -66,6 +92,7 @@ export interface ExtraItem {
 	quantity_total: number | null;
 	quantity_sold: number;
 	show_remaining: boolean;
+	limit_to_ticket_count: boolean;
 }
 
 export interface ExtraSection {
@@ -80,6 +107,7 @@ export interface ExtraSection {
 export interface EventDetail extends Event {
 	ticket_types: TicketType[];
 	extra_sections: ExtraSection[];
+	seating: Seating | null;
 }
 
 export type OrderStatus = 'pending' | 'paid' | 'expired' | 'refunded';
@@ -98,6 +126,7 @@ export interface Pass {
 	id: string;
 	kind: 'ticket' | 'extra';
 	item_name: string;
+	seat_label: string | null;
 	token: string;
 	checked_in_at: string | null;
 	qr_png_base64: string;

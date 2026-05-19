@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { auth } from '$lib/stores/auth.svelte';
+	import { theme } from '$lib/stores/theme.svelte';
 	import { api } from '$lib/api';
 	import { t } from '$lib/i18n';
 	import { goto } from '$app/navigation';
@@ -57,6 +58,14 @@
 			{:else}
 				<a href="/auth/login" class="btn small">{t('nav.login')}</a>
 			{/if}
+			<button
+				class="secondary small theme-toggle"
+				title={theme.current === 'dark' ? t('theme.toggleToLight') : t('theme.toggleToDark')}
+				aria-label={theme.current === 'dark' ? t('theme.toggleToLight') : t('theme.toggleToDark')}
+				onclick={() => theme.toggle()}
+			>
+				{theme.current === 'dark' ? '☀' : '☾'}
+			</button>
 		</div>
 	</div>
 </nav>
@@ -108,7 +117,11 @@
 		background: var(--surface-2);
 	}
 	.nav-links :global(a.btn) {
-		color: #0f172a;
+		color: var(--accent-contrast);
+	}
+	.theme-toggle {
+		min-width: 2.2rem;
+		line-height: 1;
 	}
 	.who {
 		font-size: 0.85rem !important;

@@ -15,7 +15,15 @@ defmodule Backend.Events do
   require Logger
   alias Backend.Repo
   alias Backend.Accounts.User
-  alias Backend.Events.{Event, ExtraItem, ExtraItemSection, TicketBatch, TicketType}
+  alias Backend.Events.{
+    Event,
+    ExtraItem,
+    ExtraItemSection,
+    SeatTable,
+    Seating,
+    TicketBatch,
+    TicketType
+  }
   alias Backend.Orders.{Order, OrderItem}
   alias Backend.Tickets.Pass
 
@@ -117,9 +125,53 @@ defmodule Backend.Events do
 
   @doc "Updates `event_id`. Returns `{:error, :forbidden}` if user is not owner/admin."
   def update_event(user, event_id, attrs) do
-    with {:ok, event} <- fetch_owned_event(user, event_id) do
+    with {:ok, event} <- fetch_owned_event(user, event_id),
+         :ok <- validate_seat_change(event, attrs) do
       event |> Event.update_changeset(attrs) |> Repo.update()
     end
+  end
+
+  # Guards against disabling seat selection or shrinking `seats_per_table`
+  # below an active assignment. The changeset alone can't see other rows, so
+  # we cross-check here before persisting.
+  defp validate_seat_change(%Event{seat_selection_enabled: false}, _attrs), do: :ok
+
+  defp validate_seat_change(%Event{seat_selection_enabled: true} = event, attrs) do
+    next_enabled = pick(attrs, "seat_selection_enabled", :seat_selection_enabled, true)
+    next_seats = pick(attrs, "seats_per_table", :seats_per_table, event.seats_per_table)
+
+    cond do
+      next_enabled == false and event_has_active_assignments?(event.id) ->
+        {:error, :seat_selection_in_use}
+
+      is_integer(next_seats) and next_seats < highest_assigned_seat(event.id) ->
+        {:error, :seats_per_table_too_low}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp pick(attrs, string_key, atom_key, default) do
+    case Map.fetch(attrs, string_key) do
+      {:ok, v} -> v
+      :error -> Map.get(attrs, atom_key, default)
+    end
+  end
+
+  defp event_has_active_assignments?(event_id) do
+    Repo.exists?(
+      from a in Backend.Events.SeatAssignment,
+        where: a.event_id == ^event_id and is_nil(a.released_at)
+    )
+  end
+
+  defp highest_assigned_seat(event_id) do
+    Repo.one(
+      from a in Backend.Events.SeatAssignment,
+        where: a.event_id == ^event_id and is_nil(a.released_at),
+        select: max(a.seat_number)
+    ) || 0
   end
 
   @doc """
@@ -153,8 +205,58 @@ defmodule Backend.Events do
           set: [deleted_at: now]
         )
 
+        Repo.update_all(
+          from(st in SeatTable,
+            where: st.event_id == ^event.id and is_nil(st.deleted_at)
+          ),
+          set: [deleted_at: now]
+        )
+
         event
       end)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Seat tables (rounded tables)
+  # ---------------------------------------------------------------------------
+
+  @doc "Lists live seat tables for `event_id`. No ownership check (public)."
+  def list_seat_tables(event_id), do: Seating.list_tables(event_id)
+
+  @doc "Creates a seat table on `event_id`. Checks ownership."
+  def create_seat_table(user, event_id, attrs) do
+    with {:ok, event} <- fetch_owned_event(user, event_id) do
+      Seating.create_table(event.id, attrs)
+    end
+  end
+
+  @doc "Updates seat table `id`. Checks ownership via the parent event."
+  def update_seat_table(user, id, attrs) do
+    with {:ok, table} <- fetch_owned_seat_table(user, id) do
+      Seating.update_table(table, attrs)
+    end
+  end
+
+  @doc "Soft-deletes seat table `id`. Checks ownership; refuses if assigned."
+  def delete_seat_table(user, id) do
+    with {:ok, table} <- fetch_owned_seat_table(user, id) do
+      Seating.delete_table(table)
+    end
+  end
+
+  defp fetch_owned_seat_table(user, id) do
+    query =
+      from t in SeatTable,
+        join: e in Event,
+        on: t.event_id == e.id,
+        where: t.id == ^id and is_nil(t.deleted_at) and is_nil(e.deleted_at),
+        select: {t, e}
+
+    case Repo.one(query) do
+      nil -> {:error, :not_found}
+      {table, event} when user.role == "admin" or event.creator_id == user.id -> {:ok, table}
+      {_table, _event} -> {:error, :forbidden}
     end
   end
 

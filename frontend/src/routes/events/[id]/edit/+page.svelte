@@ -15,6 +15,8 @@
 		EventDetail,
 		ExtraItem,
 		ExtraSection,
+		SeatTable,
+		SeatingTableSnapshot,
 		TicketType
 	} from '$lib/types';
 	import { onMount } from 'svelte';
@@ -95,8 +97,64 @@
 
 	async function saveEvent(data: Partial<Event>) {
 		if (!event) return;
-		await api.updateEvent(event.id, data);
-		await reload();
+		try {
+			await api.updateEvent(event.id, data);
+			await reload();
+		} catch (e) {
+			if (e instanceof ApiError && e.message === 'seat_selection_in_use') {
+				actionError = t('eventEdit.seatsInUse');
+				throw new Error(t('eventEdit.seatsInUse'));
+			}
+			if (e instanceof ApiError && e.message === 'seats_per_table_too_low') {
+				actionError = t('eventEdit.seatsTooLow');
+				throw new Error(t('eventEdit.seatsTooLow'));
+			}
+			throw e;
+		}
+	}
+
+	let newTableName = $state('');
+
+	async function addTable() {
+		if (!event || !newTableName.trim()) return;
+		actionError = null;
+		try {
+			await api.createSeatTable(event.id, { name: newTableName.trim() });
+			newTableName = '';
+			await reload();
+		} catch (e) {
+			reportError(e, 'eventEdit.saveTableError');
+		}
+	}
+
+	async function renameTable(table: SeatTable | SeatingTableSnapshot, name: string) {
+		actionError = null;
+		try {
+			await api.updateSeatTable(table.id, { name });
+			await reload();
+		} catch (e) {
+			reportError(e, 'eventEdit.saveTableError');
+		}
+	}
+
+	async function delTable(table: SeatingTableSnapshot) {
+		const ok = await confirmDialog({
+			message: t('eventEdit.confirmDeleteTable', { name: table.name }),
+			confirmText: t('common.delete'),
+			danger: true
+		});
+		if (!ok) return;
+		actionError = null;
+		try {
+			await api.deleteSeatTable(table.id);
+			await reload();
+		} catch (e) {
+			if (e instanceof ApiError && e.message === 'table_has_assignments') {
+				actionError = t('eventEdit.tableHasAssignments');
+			} else {
+				reportError(e, 'eventEdit.deleteTableError');
+			}
+		}
 	}
 
 	async function addTicket() {
@@ -406,6 +464,44 @@
 		</div>
 	</div>
 
+	<div class="card stack" style="margin: 1rem 0;">
+		<h2>{t('eventEdit.seating')}</h2>
+		{#if !event.seat_selection_enabled}
+			<p class="muted">{t('eventEdit.seatingDisabledHint')}</p>
+		{:else}
+			{#each event.seating?.tables ?? [] as tbl (tbl.id)}
+				<div class="add table-row">
+					<FloatingField label={t('eventEdit.tableName')}>
+						<input
+							placeholder=" "
+							value={tbl.name}
+							onchange={(e) => renameTable(tbl, e.currentTarget.value)}
+						/>
+					</FloatingField>
+					<div class="muted small">
+						{t('eventEdit.seatsTaken', {
+							taken: tbl.taken_seats.length,
+							total: event.seats_per_table ?? 0
+						})}
+					</div>
+					<button class="danger small" onclick={() => delTable(tbl)}>
+						{t('common.delete')}
+					</button>
+				</div>
+			{/each}
+			<div class="add table-row">
+				<FloatingField label={t('eventEdit.tableName')}>
+					<input
+						placeholder={t('eventEdit.tableNamePlaceholder')}
+						bind:value={newTableName}
+					/>
+				</FloatingField>
+				<div></div>
+				<button class="small" onclick={addTable}>{t('eventEdit.addTable')}</button>
+			</div>
+		{/if}
+	</div>
+
 	<h2 style="margin: 1.5rem 0 0.5rem;">{t('eventEdit.addons')}</h2>
 
 	{#each event.extra_sections as s (s.id)}
@@ -471,6 +567,15 @@
 								saveExtra(x, { show_remaining: e.currentTarget.checked })}
 						/>
 						{t('eventEdit.showRemaining')}
+					</label>
+					<label class="check">
+						<input
+							type="checkbox"
+							checked={x.limit_to_ticket_count}
+							onchange={(e) =>
+								saveExtra(x, { limit_to_ticket_count: e.currentTarget.checked })}
+						/>
+						{t('eventEdit.limitToTicketCount')}
 					</label>
 					<button class="danger small" onclick={() => delExtra(x)}>{t('common.delete')}</button>
 				</div>
@@ -543,6 +648,9 @@
 	}
 	.batch-row {
 		grid-template-columns: auto 1fr 1fr auto auto;
+	}
+	.table-row {
+		grid-template-columns: 1fr auto auto;
 	}
 	.batch-label {
 		display: flex;

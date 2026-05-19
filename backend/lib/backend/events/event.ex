@@ -14,12 +14,15 @@ defmodule Backend.Events.Event do
     field :ends_at, :utc_datetime
     field :cover_image_url, :string
     field :status, :string, default: "draft"
+    field :seat_selection_enabled, :boolean, default: false
+    field :seats_per_table, :integer
     field :deleted_at, :utc_datetime_usec
 
     belongs_to :creator, Backend.Accounts.User
     has_many :ticket_types, Backend.Events.TicketType
     has_many :extras, Backend.Events.ExtraItem
     has_many :extra_item_sections, Backend.Events.ExtraItemSection
+    has_many :seat_tables, Backend.Events.SeatTable
 
     timestamps(type: :utc_datetime)
   end
@@ -38,10 +41,13 @@ defmodule Backend.Events.Event do
       :starts_at,
       :ends_at,
       :cover_image_url,
-      :status
+      :status,
+      :seat_selection_enabled,
+      :seats_per_table
     ])
     |> validate_required([:creator_id, :title, :starts_at])
     |> validate_inclusion(:status, @valid_statuses)
+    |> validate_seat_config()
   end
 
   @doc "Changeset for updating an existing event (no creator_id change)."
@@ -55,9 +61,26 @@ defmodule Backend.Events.Event do
       :starts_at,
       :ends_at,
       :cover_image_url,
-      :status
+      :status,
+      :seat_selection_enabled,
+      :seats_per_table
     ])
     |> validate_required([:title, :starts_at])
     |> validate_inclusion(:status, @valid_statuses)
+    |> validate_seat_config()
+  end
+
+  # When seat selection is enabled, seats_per_table must be a positive integer.
+  # Disabled events may carry any value (including nil) — the field is ignored.
+  defp validate_seat_config(changeset) do
+    enabled = get_field(changeset, :seat_selection_enabled)
+
+    if enabled do
+      changeset
+      |> validate_required([:seats_per_table])
+      |> validate_number(:seats_per_table, greater_than: 0, less_than_or_equal_to: 200)
+    else
+      changeset
+    end
   end
 end

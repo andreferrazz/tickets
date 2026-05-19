@@ -3,6 +3,7 @@ defmodule BackendWeb.EventController do
   require Logger
 
   alias Backend.Events
+  alias Backend.Events.Seating
 
   @doc "GET /api/v1/events — published events plus the caller's own drafts (admins see all)"
   def index(conn, _params) do
@@ -58,8 +59,37 @@ defmodule BackendWeb.EventController do
       {:error, :forbidden} ->
         conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
 
+      {:error, :seat_selection_in_use} ->
+        conn
+        |> put_status(:conflict)
+        |> json(%{error: "seat_selection_in_use"})
+
+      {:error, :seats_per_table_too_low} ->
+        conn
+        |> put_status(:conflict)
+        |> json(%{error: "seats_per_table_too_low"})
+
       {:error, changeset} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: format_errors(changeset)})
+    end
+  end
+
+  @doc """
+  GET /api/v1/events/:id/seating — live availability for the buyer page.
+
+  Returns 404 when seat selection is disabled on the event so the frontend can
+  fall back to the legacy flow without inspecting flags.
+  """
+  def seating(conn, %{"id" => id}) do
+    case Events.get_event(id) do
+      nil ->
+        conn |> put_status(:not_found) |> json(%{error: "event not found"})
+
+      event ->
+        case Seating.seating_snapshot(event) do
+          nil -> conn |> put_status(:not_found) |> json(%{error: "seating disabled"})
+          snapshot -> json(conn, seating_json(snapshot))
+        end
     end
   end
 
@@ -94,17 +124,40 @@ defmodule BackendWeb.EventController do
       ends_at: e.ends_at,
       cover_image_url: e.cover_image_url,
       status: e.status,
+      seat_selection_enabled: e.seat_selection_enabled,
+      seats_per_table: e.seats_per_table,
       created_at: e.inserted_at,
       updated_at: e.updated_at
     }
   end
 
   def event_detail_json(event) do
-    event_json(event)
-    |> Map.merge(%{
-      ticket_types: Enum.map(event.ticket_types, &ticket_type_json/1),
-      extra_sections: Enum.map(event.extra_item_sections, &extra_section_json/1)
-    })
+    base =
+      event_json(event)
+      |> Map.merge(%{
+        ticket_types: Enum.map(event.ticket_types, &ticket_type_json/1),
+        extra_sections: Enum.map(event.extra_item_sections, &extra_section_json/1)
+      })
+
+    case Seating.seating_snapshot(event) do
+      nil -> Map.put(base, :seating, nil)
+      snapshot -> Map.put(base, :seating, seating_json(snapshot))
+    end
+  end
+
+  defp seating_json(snapshot) do
+    %{
+      seats_per_table: snapshot.seats_per_table,
+      tables:
+        Enum.map(snapshot.tables, fn t ->
+          %{
+            id: t.id,
+            name: t.name,
+            position: t.position,
+            taken_seats: t.taken_seats
+          }
+        end)
+    }
   end
 
   def extra_section_json(s) do
@@ -164,7 +217,8 @@ defmodule BackendWeb.EventController do
       price_cents: ex.price_cents,
       quantity_total: ex.quantity_total,
       quantity_sold: ex.quantity_sold,
-      show_remaining: ex.show_remaining
+      show_remaining: ex.show_remaining,
+      limit_to_ticket_count: ex.limit_to_ticket_count
     }
   end
 

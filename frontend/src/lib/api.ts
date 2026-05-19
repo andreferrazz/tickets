@@ -13,6 +13,9 @@ import type {
 	Order,
 	Pass,
 	ProfileUpdate,
+	SeatPick,
+	SeatTable,
+	Seating,
 	TicketType,
 	User,
 	CartLine
@@ -123,8 +126,19 @@ export const api = {
 		request<ExtraSection>(`/extra-sections/${id}`, { method: 'PUT', body }),
 	deleteExtraSection: (id: string) =>
 		request<{ deleted: true }>(`/extra-sections/${id}`, { method: 'DELETE' }),
-	createOrder: (event_id: string, items: CartLine[]) =>
-		request<Order>('/orders', { method: 'POST', body: { event_id, items } }),
+	createSeatTable: (eventId: string, body: { name: string; position?: number }) =>
+		request<SeatTable>(`/events/${eventId}/seat-tables`, { method: 'POST', body }),
+	updateSeatTable: (id: string, body: Partial<Pick<SeatTable, 'name' | 'position'>>) =>
+		request<SeatTable>(`/seat-tables/${id}`, { method: 'PUT', body }),
+	deleteSeatTable: (id: string) =>
+		request<{ deleted: true }>(`/seat-tables/${id}`, { method: 'DELETE' }),
+	getEventSeating: (id: string, fetcher?: typeof fetch) =>
+		request<Seating>(`/events/${id}/seating`, { fetcher }),
+	createOrder: (event_id: string, items: CartLine[], seat_picks: SeatPick[] = []) =>
+		request<Order>('/orders', {
+			method: 'POST',
+			body: { event_id, items, seat_picks }
+		}),
 	listOrders: (fetcher?: typeof fetch) => request<Order[]>('/orders', { fetcher }),
 	getOrder: (id: string, fetcher?: typeof fetch) =>
 		request<Order>(`/orders/${id}`, { fetcher }),
