@@ -235,6 +235,21 @@ defmodule Backend.EventsTest do
       assert b2.abacate_product_id == "prod_test_batch_#{b2.id}"
     end
 
+    test "creates a free batch without calling Abacate Pay" do
+      user = creator_user()
+      event = published_event(user)
+      {:ok, tt} = Events.create_ticket_type(user, event.id, %{"name" => "Free RSVP"})
+
+      assert {:ok, batch} =
+               Events.create_batch(user, tt.id, %{
+                 "price_cents" => 0,
+                 "quantity_total" => 50
+               })
+
+      assert batch.price_cents == 0
+      assert is_nil(batch.abacate_product_id)
+    end
+
     test "returns forbidden for a ticket type the user doesn't own" do
       creator = creator_user()
       other = buyer_user()
@@ -339,6 +354,20 @@ defmodule Backend.EventsTest do
       assert extra.event_id == event.id
       assert is_nil(extra.quantity_total)
       assert extra.abacate_product_id == "prod_test_extra_#{extra.id}"
+    end
+
+    test "creates a free extra without calling Abacate Pay" do
+      user = creator_user()
+      event = published_event(user)
+
+      assert {:ok, extra} =
+               Events.create_extra(user, event.id, %{
+                 "name" => "Welcome Gift",
+                 "price_cents" => 0
+               })
+
+      assert extra.price_cents == 0
+      assert is_nil(extra.abacate_product_id)
     end
   end
 

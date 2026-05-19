@@ -392,6 +392,55 @@ defmodule Backend.OrdersTest do
       assert reopened.quantity_sold == 0
     end
 
+    test "free order skips Abacate checkout and is paid + fulfilled immediately" do
+      creator = make_creator()
+      buyer = make_buyer()
+      {event, tt, _batch} = published_event_with_tickets(creator, price_cents: 0)
+
+      assert {:ok, order} =
+               Orders.create_order(buyer, event.id, [
+                 %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 2}
+               ])
+
+      assert order.status == "paid"
+      assert order.total_cents == 0
+      assert is_nil(order.abacate_checkout_id)
+      assert is_nil(order.abacate_payment_url)
+      refute is_nil(order.paid_at)
+
+      # Passes are issued inline (no webhook needed for free orders).
+      assert Repo.aggregate(
+               from(p in Backend.Tickets.Pass, where: p.order_id == ^order.id),
+               :count
+             ) == 2
+    end
+
+    test "mixed cart with a free ticket and a paid extra builds a checkout for the extra only" do
+      creator = make_creator()
+      buyer = make_buyer()
+      {event, tt, _batch} = published_event_with_tickets(creator, price_cents: 0)
+
+      {:ok, section} = Events.create_section(creator, event.id, %{"title" => "Add-ons"})
+
+      {:ok, extra} =
+        Events.create_extra(creator, event.id, %{
+          "name" => "Drink",
+          "price_cents" => 1500,
+          "section_id" => section.id
+        })
+
+      assert {:ok, order} =
+               Orders.create_order(buyer, event.id, [
+                 %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1},
+                 %{"item_type" => "extra", "item_id" => extra.id, "quantity" => 1}
+               ])
+
+      # Order goes through normal checkout — total > 0 because of the extra.
+      assert order.status == "pending"
+      assert order.total_cents == 1500
+      assert is_binary(order.abacate_payment_url)
+    end
+
     test "refunding a sale from a manually-closed batch keeps it closed" do
       creator = make_creator()
       buyer = make_buyer()

@@ -311,19 +311,31 @@ defmodule Backend.Events do
   # Inserts the batch, then creates its Abacate Pay product and writes the
   # returned `prod_*` id back. Any failure rolls the row back so we never leave
   # a batch without a paired upstream product.
+  #
+  # Free batches (price_cents == 0) skip the Abacate product entirely — the
+  # upstream API rejects zero-priced products, and the order flow has its own
+  # free-line handling that excludes such lines from the checkout payload.
   defp create_batch_with_abacate_product(changeset, ticket_type) do
     Repo.transaction(fn ->
       with {:ok, batch} <- Repo.insert(changeset),
-           label = "#{ticket_type.name} - Lote #{batch.sequence}",
-           external_id = "batch_#{batch.id}",
-           {:ok, prod_id} <- abacate_pay().create_product(label, batch.price_cents, external_id),
-           {:ok, batch} <-
-             batch |> Ecto.Changeset.change(abacate_product_id: prod_id) |> Repo.update() do
+           {:ok, batch} <- maybe_attach_abacate_product(batch, ticket_type) do
         batch
       else
         {:error, reason} -> Repo.rollback(reason)
       end
     end)
+  end
+
+  defp maybe_attach_abacate_product(%TicketBatch{price_cents: 0} = batch, _ticket_type),
+    do: {:ok, batch}
+
+  defp maybe_attach_abacate_product(batch, ticket_type) do
+    label = "#{ticket_type.name} - Lote #{batch.sequence}"
+    external_id = "batch_#{batch.id}"
+
+    with {:ok, prod_id} <- abacate_pay().create_product(label, batch.price_cents, external_id) do
+      batch |> Ecto.Changeset.change(abacate_product_id: prod_id) |> Repo.update()
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -501,19 +513,29 @@ defmodule Backend.Events do
   # Inserts `changeset`, creates the matching Abacate Pay product, then writes
   # the returned `prod_*` id back onto the row. Any failure rolls the row back
   # so we never leave a record without a paired upstream product.
+  #
+  # Free records (price_cents == 0) skip the Abacate product — the upstream
+  # API rejects zero-priced products, and the order flow's checkout payload
+  # already filters out zero-priced lines.
   defp create_with_abacate_product(changeset, prefix) do
     Repo.transaction(fn ->
       with {:ok, record} <- Repo.insert(changeset),
-           external_id = "#{prefix}_#{record.id}",
-           {:ok, prod_id} <-
-             abacate_pay().create_product(record.name, record.price_cents, external_id),
-           {:ok, record} <-
-             record |> Ecto.Changeset.change(abacate_product_id: prod_id) |> Repo.update() do
+           {:ok, record} <- attach_abacate_product_unless_free(record, prefix) do
         record
       else
         {:error, reason} -> Repo.rollback(reason)
       end
     end)
+  end
+
+  defp attach_abacate_product_unless_free(%{price_cents: 0} = record, _prefix), do: {:ok, record}
+
+  defp attach_abacate_product_unless_free(record, prefix) do
+    external_id = "#{prefix}_#{record.id}"
+
+    with {:ok, prod_id} <- abacate_pay().create_product(record.name, record.price_cents, external_id) do
+      record |> Ecto.Changeset.change(abacate_product_id: prod_id) |> Repo.update()
+    end
   end
 
   defp abacate_pay,

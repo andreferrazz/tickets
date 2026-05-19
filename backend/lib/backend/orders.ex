@@ -11,6 +11,7 @@ defmodule Backend.Orders do
   alias Backend.Events
   alias Backend.Events.{Event, ExtraItem, TicketBatch}
   alias Backend.Orders.{Order, OrderItem}
+  alias Backend.Tickets
 
   # ---------------------------------------------------------------------------
   # Create
@@ -33,14 +34,76 @@ defmodule Backend.Orders do
          {:ok, line_items} <- resolve_items(event, cart_items),
          total = compute_total(line_items),
          {:ok, order} <- reserve_order(user, event, total, line_items) do
-      case build_checkout(order, line_items, user.abacate_customer_id) do
-        {:ok, checkout} ->
-          {:ok, attach_checkout(order, event, checkout)}
+      finalize_order(user, event, total, line_items, order)
+    end
+  end
 
-        {:error, reason} ->
-          cancel_order(order)
-          {:error, reason}
-      end
+  # Free orders (total == 0) skip Abacate Pay entirely — there's nothing to
+  # charge — and are marked paid + fulfilled inline. Paid orders go through
+  # the usual checkout-then-webhook path.
+  defp finalize_order(_user, event, 0, _line_items, order) do
+    with {:ok, paid} <- mark_free_order_paid(order),
+         {:ok, paid, _passes} <- fulfill_paid_order(%{paid | event_title: event.title}) do
+      {:ok, paid}
+    else
+      {:error, reason} ->
+        cancel_order(order)
+        {:error, reason}
+    end
+  end
+
+  defp finalize_order(user, event, _total, line_items, order) do
+    case build_checkout(order, line_items, user.abacate_customer_id) do
+      {:ok, checkout} ->
+        {:ok, attach_checkout(order, event, checkout)}
+
+      {:error, reason} ->
+        cancel_order(order)
+        {:error, reason}
+    end
+  end
+
+  defp mark_free_order_paid(order) do
+    order
+    |> Ecto.Changeset.change(
+      status: "paid",
+      paid_at: DateTime.utc_now() |> DateTime.truncate(:second)
+    )
+    |> Repo.update()
+  end
+
+  @doc """
+  Issues passes for a paid order and emails them to the buyer. Called by the
+  webhook handler after Abacate confirms payment, and by `create_order/3` for
+  free orders that skip the checkout entirely.
+
+  Idempotent: re-running on an order that already has passes returns them
+  with status `:existed` and skips the email send, matching the
+  webhook-replay safety the old in-controller orchestration provided.
+  """
+  def fulfill_paid_order(order) do
+    order = order |> Repo.preload([:user, :items]) |> ensure_event_title()
+
+    with {:ok, passes, status} <- Tickets.issue_for_order(order) do
+      if status == :created, do: deliver_pass_emails(order, passes)
+      {:ok, order, passes}
+    end
+  end
+
+  defp ensure_event_title(%Order{event_title: title} = order) when is_binary(title), do: order
+  defp ensure_event_title(order), do: with_event_title(order)
+
+  defp deliver_pass_emails(order, passes) do
+    {ticket_passes, extra_passes} = Enum.split_with(passes, &(&1.kind == "ticket"))
+    Backend.Mailer.send_tickets_email(order.user.email, order, ticket_passes)
+
+    case extra_passes do
+      [extra_pass | _] ->
+        extras_items = Enum.filter(order.items, &(&1.item_type == "extra"))
+        Backend.Mailer.send_extras_email(order.user.email, order, extra_pass, extras_items)
+
+      [] ->
+        :ok
     end
   end
 
@@ -325,8 +388,14 @@ defmodule Backend.Orders do
     end
   end
 
+  # Lines with `price_cents == 0` (free batches, free extras) are excluded
+  # from the upstream invoice — Abacate Pay rejects zero-priced items and
+  # there's nothing to bill anyway. The order still records them; passes are
+  # issued normally.
   defp collect_abacate_items(line_items) do
-    Enum.reduce_while(line_items, {:ok, []}, fn line, {:ok, acc} ->
+    paid_lines = Enum.filter(line_items, &(&1.price_cents > 0))
+
+    Enum.reduce_while(paid_lines, {:ok, []}, fn line, {:ok, acc} ->
       case line.abacate_product_id do
         id when is_binary(id) -> {:cont, {:ok, acc ++ [%{id: id, quantity: line.quantity}]}}
         _ -> {:halt, {:error, {:missing_abacate_product, line.name}}}
