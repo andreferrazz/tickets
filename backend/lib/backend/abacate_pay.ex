@@ -76,6 +76,7 @@ defmodule Backend.AbacatePay do
       %{
         items: items,
         methods: ["PIX", "CARD"],
+        card: %{maxInstallments: max_card_installments()},
         returnUrl: return_url,
         completionUrl: completion_url
       }
@@ -95,4 +96,7 @@ defmodule Backend.AbacatePay do
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp max_card_installments,
+    do: Application.get_env(:backend, :max_card_installments, 3)
 end

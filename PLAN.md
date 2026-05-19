@@ -91,7 +91,7 @@ Abacate Pay uses **Products** and **Checkouts**:
 - Base URL: `https://api.abacatepay.com/v2`
 - Auth: `Authorization: Bearer <abacatepay-api-key>`
 - Create product: `POST /v2/products/create` — body: `{ externalId, name, price, currency: "BRL" }`
-- Create checkout: `POST /v2/checkouts/create` — body: `{ items: [{ id, quantity }], methods: ["PIX"], returnUrl, completionUrl }`
+- Create checkout: `POST /v2/checkouts/create` — body: `{ items: [{ id, quantity }], methods: ["PIX", "CARD"], card: { maxInstallments: 3 }, returnUrl, completionUrl }`
 - Webhook events we care about: `checkout.completed`, `checkout.refunded`
 
 ---
