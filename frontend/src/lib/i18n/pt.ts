@@ -91,7 +91,6 @@ export const pt = {
 	'event.remainingCount': 'Restam {count}',
 	'event.orderSummary': 'Resumo do pedido',
 	'event.noItems': 'Nenhum item selecionado.',
-	'event.ticketRequired': 'Selecione pelo menos um ingresso para comprar complementos.',
 	'event.extraNeedsTicket': 'Disponível conforme a quantidade de ingressos.',
 	'event.errorExtraExceedsTickets':
 		'Você pediu mais desse complemento do que ingressos no pedido.',
