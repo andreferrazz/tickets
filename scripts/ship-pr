@@ -11,9 +11,9 @@ BASE="main"
 MERGE_STRATEGY="squash"        # squash | merge | rebase
 MODEL="sonnet"
 ASSUME_YES=false
-SKIP_AI_REVIEW=false
+SKIP_AI_REVIEW=true
 DRAFT=false
-DELETE_BRANCH=true
+DELETE_BRANCH=false
 AUTO_MERGE=false               # use gh's --auto (waits for checks)
 
 # ---------- helpers ----------
@@ -33,9 +33,9 @@ Options:
   -s, --strategy <strat>     Merge strategy: squash|merge|rebase (default: squash)
   -m, --model <model>        Claude model (default: sonnet)
   -y, --yes                  Skip human confirmation prompts
-      --skip-review          Skip the AI review step
+      --review               Run the AI review step (skipped by default)
       --draft                Open PR as draft (implies no merge)
-      --keep-branch          Don't delete the branch after merge
+      --delete-branch        Delete the branch after merge (kept by default)
       --auto                 Use 'gh pr merge --auto' (waits for checks)
   -h, --help                 Show this help
 
@@ -53,9 +53,9 @@ while [[ $# -gt 0 ]]; do
     -s|--strategy)    MERGE_STRATEGY="$2"; shift 2 ;;
     -m|--model)       MODEL="$2"; shift 2 ;;
     -y|--yes)         ASSUME_YES=true; shift ;;
-    --skip-review)    SKIP_AI_REVIEW=true; shift ;;
+    --review)         SKIP_AI_REVIEW=false; shift ;;
     --draft)          DRAFT=true; shift ;;
-    --keep-branch)    DELETE_BRANCH=false; shift ;;
+    --delete-branch)  DELETE_BRANCH=true; shift ;;
     --auto)           AUTO_MERGE=true; shift ;;
     -h|--help)        usage; exit 0 ;;
     *)                die "Unknown option: $1" ;;
