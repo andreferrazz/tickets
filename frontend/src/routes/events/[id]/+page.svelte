@@ -6,6 +6,7 @@
 	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
+	import { requestLogin } from '$lib/stores/loginModal.svelte';
 	import type { CartLine, EventDetail, SeatPick } from '$lib/types';
 	import { onMount } from 'svelte';
 
@@ -109,9 +110,9 @@
 	async function buy() {
 		if (!event || lines.length === 0 || !hasTicket) return;
 		if (!seatsReady) return;
-		if (!auth.isAuthed) {
-			await goto(`/auth/login?next=/events/${event.id}`);
-			return;
+		if (!auth.isAuthed || !auth.user?.profile_complete) {
+			const ok = await requestLogin();
+			if (!ok) return;
 		}
 		buyError = null;
 		busy = true;
