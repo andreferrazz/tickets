@@ -9,6 +9,8 @@
 	import { onMount } from 'svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import PromptDialog from '$lib/components/PromptDialog.svelte';
+	import LoginModal from '$lib/components/LoginModal.svelte';
+	import { loginModalStore } from '$lib/stores/loginModal.svelte';
 
 	let { children } = $props();
 
@@ -24,6 +26,8 @@
 		if (!auth.isAuthed || !auth.user) return;
 		if (auth.user.profile_complete === true) return;
 		if (page.url.pathname.startsWith('/auth/')) return;
+		// The login modal handles profile completion in-page; don't yank the user away.
+		if (loginModalStore.open) return;
 		goto('/auth/profile');
 	});
 
@@ -76,6 +80,7 @@
 
 <ConfirmDialog />
 <PromptDialog />
+<LoginModal />
 
 <style>
 	.nav {
