@@ -113,7 +113,7 @@ export const pt = {
 	'dashboard.revenue': 'Receita',
 	'dashboard.revenueHint': 'Apenas pedidos pagos.',
 	'dashboard.netRevenue': 'Receita líquida',
-	'dashboard.netRevenueHint': 'Receita menos taxas Abacate Pay.',
+	'dashboard.netRevenueHint': 'Receita menos taxas do gateway de pagamento.',
 	'dashboard.feesDeducted': 'Taxas descontadas: {amount}',
 	'dashboard.ticketsReserved': 'Ingressos reservados',
 	'dashboard.ticketsReservedHint': 'Inclui reservas pendentes e pagas.',
