@@ -43,6 +43,26 @@ defmodule BackendWeb.TicketTypeController do
     end
   end
 
+  @doc "GET /api/v1/ticket-types/:id/buyers — creator/admin only; 404 otherwise"
+  def buyers(conn, %{"id" => id}) do
+    case Events.list_ticket_type_buyers(conn.assigns.current_user, id) do
+      {:ok, rows} ->
+        json(conn, Enum.map(rows, &buyer_json/1))
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "ticket type not found"})
+    end
+  end
+
+  defp buyer_json(row) do
+    %{
+      name: row.name,
+      tax_id: row.tax_id,
+      email: row.email,
+      quantity: row.quantity
+    }
+  end
+
   @doc "DELETE /api/v1/ticket-types/:id"
   def delete(conn, %{"id" => id}) do
     case Events.delete_ticket_type(conn.assigns.current_user, id) do
