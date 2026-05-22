@@ -136,6 +136,7 @@ export const pt = {
 	'dashboard.errorFallback': 'Falha ao carregar painel',
 	'dashboard.notAuthorized': 'Você não tem acesso a este painel.',
 	'dashboard.extraBuyers': 'Compradores · {name}',
+	'dashboard.ticketBuyers': 'Compradores · {name}',
 	'dashboard.buyerName': 'Nome',
 	'dashboard.buyerTaxId': 'CPF/CNPJ',
 	'dashboard.buyerQty': 'Qtde',

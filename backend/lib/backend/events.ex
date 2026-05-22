@@ -494,12 +494,24 @@ defmodule Backend.Events do
   """
   def list_extra_buyers(user, extra_id) do
     case fetch_owned_extra(user, extra_id) do
-      {:ok, extra} -> {:ok, query_extra_buyers(extra.id)}
+      {:ok, extra} -> {:ok, query_item_buyers("extra", extra.id)}
       {:error, _} -> {:error, :not_found}
     end
   end
 
-  defp query_extra_buyers(extra_id) do
+  @doc """
+  Returns the buyers of a single ticket type, one row per user, with summed
+  `quantity` across their orders. Same authorization and status filtering as
+  `list_extra_buyers/2` — see that function's docstring for rationale.
+  """
+  def list_ticket_type_buyers(user, ticket_type_id) do
+    case fetch_owned_ticket_type(user, ticket_type_id) do
+      {:ok, tt} -> {:ok, query_item_buyers("ticket", tt.id)}
+      {:error, _} -> {:error, :not_found}
+    end
+  end
+
+  defp query_item_buyers(item_type, item_id) do
     Repo.all(
       from oi in OrderItem,
         join: o in Order,
@@ -507,7 +519,7 @@ defmodule Backend.Events do
         join: u in User,
         on: o.user_id == u.id,
         where:
-          oi.item_type == "extra" and oi.item_id == ^extra_id and
+          oi.item_type == ^item_type and oi.item_id == ^item_id and
             o.status in ["pending", "paid"],
         group_by: [u.id, u.name, u.tax_id, u.email],
         order_by: [desc: sum(oi.quantity), asc: u.name],

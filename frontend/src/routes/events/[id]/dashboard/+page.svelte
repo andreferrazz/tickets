@@ -5,14 +5,17 @@
 	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
-	import type { EventStats, ExtraBuyer, ExtraStats } from '$lib/types';
+	import type { EventStats, ExtraBuyer } from '$lib/types';
 	import { onMount } from 'svelte';
+
+	type BuyerKind = 'extra' | 'ticket';
+	type BuyerTarget = { kind: BuyerKind; id: string; name: string };
 
 	let stats = $state<EventStats | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
-	let openExtra = $state<ExtraStats | null>(null);
+	let buyerModal = $state<BuyerTarget | null>(null);
 	let buyers = $state<ExtraBuyer[] | null>(null);
 	let buyersLoading = $state(false);
 	let buyersError = $state<string | null>(null);
@@ -40,13 +43,16 @@
 		return Math.min(100, Math.round((sold / capacity) * 100));
 	}
 
-	async function showBuyers(x: ExtraStats) {
-		openExtra = x;
+	async function openBuyers(target: BuyerTarget) {
+		buyerModal = target;
 		buyers = null;
 		buyersError = null;
 		buyersLoading = true;
 		try {
-			buyers = await api.listExtraBuyers(x.id);
+			buyers =
+				target.kind === 'ticket'
+					? await api.listTicketTypeBuyers(target.id)
+					: await api.listExtraBuyers(target.id);
 		} catch (e) {
 			buyersError = e instanceof ApiError ? e.message : t('dashboard.errorFallback');
 		} finally {
@@ -55,17 +61,24 @@
 	}
 
 	function closeBuyers() {
-		openExtra = null;
+		buyerModal = null;
 		buyers = null;
 		buyersError = null;
 	}
 
 	function onModalKey(e: KeyboardEvent) {
-		if (openExtra && e.key === 'Escape') closeBuyers();
+		if (buyerModal && e.key === 'Escape') closeBuyers();
 	}
 
 	function onBackdropClick(e: MouseEvent) {
 		if (e.target === e.currentTarget) closeBuyers();
+	}
+
+	function onTicketCardKey(e: KeyboardEvent, ttId: string, ttName: string) {
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			openBuyers({ kind: 'ticket', id: ttId, name: ttName });
+		}
 	}
 </script>
 
@@ -140,7 +153,13 @@
 		{:else}
 			<div class="stack">
 				{#each stats.ticket_types as tt (tt.id)}
-					<div class="card">
+					<div
+						class="card ticket-row"
+						role="button"
+						tabindex="0"
+						onclick={() => openBuyers({ kind: 'ticket', id: tt.id, name: tt.name })}
+						onkeydown={(e) => onTicketCardKey(e, tt.id, tt.name)}
+					>
 						<div class="row-between">
 							<div>
 								<strong>{tt.name}</strong>
@@ -180,7 +199,7 @@
 					<button
 						type="button"
 						class="card row-between extra-row"
-						onclick={() => showBuyers(x)}
+						onclick={() => openBuyers({ kind: 'extra', id: x.id, name: x.name })}
 					>
 						<div>
 							<strong>{x.name}</strong>
@@ -227,11 +246,16 @@
 
 <svelte:window on:keydown={onModalKey} />
 
-{#if openExtra}
+{#if buyerModal}
 	<div class="backdrop" onclick={onBackdropClick} role="presentation">
 		<div class="dialog card" role="dialog" aria-modal="true" aria-labelledby="buyers-title">
 			<div class="dialog-head">
-				<h3 id="buyers-title">{t('dashboard.extraBuyers', { name: openExtra.name })}</h3>
+				<h3 id="buyers-title">
+					{t(
+						buyerModal.kind === 'ticket' ? 'dashboard.ticketBuyers' : 'dashboard.extraBuyers',
+						{ name: buyerModal.name },
+					)}
+				</h3>
 				<button type="button" class="secondary small" onclick={closeBuyers}>
 					{t('dashboard.close')}
 				</button>
@@ -344,6 +368,16 @@
 	}
 	.extra-row:hover {
 		background: var(--surface-2);
+	}
+	.ticket-row {
+		cursor: pointer;
+	}
+	.ticket-row:hover {
+		background: var(--surface-2);
+	}
+	.ticket-row:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
 	}
 	.backdrop {
 		position: fixed;

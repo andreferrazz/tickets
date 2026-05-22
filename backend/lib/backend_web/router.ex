@@ -61,6 +61,7 @@ defmodule BackendWeb.Router do
 
     put "/ticket-types/:id", TicketTypeController, :update
     delete "/ticket-types/:id", TicketTypeController, :delete
+    get "/ticket-types/:id/buyers", TicketTypeController, :buyers
 
     put "/batches/:id", TicketBatchController, :update
     post "/batches/:id/close", TicketBatchController, :close

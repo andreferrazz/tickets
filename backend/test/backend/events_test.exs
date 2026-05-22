@@ -741,6 +741,39 @@ defmodule Backend.EventsTest do
       assert {:error, :not_found} = Events.list_extra_buyers(stranger, x.id)
     end
 
+    test "list_ticket_type_buyers sums quantity per user across orders; owner-only" do
+      creator = creator_user()
+      stranger = creator_user()
+      buyer = buyer_user()
+
+      Repo.update_all(from(u in Accounts.User, where: u.id == ^buyer.id),
+        set: [name: "Bob", tax_id: "98765432100"]
+      )
+
+      event = published_event(creator)
+      {:ok, tt} = Events.create_ticket_type(creator, event.id, %{"name" => "General"})
+
+      {:ok, _b} =
+        Events.create_batch(creator, tt.id, %{"price_cents" => 1000, "quantity_total" => 10})
+
+      {:ok, _o1} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      {:ok, _o2} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 2}
+        ])
+
+      assert {:ok, [row]} = Events.list_ticket_type_buyers(creator, tt.id)
+      assert row.name == "Bob"
+      assert row.tax_id == "98765432100"
+      assert row.quantity == 3
+
+      assert {:error, :not_found} = Events.list_ticket_type_buyers(stranger, tt.id)
+    end
+
     test "recent_orders lists most recent first with buyer email and item_count" do
       creator = creator_user()
       buyer = buyer_user()
