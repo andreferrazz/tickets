@@ -71,6 +71,10 @@ defmodule BackendWeb.Router do
     delete "/extras/:id", ExtraItemController, :delete
     get "/extras/:id/buyers", ExtraItemController, :buyers
 
+    patch "/organizations/:id/payout-settings", OrganizationController, :update_payout_settings
+    post "/events/:event_id/payouts", PayoutController, :create
+    get "/events/:event_id/payouts", PayoutController, :index
+
     put "/extra-sections/:id", ExtraItemSectionController, :update
     delete "/extra-sections/:id", ExtraItemSectionController, :delete
 

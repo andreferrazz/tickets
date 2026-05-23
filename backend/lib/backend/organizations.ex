@@ -50,6 +50,25 @@ defmodule Backend.Organizations do
   defp authorized_to_update?(user, org_id), do: leader?(user.id, org_id)
 
   @doc """
+  Updates the PIX payout destination for `organization_id` on behalf of `user`.
+  Leader-only (admins bypass). Used by the dashboard withdraw modal — funds
+  belong to the org so the key is org-wide.
+  """
+  def update_payout_settings(user, organization_id, attrs) do
+    case Repo.get(Organization, organization_id) do
+      nil ->
+        {:error, :not_found}
+
+      org ->
+        if authorized_to_update?(user, organization_id) do
+          org |> Organization.payout_settings_changeset(attrs) |> Repo.update()
+        else
+          {:error, :forbidden}
+        end
+    end
+  end
+
+  @doc """
   Deletes `organization_id` on behalf of `user`. Refuses unless the user is the
   leader (admins bypass). Refuses with `{:error, :has_active_events}` whenever
   any event row still references the org — soft-deleted or not — because the

@@ -14,6 +14,8 @@ import type {
 	Organization,
 	OrganizationMembership,
 	Pass,
+	Payout,
+	PayoutSettings,
 	ProfileUpdate,
 	SeatPick,
 	SeatTable,
@@ -126,6 +128,15 @@ export const api = {
 		request<ExtraBuyer[]>(`/extras/${id}/buyers`, { fetcher }),
 	listTicketTypeBuyers: (id: string, fetcher?: typeof fetch) =>
 		request<ExtraBuyer[]>(`/ticket-types/${id}/buyers`, { fetcher }),
+	updatePayoutSettings: (orgId: string, body: PayoutSettings) =>
+		request<Organization>(`/organizations/${orgId}/payout-settings`, {
+			method: 'PATCH',
+			body,
+		}),
+	createPayout: (eventId: string, body: { amount_cents: number }) =>
+		request<Payout>(`/events/${eventId}/payouts`, { method: 'POST', body }),
+	listPayouts: (eventId: string) =>
+		request<Payout[]>(`/events/${eventId}/payouts`),
 	createExtraSection: (eventId: string, body: Partial<ExtraSection>) =>
 		request<ExtraSection>(`/events/${eventId}/extra-sections`, { method: 'POST', body }),
 	updateExtraSection: (id: string, body: Partial<ExtraSection>) =>

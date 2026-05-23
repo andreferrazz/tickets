@@ -242,7 +242,9 @@ defmodule BackendWeb.EventController do
       totals: stats.totals,
       ticket_types: stats.ticket_types,
       extras: stats.extras,
-      recent_orders: Enum.map(stats.recent_orders, &recent_order_json/1)
+      recent_orders: Enum.map(stats.recent_orders, &recent_order_json/1),
+      can_withdraw: stats.can_withdraw,
+      organization: stats.organization
     }
   end
 

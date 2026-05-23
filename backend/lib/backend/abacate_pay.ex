@@ -9,6 +9,7 @@ defmodule Backend.AbacatePay do
   @behaviour Backend.AbacatePayBehaviour
 
   @base_url "https://api.abacatepay.com/v2"
+  @v1_base_url "https://api.abacatepay.com/v1"
 
   @public_key "t9dXRhHHo3yDEj5pVDYz0frf7q6bMKyMRmxxCPIPp3RCplBfXRxqlC6ZpiWmOqj4L63qEaeUOtrCI8P0VMUgo6iIga2ri9ogaHFs0WIIywSMg0q7RmBfybe1E5XJcfC4IW3alNqym0tXoAKkzvfEjZxV6bE0oG2zJrNNYmUCKZyV0KZ3JS8Votf9EAWWYdiDkMkpbMdPggfh1EqHlVkMiTady6jOR3hyzGEHrIz2Ret0xHKMbiqkr9HS1JhNHDX9"
 
@@ -130,6 +131,65 @@ defmodule Backend.AbacatePay do
         {:error, reason}
     end
   end
+
+  @doc """
+  Requests a PIX payout (withdrawal). Endpoint lives under v1 (not v2).
+
+  `external_id` is our own UUID — Abacate echoes it back and uses it as the
+  idempotency key against accidental retries.
+  """
+  @impl Backend.AbacatePayBehaviour
+  def create_payout(amount_cents, external_id, description, pix_key, pix_key_type)
+      when is_integer(amount_cents) and amount_cents > 0 do
+    body =
+      %{
+        amount: amount_cents,
+        externalId: external_id,
+        pixKey: pix_key,
+        pixKeyType: pix_key_type
+      }
+      |> maybe_put(:description, description)
+
+    case Req.post("#{@v1_base_url}/payouts/create",
+           json: body,
+           headers: [auth_header()]
+         ) do
+      {:ok, %{status: status, body: %{"data" => data}}} when status in 200..201 ->
+        {:ok,
+         %{
+           id: data["id"],
+           status: normalize_payout_status(data["status"]),
+           receipt_url: data["receiptUrl"]
+         }}
+
+      {:ok, %{status: 429, body: body}} ->
+        {:error, {:rate_limited, body}}
+
+      {:ok, %{status: status, body: %{"error" => msg}}} when status in 400..499 ->
+        {:error, {:invalid_data, status, msg}}
+
+      {:ok, %{status: status, body: body}} ->
+        {:error, {:upstream, status, body}}
+
+      {:error, reason} ->
+        {:error, {:transport, reason}}
+    end
+  end
+
+  @doc "Normalises Abacate payout status to lowercase."
+  def normalize_payout_status(status) when is_binary(status) do
+    case String.upcase(status) do
+      "PENDING" -> "pending"
+      "COMPLETE" -> "complete"
+      "FAILED" -> "failed"
+      "CANCELLED" -> "cancelled"
+      "REFUNDED" -> "refunded"
+      "EXPIRED" -> "expired"
+      _ -> "pending"
+    end
+  end
+
+  def normalize_payout_status(_), do: "pending"
 
   defp normalize_checkout_status(status) when is_binary(status) do
     case String.upcase(status) do

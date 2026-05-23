@@ -2,23 +2,24 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api, ApiError, formatBRL } from '$lib/api';
+	import BuyerModal, { type BuyerTarget } from '$lib/components/BuyerModal.svelte';
+	import WithdrawModal from '$lib/components/WithdrawModal.svelte';
 	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
-	import type { EventStats, ExtraBuyer } from '$lib/types';
+	import type { EventStats } from '$lib/types';
 	import { onMount } from 'svelte';
-
-	type BuyerKind = 'extra' | 'ticket';
-	type BuyerTarget = { kind: BuyerKind; id: string; name: string };
 
 	let stats = $state<EventStats | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
-	let buyerModal = $state<BuyerTarget | null>(null);
-	let buyers = $state<ExtraBuyer[] | null>(null);
-	let buyersLoading = $state(false);
-	let buyersError = $state<string | null>(null);
+	let buyerTarget = $state<BuyerTarget | null>(null);
+	let withdrawOpen = $state(false);
+
+	async function refreshStats() {
+		stats = await api.getEventStats(page.params.id!);
+	}
 
 	onMount(async () => {
 		if (!auth.isAuthed) {
@@ -43,41 +44,10 @@
 		return Math.min(100, Math.round((sold / capacity) * 100));
 	}
 
-	async function openBuyers(target: BuyerTarget) {
-		buyerModal = target;
-		buyers = null;
-		buyersError = null;
-		buyersLoading = true;
-		try {
-			buyers =
-				target.kind === 'ticket'
-					? await api.listTicketTypeBuyers(target.id)
-					: await api.listExtraBuyers(target.id);
-		} catch (e) {
-			buyersError = e instanceof ApiError ? e.message : t('dashboard.errorFallback');
-		} finally {
-			buyersLoading = false;
-		}
-	}
-
-	function closeBuyers() {
-		buyerModal = null;
-		buyers = null;
-		buyersError = null;
-	}
-
-	function onModalKey(e: KeyboardEvent) {
-		if (buyerModal && e.key === 'Escape') closeBuyers();
-	}
-
-	function onBackdropClick(e: MouseEvent) {
-		if (e.target === e.currentTarget) closeBuyers();
-	}
-
 	function onTicketCardKey(e: KeyboardEvent, ttId: string, ttName: string) {
 		if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault();
-			openBuyers({ kind: 'ticket', id: ttId, name: ttName });
+			buyerTarget = { kind: 'ticket', id: ttId, name: ttName };
 		}
 	}
 </script>
@@ -105,6 +75,11 @@
 				{t('dashboard.feesDeducted', { amount: formatBRL(stats.totals.fees_cents) })}
 			</div>
 			<div class="muted small">{t('dashboard.netRevenueHint')}</div>
+			{#if stats.can_withdraw}
+				<button type="button" class="btn small withdraw-btn" onclick={() => (withdrawOpen = true)}>
+					{t('dashboard.withdraw')}
+				</button>
+			{/if}
 		</div>
 		<div class="card kpi">
 			<div class="muted small">{t('dashboard.ticketsReserved')}</div>
@@ -157,7 +132,7 @@
 						class="card ticket-row"
 						role="button"
 						tabindex="0"
-						onclick={() => openBuyers({ kind: 'ticket', id: tt.id, name: tt.name })}
+						onclick={() => (buyerTarget = { kind: 'ticket', id: tt.id, name: tt.name })}
 						onkeydown={(e) => onTicketCardKey(e, tt.id, tt.name)}
 					>
 						<div class="row-between">
@@ -199,7 +174,7 @@
 					<button
 						type="button"
 						class="card row-between extra-row"
-						onclick={() => openBuyers({ kind: 'extra', id: x.id, name: x.name })}
+						onclick={() => (buyerTarget = { kind: 'extra', id: x.id, name: x.name })}
 					>
 						<div>
 							<strong>{x.name}</strong>
@@ -244,53 +219,17 @@
 	</section>
 {/if}
 
-<svelte:window on:keydown={onModalKey} />
-
-{#if buyerModal}
-	<div class="backdrop" onclick={onBackdropClick} role="presentation">
-		<div class="dialog card" role="dialog" aria-modal="true" aria-labelledby="buyers-title">
-			<div class="dialog-head">
-				<h3 id="buyers-title">
-					{t(
-						buyerModal.kind === 'ticket' ? 'dashboard.ticketBuyers' : 'dashboard.extraBuyers',
-						{ name: buyerModal.name },
-					)}
-				</h3>
-				<button type="button" class="secondary small" onclick={closeBuyers}>
-					{t('dashboard.close')}
-				</button>
-			</div>
-			{#if buyersLoading}
-				<p class="muted">{t('common.loading')}</p>
-			{:else if buyersError}
-				<div class="error">{buyersError}</div>
-			{:else if !buyers || buyers.length === 0}
-				<p class="muted">{t('dashboard.noBuyers')}</p>
-			{:else}
-				<div class="table-wrap">
-					<table>
-						<thead>
-							<tr>
-								<th>{t('dashboard.buyerName')}</th>
-								<th>{t('dashboard.buyerTaxId')}</th>
-								<th class="num-col">{t('dashboard.buyerQty')}</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each buyers as b (b.email)}
-								<tr>
-									<td>{b.name ?? b.email}</td>
-									<td>{b.tax_id ?? '—'}</td>
-									<td class="num-col">{b.quantity}</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
-			{/if}
-		</div>
-	</div>
+{#if stats}
+	<WithdrawModal
+		eventId={stats.event_id}
+		{stats}
+		open={withdrawOpen}
+		onClose={() => (withdrawOpen = false)}
+		onChange={refreshStats}
+	/>
 {/if}
+
+<BuyerModal target={buyerTarget} onClose={() => (buyerTarget = null)} />
 
 <style>
 	.head {
@@ -379,53 +318,8 @@
 		outline: 2px solid var(--accent);
 		outline-offset: 2px;
 	}
-	.backdrop {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.6);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 1rem;
-		z-index: 100;
-	}
-	.dialog {
-		max-width: 640px;
-		width: 100%;
-		max-height: 80vh;
-		display: flex;
-		flex-direction: column;
-		background: var(--surface);
-	}
-	.dialog-head {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 0.75rem;
-		gap: 1rem;
-	}
-	.dialog-head h3 {
-		margin: 0;
-	}
-	.table-wrap {
-		overflow: auto;
-	}
-	table {
-		width: 100%;
-		border-collapse: collapse;
-	}
-	th,
-	td {
-		padding: 0.5rem 0.75rem;
-		border-bottom: 1px solid var(--border);
-		text-align: left;
-	}
-	th {
-		font-size: 0.85rem;
-		color: var(--muted);
-		font-weight: 600;
-	}
-	.num-col {
-		text-align: right;
+	.withdraw-btn {
+		margin-top: 0.5rem;
+		align-self: flex-start;
 	}
 </style>

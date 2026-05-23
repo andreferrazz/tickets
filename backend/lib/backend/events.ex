@@ -320,6 +320,7 @@ defmodule Backend.Events do
     case fetch_owned_event(user, event_id) do
       {:ok, event} ->
         event = preload_for_stats(event)
+        org = Repo.get!(Backend.Organizations.Organization, event.organization_id)
 
         {:ok,
          %{
@@ -327,12 +328,24 @@ defmodule Backend.Events do
            totals: totals_for(event),
            ticket_types: ticket_type_stats(event),
            extras: extra_stats(event),
-           recent_orders: recent_orders(event.id)
+           recent_orders: recent_orders(event.id),
+           can_withdraw: can_withdraw?(user, event),
+           organization: %{
+             id: org.id,
+             pix_key: org.pix_key,
+             pix_key_type: org.pix_key_type
+           }
          }}
 
       {:error, _} ->
         {:error, :not_found}
     end
+  end
+
+  defp can_withdraw?(%{role: "admin"}, _event), do: true
+
+  defp can_withdraw?(user, event) do
+    Backend.Organizations.leader?(user.id, event.organization_id)
   end
 
   defp preload_for_stats(event) do
@@ -353,6 +366,8 @@ defmodule Backend.Events do
     %{issued: passes_issued, checked_in: checked_in} = pass_totals(event.id)
     {tickets_sold, tickets_capacity} = ticket_capacity(event)
     extras_sold = Enum.sum(for s <- event.extra_item_sections, x <- s.extras, do: x.quantity_sold)
+    net = revenue - fees
+    deducted = Backend.Payouts.deducted_cents(event.id)
 
     %{
       orders_paid: paid_orders,
@@ -360,13 +375,25 @@ defmodule Backend.Events do
       revenue_cents: revenue,
       gross_revenue_cents: revenue,
       fees_cents: fees,
-      net_revenue_cents: revenue - fees,
+      net_revenue_cents: net,
+      available_to_withdraw_cents: max(0, net - deducted),
+      last_payout_at: Backend.Payouts.last_payout_at(event.id),
       tickets_sold: tickets_sold,
       tickets_capacity: tickets_capacity,
       extras_sold: extras_sold,
       passes_issued: passes_issued,
       passes_checked_in: checked_in
     }
+  end
+
+  @doc """
+  Returns the net revenue (paid revenue minus fees) for `event_id` in cents.
+  Used by `Backend.Payouts` to compute the available withdrawal balance
+  without rebuilding the full `event_stats` payload.
+  """
+  def net_revenue_cents(event_id) when is_binary(event_id) do
+    %{revenue: revenue, fees: fees} = order_totals(event_id)
+    revenue - fees
   end
 
   defp order_totals(event_id) do

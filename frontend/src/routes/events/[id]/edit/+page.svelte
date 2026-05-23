@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api, ApiError, formatBRL } from '$lib/api';
+	import { formatCentsInput, parseCentsInput } from '$lib/currency';
 	import EventForm from '$lib/components/EventForm.svelte';
 	import FloatingField from '$lib/components/FloatingField.svelte';
 	import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';
@@ -53,16 +54,6 @@
 		}
 	}
 
-	function formatCentsInput(cents: number): string {
-		const c = Math.max(0, Math.trunc(cents));
-		return (c / 100).toFixed(2);
-	}
-
-	function parseCentsInput(value: string): number {
-		const digits = value.replace(/\D/g, '');
-		if (!digits) return 0;
-		return Number(digits);
-	}
 	let actionError = $state<string | null>(null);
 
 	function reportError(e: unknown, fallbackKey: TranslationKey) {
