@@ -9,7 +9,6 @@ defmodule Backend.AbacatePay do
   @behaviour Backend.AbacatePayBehaviour
 
   @base_url "https://api.abacatepay.com/v2"
-  @v1_base_url "https://api.abacatepay.com/v1"
 
   @public_key "t9dXRhHHo3yDEj5pVDYz0frf7q6bMKyMRmxxCPIPp3RCplBfXRxqlC6ZpiWmOqj4L63qEaeUOtrCI8P0VMUgo6iIga2ri9ogaHFs0WIIywSMg0q7RmBfybe1E5XJcfC4IW3alNqym0tXoAKkzvfEjZxV6bE0oG2zJrNNYmUCKZyV0KZ3JS8Votf9EAWWYdiDkMkpbMdPggfh1EqHlVkMiTady6jOR3hyzGEHrIz2Ret0xHKMbiqkr9HS1JhNHDX9"
 
@@ -133,10 +132,8 @@ defmodule Backend.AbacatePay do
   end
 
   @doc """
-  Requests a PIX payout (withdrawal). Endpoint lives under v1 (not v2).
-
-  `external_id` is our own UUID — Abacate echoes it back and uses it as the
-  idempotency key against accidental retries.
+  Requests a PIX payout (withdrawal). `external_id` is our own UUID — Abacate
+  echoes it back and uses it as the idempotency key against accidental retries.
   """
   @impl Backend.AbacatePayBehaviour
   def create_payout(amount_cents, external_id, description, pix_key, pix_key_type)
@@ -145,12 +142,11 @@ defmodule Backend.AbacatePay do
       %{
         amount: amount_cents,
         externalId: external_id,
-        pixKey: pix_key,
-        pixKeyType: pix_key_type
+        pix: %{key: pix_key, type: abacate_pix_type(pix_key_type)}
       }
       |> maybe_put(:description, description)
 
-    case Req.post("#{@v1_base_url}/payouts/create",
+    case Req.post("#{@base_url}/payouts/create",
            json: body,
            headers: [auth_header()]
          ) do
@@ -175,6 +171,13 @@ defmodule Backend.AbacatePay do
         {:error, {:transport, reason}}
     end
   end
+
+  # Maps our internal PIX type to Abacate's enum (uppercase + EVP→RANDOM).
+  defp abacate_pix_type("cpf"), do: "CPF"
+  defp abacate_pix_type("cnpj"), do: "CNPJ"
+  defp abacate_pix_type("email"), do: "EMAIL"
+  defp abacate_pix_type("phone"), do: "PHONE"
+  defp abacate_pix_type("evp"), do: "RANDOM"
 
   @doc "Normalises Abacate payout status to lowercase."
   def normalize_payout_status(status) when is_binary(status) do
