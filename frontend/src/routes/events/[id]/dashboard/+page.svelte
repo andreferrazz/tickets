@@ -114,6 +114,9 @@
 		<div class="card kpi">
 			<div class="muted small">{t('dashboard.ordersPaid')}</div>
 			<strong class="big">{stats.totals.orders_paid}</strong>
+			<a href="/events/{stats.event_id}/orders" class="btn small view-orders-btn">
+				{t('dashboard.viewOrders')}
+			</a>
 		</div>
 		<div class="card kpi">
 			<div class="muted small">{t('dashboard.ordersPending')}</div>
@@ -319,6 +322,10 @@
 		outline-offset: 2px;
 	}
 	.withdraw-btn {
+		margin-top: 0.5rem;
+		align-self: flex-start;
+	}
+	.view-orders-btn {
 		margin-top: 0.5rem;
 		align-self: flex-start;
 	}
