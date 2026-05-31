@@ -5,15 +5,19 @@ import type {
 	Batch,
 	Event,
 	EventDetail,
+	EventOrder,
 	EventStats,
 	ExtraBuyer,
 	ExtraItem,
 	ExtraSection,
 	Invitation,
 	Order,
+	OrderStatus,
 	Organization,
 	OrganizationMembership,
 	Pass,
+	Payout,
+	PayoutSettings,
 	ProfileUpdate,
 	SeatPick,
 	SeatTable,
@@ -126,6 +130,15 @@ export const api = {
 		request<ExtraBuyer[]>(`/extras/${id}/buyers`, { fetcher }),
 	listTicketTypeBuyers: (id: string, fetcher?: typeof fetch) =>
 		request<ExtraBuyer[]>(`/ticket-types/${id}/buyers`, { fetcher }),
+	updatePayoutSettings: (orgId: string, body: PayoutSettings) =>
+		request<Organization>(`/organizations/${orgId}/payout-settings`, {
+			method: 'PATCH',
+			body,
+		}),
+	createPayout: (eventId: string, body: { amount_cents: number }) =>
+		request<Payout>(`/events/${eventId}/payouts`, { method: 'POST', body }),
+	listPayouts: (eventId: string) =>
+		request<Payout[]>(`/events/${eventId}/payouts`),
 	createExtraSection: (eventId: string, body: Partial<ExtraSection>) =>
 		request<ExtraSection>(`/events/${eventId}/extra-sections`, { method: 'POST', body }),
 	updateExtraSection: (id: string, body: Partial<ExtraSection>) =>
@@ -146,6 +159,11 @@ export const api = {
 			body: { event_id, items, seat_picks }
 		}),
 	listOrders: (fetcher?: typeof fetch) => request<Order[]>('/orders', { fetcher }),
+	listEventOrders: (eventId: string, statuses: OrderStatus[] = [], fetcher?: typeof fetch) => {
+		const qs = statuses.map((s) => `status[]=${encodeURIComponent(s)}`).join('&');
+		const path = qs ? `/events/${eventId}/orders?${qs}` : `/events/${eventId}/orders`;
+		return request<EventOrder[]>(path, { fetcher });
+	},
 	getOrder: (id: string, fetcher?: typeof fetch) =>
 		request<Order>(`/orders/${id}`, { fetcher }),
 	getOrderPasses: (id: string, fetcher?: typeof fetch) =>

@@ -51,10 +51,36 @@ defmodule BackendWeb.OrganizationController do
     end
   end
 
+  @doc """
+  PATCH /api/v1/organizations/:id/payout-settings — set the PIX destination.
+
+  Leader-only (admins bypass). Reads `pix_key` and `pix_key_type` from the
+  request body.
+  """
+  def update_payout_settings(conn, %{"id" => id} = params) do
+    attrs = Map.take(params, ["pix_key", "pix_key_type"])
+
+    case Organizations.update_payout_settings(conn.assigns.current_user, id, attrs) do
+      {:ok, org} ->
+        json(conn, organization_json(org))
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "organization not found"})
+
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+
+      {:error, changeset} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: format_errors(changeset)})
+    end
+  end
+
   defp organization_json(org) do
     %{
       id: org.id,
       name: org.name,
+      pix_key: org.pix_key,
+      pix_key_type: org.pix_key_type,
       created_at: org.inserted_at,
       updated_at: org.updated_at
     }

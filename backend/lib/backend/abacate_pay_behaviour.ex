@@ -33,4 +33,19 @@ defmodule Backend.AbacatePayBehaviour do
                  card_installments: pos_integer() | nil
                }}
               | {:error, any()}
+
+  @callback create_payout(
+              amount_cents :: integer(),
+              external_id :: String.t(),
+              description :: String.t() | nil,
+              pix_key :: String.t(),
+              pix_key_type :: String.t()
+            ) ::
+              {:ok,
+               %{
+                 id: String.t(),
+                 status: String.t(),
+                 receipt_url: String.t() | nil
+               }}
+              | {:error, any()}
 end

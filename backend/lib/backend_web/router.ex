@@ -71,6 +71,10 @@ defmodule BackendWeb.Router do
     delete "/extras/:id", ExtraItemController, :delete
     get "/extras/:id/buyers", ExtraItemController, :buyers
 
+    patch "/organizations/:id/payout-settings", OrganizationController, :update_payout_settings
+    post "/events/:event_id/payouts", PayoutController, :create
+    get "/events/:event_id/payouts", PayoutController, :index
+
     put "/extra-sections/:id", ExtraItemSectionController, :update
     delete "/extra-sections/:id", ExtraItemSectionController, :delete
 
@@ -81,6 +85,7 @@ defmodule BackendWeb.Router do
     get "/orders", OrderController, :index
     get "/orders/:id", OrderController, :show
     get "/orders/:id/passes", OrderController, :passes
+    get "/events/:event_id/orders", OrderController, :event_index
 
     post "/passes/validate", PassController, :validate
 

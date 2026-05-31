@@ -131,6 +131,69 @@ defmodule Backend.AbacatePay do
     end
   end
 
+  @doc """
+  Requests a PIX payout (withdrawal). `external_id` is our own UUID — Abacate
+  echoes it back and uses it as the idempotency key against accidental retries.
+  """
+  @impl Backend.AbacatePayBehaviour
+  def create_payout(amount_cents, external_id, description, pix_key, pix_key_type)
+      when is_integer(amount_cents) and amount_cents > 0 do
+    body =
+      %{
+        amount: amount_cents,
+        externalId: external_id,
+        pix: %{key: pix_key, type: abacate_pix_type(pix_key_type)}
+      }
+      |> maybe_put(:description, description)
+
+    case Req.post("#{@base_url}/payouts/create",
+           json: body,
+           headers: [auth_header()]
+         ) do
+      {:ok, %{status: status, body: %{"data" => data}}} when status in 200..201 ->
+        {:ok,
+         %{
+           id: data["id"],
+           status: normalize_payout_status(data["status"]),
+           receipt_url: data["receiptUrl"]
+         }}
+
+      {:ok, %{status: 429, body: body}} ->
+        {:error, {:rate_limited, body}}
+
+      {:ok, %{status: status, body: %{"error" => msg}}} when status in 400..499 ->
+        {:error, {:invalid_data, status, msg}}
+
+      {:ok, %{status: status, body: body}} ->
+        {:error, {:upstream, status, body}}
+
+      {:error, reason} ->
+        {:error, {:transport, reason}}
+    end
+  end
+
+  # Maps our internal PIX type to Abacate's enum (uppercase + EVP→RANDOM).
+  defp abacate_pix_type("cpf"), do: "CPF"
+  defp abacate_pix_type("cnpj"), do: "CNPJ"
+  defp abacate_pix_type("email"), do: "EMAIL"
+  defp abacate_pix_type("phone"), do: "PHONE"
+  defp abacate_pix_type("evp"), do: "RANDOM"
+
+  @doc "Normalises Abacate payout status to lowercase."
+  def normalize_payout_status(status) when is_binary(status) do
+    case String.upcase(status) do
+      "PENDING" -> "pending"
+      "COMPLETE" -> "complete"
+      "FAILED" -> "failed"
+      "CANCELLED" -> "cancelled"
+      "REFUNDED" -> "refunded"
+      "EXPIRED" -> "expired"
+      _ -> "pending"
+    end
+  end
+
+  def normalize_payout_status(_), do: "pending"
+
   defp normalize_checkout_status(status) when is_binary(status) do
     case String.upcase(status) do
       "PAID" -> "paid"

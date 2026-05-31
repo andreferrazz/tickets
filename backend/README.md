@@ -2,6 +2,7 @@
 
 To start your Phoenix server:
 
+* Load environment variables from `.env` into your shell: `set -a; source .env; set +a`
 * Run `mix setup` to install and setup dependencies
 * Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
 

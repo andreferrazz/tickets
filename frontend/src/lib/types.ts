@@ -146,6 +146,28 @@ export interface Order {
 	items: OrderItem[];
 }
 
+export type PaymentMethod = 'PIX' | 'CARD';
+
+export interface EventOrderLine {
+	name: string;
+	quantity: number;
+	unit_price_cents: number;
+}
+
+export interface EventOrder {
+	id: string;
+	buyer_name: string | null;
+	buyer_email: string;
+	buyer_phone: string | null;
+	status: OrderStatus;
+	total_cents: number;
+	payment_method: PaymentMethod | null;
+	paid_at: string | null;
+	created_at: string;
+	tickets: EventOrderLine[];
+	extras: EventOrderLine[];
+}
+
 export interface Invitation {
 	id: string;
 	inviter_id: string;
@@ -159,6 +181,8 @@ export interface Invitation {
 export interface Organization {
 	id: string;
 	name: string;
+	pix_key?: string | null;
+	pix_key_type?: PixKeyType | null;
 	created_at?: string;
 	updated_at?: string;
 }
@@ -197,11 +221,39 @@ export interface EventStatsTotals {
 	gross_revenue_cents: number;
 	fees_cents: number;
 	net_revenue_cents: number;
+	available_to_withdraw_cents: number;
+	last_payout_at: string | null;
 	tickets_sold: number;
 	tickets_capacity: number;
 	extras_sold: number;
 	passes_issued: number;
 	passes_checked_in: number;
+}
+
+export type PixKeyType = 'cpf' | 'cnpj' | 'email' | 'phone' | 'evp';
+
+export interface PayoutSettings {
+	pix_key: string | null;
+	pix_key_type: PixKeyType | null;
+}
+
+export type PayoutStatus =
+	| 'pending'
+	| 'complete'
+	| 'failed'
+	| 'cancelled'
+	| 'refunded'
+	| 'expired';
+
+export interface Payout {
+	id: string;
+	amount_cents: number;
+	status: PayoutStatus;
+	pix_key: string;
+	pix_key_type: PixKeyType;
+	receipt_url: string | null;
+	error_message: string | null;
+	created_at: string;
 }
 
 export interface BatchStats {
@@ -248,6 +300,12 @@ export interface EventStats {
 	ticket_types: TicketTypeStats[];
 	extras: ExtraStats[];
 	recent_orders: RecentOrderRow[];
+	can_withdraw: boolean;
+	organization: {
+		id: string;
+		pix_key: string | null;
+		pix_key_type: PixKeyType | null;
+	};
 }
 
 export interface ExtraBuyer {

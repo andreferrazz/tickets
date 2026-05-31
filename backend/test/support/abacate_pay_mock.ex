@@ -48,4 +48,36 @@ defmodule Backend.AbacatePayMock do
     Process.put({__MODULE__, :checkout, checkout_id}, response)
     :ok
   end
+
+  @impl Backend.AbacatePayBehaviour
+  def create_payout(_amount, external_id, _description, _pix_key, _pix_key_type) do
+    case Process.get({__MODULE__, :payout, external_id}) do
+      nil ->
+        {:ok,
+         %{
+           id: "pyt_test_#{external_id}",
+           status: "pending",
+           receipt_url: nil
+         }}
+
+      {:error, _} = err ->
+        err
+
+      result when is_map(result) ->
+        {:ok,
+         Map.merge(
+           %{id: "pyt_test_#{external_id}", status: "pending", receipt_url: nil},
+           result
+         )}
+    end
+  end
+
+  @doc """
+  Overrides `create_payout/5` response by `external_id` in the current test
+  process. Pass a map (merged onto defaults) or `{:error, reason}`.
+  """
+  def put_payout(external_id, response) do
+    Process.put({__MODULE__, :payout, external_id}, response)
+    :ok
+  end
 end

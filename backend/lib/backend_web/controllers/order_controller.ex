@@ -61,6 +61,41 @@ defmodule BackendWeb.OrderController do
     json(conn, Enum.map(orders, &order_json/1))
   end
 
+  @doc """
+  GET /api/v1/events/:event_id/orders
+
+  Lists orders for an event for its organization members (or admin).
+
+  Accepts repeated `status[]=paid&status[]=pending` query params or a
+  comma-separated `status=paid,pending`. Omit to return every status.
+  """
+  def event_index(conn, %{"event_id" => event_id} = params) do
+    statuses = parse_statuses(params["status"])
+
+    case Orders.list_event_orders(conn.assigns.current_user, event_id, statuses) do
+      {:ok, orders} ->
+        json(conn, Enum.map(orders, &event_order_json/1))
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "event not found"})
+
+      {:error, {:invalid_status, value}} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "invalid status", value: to_string(value)})
+    end
+  end
+
+  defp parse_statuses(nil), do: nil
+  defp parse_statuses([]), do: nil
+  defp parse_statuses(list) when is_list(list), do: list
+
+  defp parse_statuses(value) when is_binary(value) do
+    value |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
+  end
+
+  defp parse_statuses(_), do: nil
+
   @doc "GET /api/v1/orders/:id"
   def show(conn, %{"id" => id}) do
     case Orders.get_order(conn.assigns.current_user, id) do
@@ -111,6 +146,32 @@ defmodule BackendWeb.OrderController do
       token: pass.token,
       checked_in_at: pass.checked_in_at,
       qr_png_base64: pass |> Tickets.qr_png() |> Base.encode64()
+    }
+  end
+
+  defp event_order_json(order) do
+    {tickets, extras} = Enum.split_with(order.items, &(&1.item_type == "ticket"))
+
+    %{
+      id: order.id,
+      buyer_name: order.user && order.user.name,
+      buyer_email: order.user && order.user.email,
+      buyer_phone: order.user && order.user.cellphone,
+      status: order.status,
+      total_cents: order.total_cents,
+      payment_method: order.payment_method,
+      paid_at: order.paid_at,
+      created_at: order.inserted_at,
+      tickets: Enum.map(tickets, &line_json/1),
+      extras: Enum.map(extras, &line_json/1)
+    }
+  end
+
+  defp line_json(item) do
+    %{
+      name: item.item_name,
+      quantity: item.quantity,
+      unit_price_cents: item.unit_price_cents
     }
   end
 

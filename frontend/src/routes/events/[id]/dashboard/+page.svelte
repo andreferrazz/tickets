@@ -2,6 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api, ApiError, formatBRL } from '$lib/api';
+	import BuyerModal, { type BuyerTarget } from '$lib/components/BuyerModal.svelte';
+	import WithdrawModal from '$lib/components/WithdrawModal.svelte';
 	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
@@ -15,6 +17,12 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
+	let buyerTarget = $state<BuyerTarget | null>(null);
+	let withdrawOpen = $state(false);
+
+	async function refreshStats() {
+		stats = await api.getEventStats(page.params.id!);
+	}
 	let buyerModal = $state<BuyerTarget | null>(null);
 	let buyers = $state<ExtraBuyer[] | null>(null);
 	let buyersLoading = $state(false);
@@ -43,6 +51,13 @@
 		return Math.min(100, Math.round((sold / capacity) * 100));
 	}
 
+	function onTicketCardKey(e: KeyboardEvent, ttId: string, ttName: string) {
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			buyerTarget = { kind: 'ticket', id: ttId, name: ttName };
+		}
+	}
+	
 	async function openBuyers(target: BuyerTarget) {
 		buyerModal = target;
 		buyers = null;
@@ -105,6 +120,11 @@
 				{t('dashboard.feesDeducted', { amount: formatBRL(stats.totals.fees_cents) })}
 			</div>
 			<div class="muted small">{t('dashboard.netRevenueHint')}</div>
+			{#if stats.can_withdraw}
+				<button type="button" class="btn small withdraw-btn" onclick={() => (withdrawOpen = true)}>
+					{t('dashboard.withdraw')}
+				</button>
+			{/if}
 		</div>
 		<div class="card kpi">
 			<div class="muted small">{t('dashboard.ticketsReserved')}</div>
@@ -139,6 +159,9 @@
 		<div class="card kpi">
 			<div class="muted small">{t('dashboard.ordersPaid')}</div>
 			<strong class="big">{stats.totals.orders_paid}</strong>
+			<a href="/events/{stats.event_id}/orders" class="btn small view-orders-btn">
+				{t('dashboard.viewOrders')}
+			</a>
 		</div>
 		<div class="card kpi">
 			<div class="muted small">{t('dashboard.ordersPending')}</div>
@@ -244,6 +267,15 @@
 	</section>
 {/if}
 
+{#if stats}
+	<WithdrawModal
+		eventId={stats.event_id}
+		{stats}
+		open={withdrawOpen}
+		onClose={() => (withdrawOpen = false)}
+		onChange={refreshStats}
+	/>
+{/if}
 <svelte:window on:keydown={onModalKey} />
 
 {#if buyerModal}
@@ -291,6 +323,8 @@
 		</div>
 	</div>
 {/if}
+
+<BuyerModal target={buyerTarget} onClose={() => (buyerTarget = null)} />
 
 <style>
 	.head {
@@ -389,43 +423,19 @@
 		padding: 1rem;
 		z-index: 100;
 	}
-	.dialog {
-		max-width: 640px;
-		width: 100%;
-		max-height: 80vh;
-		display: flex;
-		flex-direction: column;
-		background: var(--surface);
+	.ticket-row:hover {
+		background: var(--surface-2);
 	}
-	.dialog-head {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 0.75rem;
-		gap: 1rem;
+	.ticket-row:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
 	}
-	.dialog-head h3 {
-		margin: 0;
+	.withdraw-btn {
+		margin-top: 0.5rem;
+		align-self: flex-start;
 	}
-	.table-wrap {
-		overflow: auto;
-	}
-	table {
-		width: 100%;
-		border-collapse: collapse;
-	}
-	th,
-	td {
-		padding: 0.5rem 0.75rem;
-		border-bottom: 1px solid var(--border);
-		text-align: left;
-	}
-	th {
-		font-size: 0.85rem;
-		color: var(--muted);
-		font-weight: 600;
-	}
-	.num-col {
-		text-align: right;
+	.view-orders-btn {
+		margin-top: 0.5rem;
+		align-self: flex-start;
 	}
 </style>
