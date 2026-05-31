@@ -85,6 +85,7 @@ defmodule BackendWeb.Router do
     get "/orders", OrderController, :index
     get "/orders/:id", OrderController, :show
     get "/orders/:id/passes", OrderController, :passes
+    get "/events/:event_id/orders", OrderController, :event_index
 
     post "/passes/validate", PassController, :validate
 

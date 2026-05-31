@@ -11,7 +11,10 @@ defmodule Backend.Orders do
   alias Backend.Events
   alias Backend.Events.{Event, ExtraItem, Seating, TicketBatch}
   alias Backend.Orders.{Order, OrderItem}
+  alias Backend.Organizations
   alias Backend.Tickets
+
+  @valid_statuses ~w(pending paid expired refunded)
 
   # ---------------------------------------------------------------------------
   # Create
@@ -133,6 +136,74 @@ defmodule Backend.Orders do
   # ---------------------------------------------------------------------------
   # Query
   # ---------------------------------------------------------------------------
+
+  @doc """
+  Lists orders for `event_id`, newest first, with items and buyer preloaded.
+
+  Authorization: `user` must be an admin or a *leader* of the event's
+  organization. Plain participants are denied — orders carry buyer PII
+  (email/phone) and shouldn't be visible to everyone with write access on
+  the event. Returns `{:error, :not_found}` for denied users and for missing
+  events alike, to avoid leaking event existence.
+
+  `statuses` is an optional list filtering on `Order.status`. When empty or
+  nil, all statuses are returned. Unknown values short-circuit the query and
+  return `{:error, {:invalid_status, value}}`.
+  """
+  def list_event_orders(user, event_id, statuses \\ nil) do
+    with {:ok, normalized} <- normalize_statuses(statuses),
+         {:ok, event} <- authorize_event(user, event_id) do
+      {:ok, query_event_orders(event.id, normalized)}
+    end
+  end
+
+  defp normalize_statuses(nil), do: {:ok, []}
+  defp normalize_statuses([]), do: {:ok, []}
+
+  defp normalize_statuses(values) when is_list(values) do
+    Enum.reduce_while(values, {:ok, []}, fn value, {:ok, acc} ->
+      case value do
+        s when s in @valid_statuses -> {:cont, {:ok, [s | acc]}}
+        bad -> {:halt, {:error, {:invalid_status, bad}}}
+      end
+    end)
+  end
+
+  defp normalize_statuses(other), do: {:error, {:invalid_status, other}}
+
+  defp authorize_event(%{role: "admin"}, event_id) do
+    case Repo.one(from e in Event, where: e.id == ^event_id and is_nil(e.deleted_at)) do
+      nil -> {:error, :not_found}
+      event -> {:ok, event}
+    end
+  end
+
+  defp authorize_event(%{id: user_id}, event_id) do
+    case Repo.one(from e in Event, where: e.id == ^event_id and is_nil(e.deleted_at)) do
+      nil ->
+        {:error, :not_found}
+
+      event ->
+        if Organizations.leader?(user_id, event.organization_id),
+          do: {:ok, event},
+          else: {:error, :not_found}
+    end
+  end
+
+  defp query_event_orders(event_id, statuses) do
+    base =
+      from o in Order,
+        where: o.event_id == ^event_id,
+        order_by: [desc: o.inserted_at]
+
+    base
+    |> filter_by_status(statuses)
+    |> Repo.all()
+    |> Repo.preload([:items, :user])
+  end
+
+  defp filter_by_status(query, []), do: query
+  defp filter_by_status(query, statuses), do: from(o in query, where: o.status in ^statuses)
 
   @doc "Returns all orders for `user`, newest first, with items and event title."
   def list_orders(user) do
