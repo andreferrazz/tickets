@@ -1,79 +1,48 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { formatBRL } from '$lib/api';
+	import { api, ApiError, formatBRL } from '$lib/api';
 	import { formatDateTime } from '$lib/datetime';
 	import { t } from '$lib/i18n';
+	import { auth } from '$lib/stores/auth.svelte';
+	import type { EventOrder, PaymentMethod } from '$lib/types';
+	import { onMount } from 'svelte';
 
-	type PaymentMethod = 'CARTAO' | 'PIX';
+	let orders = $state<EventOrder[] | null>(null);
+	let loading = $state(true);
+	let error = $state<string | null>(null);
+	let selected = $state<EventOrder | null>(null);
 
-	type OrderItem = {
-		name: string;
-		quantity: number;
-		unit_price_cents: number;
-	};
-
-	type OrderRow = {
-		id: string;
-		buyer_name: string;
-		buyer_email: string;
-		buyer_phone: string;
-		total_cents: number;
-		payment_method: PaymentMethod;
-		paid_at: string;
-		tickets: OrderItem[];
-		extras: OrderItem[];
-	};
-
-	const orders: OrderRow[] = [
-		{
-			id: '1',
-			buyer_name: 'Ana Souza',
-			buyer_email: 'ana.souza@example.com',
-			buyer_phone: '(11) 91234-5678',
-			total_cents: 12000,
-			payment_method: 'PIX',
-			paid_at: '2026-05-30T14:23:00Z',
-			tickets: [{ name: 'Pista · 1º Lote', quantity: 1, unit_price_cents: 10000 }],
-			extras: [{ name: 'Camiseta', quantity: 1, unit_price_cents: 2000 }]
-		},
-		{
-			id: '2',
-			buyer_name: 'Bruno Lima',
-			buyer_email: 'bruno.lima@example.com',
-			buyer_phone: '(21) 99876-5432',
-			total_cents: 24000,
-			payment_method: 'CARTAO',
-			paid_at: '2026-05-29T19:05:00Z',
-			tickets: [{ name: 'Pista · 2º Lote', quantity: 2, unit_price_cents: 12000 }],
-			extras: []
-		},
-		{
-			id: '3',
-			buyer_name: 'Carla Mendes',
-			buyer_email: 'carla.mendes@example.com',
-			buyer_phone: '(31) 98765-4321',
-			total_cents: 9000,
-			payment_method: 'PIX',
-			paid_at: '2026-05-28T10:42:00Z',
-			tickets: [{ name: 'Meia-entrada', quantity: 1, unit_price_cents: 6000 }],
-			extras: [{ name: 'Caneca', quantity: 1, unit_price_cents: 3000 }]
-		},
-		{
-			id: '4',
-			buyer_name: 'Diego Rocha',
-			buyer_email: 'diego.rocha@example.com',
-			buyer_phone: '(41) 91111-2222',
-			total_cents: 36000,
-			payment_method: 'CARTAO',
-			paid_at: '2026-05-27T08:11:00Z',
-			tickets: [{ name: 'VIP', quantity: 1, unit_price_cents: 30000 }],
-			extras: [{ name: 'Bebida', quantity: 2, unit_price_cents: 3000 }]
+	onMount(async () => {
+		if (!auth.isAuthed) {
+			await goto(`/auth/login?next=/events/${page.params.id}/orders`);
+			return;
 		}
-	];
+		try {
+			orders = await api.listEventOrders(page.params.id!, ['paid']);
+		} catch (e) {
+			if (e instanceof ApiError && e.status === 404) {
+				error = t('eventOrders.notAuthorized');
+			} else {
+				error = e instanceof ApiError ? e.message : t('eventOrders.errorFallback');
+			}
+		} finally {
+			loading = false;
+		}
+	});
 
-	let selected = $state<OrderRow | null>(null);
+	function paymentMethodLabel(method: PaymentMethod | null): string {
+		switch (method) {
+			case 'PIX':
+				return t('eventOrders.paymentMethod.PIX');
+			case 'CARD':
+				return t('eventOrders.paymentMethod.CARD');
+			default:
+				return t('eventOrders.unknown');
+		}
+	}
 
-	function onRowKey(e: KeyboardEvent, o: OrderRow) {
+	function onRowKey(e: KeyboardEvent, o: EventOrder) {
 		if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault();
 			selected = o;
@@ -92,75 +61,83 @@
 <svelte:window on:keydown={onKeydown} />
 
 <header class="head">
-	<h1>{t('orders.title')}</h1>
+	<h1>{t('eventOrders.title')}</h1>
 	<a href="/events/{page.params.id}/dashboard" class="btn secondary small">←</a>
 </header>
 
-<div class="card table-wrap">
-	<table class="orders">
-		<thead>
-			<tr>
-				<th>{t('orders.columnName')}</th>
-				<th>{t('orders.columnValue')}</th>
-				<th>{t('orders.columnPaymentMethod')}</th>
-				<th>{t('orders.columnPaidAt')}</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each orders as o (o.id)}
-				<tr
-					class="clickable"
-					role="button"
-					tabindex="0"
-					onclick={() => (selected = o)}
-					onkeydown={(e) => onRowKey(e, o)}
-				>
-					<td>{o.buyer_name}</td>
-					<td>{formatBRL(o.total_cents)}</td>
-					<td>{o.payment_method}</td>
-					<td>{formatDateTime(o.paid_at)}</td>
+{#if loading}
+	<p class="muted">{t('common.loading')}</p>
+{:else if error}
+	<div class="error">{error}</div>
+{:else if !orders || orders.length === 0}
+	<p class="muted">{t('eventOrders.empty')}</p>
+{:else}
+	<div class="card table-wrap">
+		<table class="orders">
+			<thead>
+				<tr>
+					<th>{t('eventOrders.columnName')}</th>
+					<th>{t('eventOrders.columnValue')}</th>
+					<th>{t('eventOrders.columnPaymentMethod')}</th>
+					<th>{t('eventOrders.columnPaidAt')}</th>
 				</tr>
-			{/each}
-		</tbody>
-	</table>
-</div>
+			</thead>
+			<tbody>
+				{#each orders as o (o.id)}
+					<tr
+						class="clickable"
+						role="button"
+						tabindex="0"
+						onclick={() => (selected = o)}
+						onkeydown={(e) => onRowKey(e, o)}
+					>
+						<td>{o.buyer_name ?? o.buyer_email}</td>
+						<td>{formatBRL(o.total_cents)}</td>
+						<td>{paymentMethodLabel(o.payment_method)}</td>
+						<td>{o.paid_at ? formatDateTime(o.paid_at) : t('eventOrders.unknown')}</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
+{/if}
 
 {#if selected}
 	<div class="backdrop" onclick={onBackdropClick} role="presentation">
 		<div class="dialog card" role="dialog" aria-modal="true" aria-labelledby="order-details-title">
 			<div class="dialog-head">
-				<h3 id="order-details-title">{t('orders.detailsTitle')}</h3>
+				<h3 id="order-details-title">{t('eventOrders.detailsTitle')}</h3>
 				<button type="button" class="secondary small" onclick={() => (selected = null)}>
 					{t('dashboard.close')}
 				</button>
 			</div>
 
 			<dl class="summary">
-				<dt>{t('orders.columnName')}</dt>
-				<dd>{selected.buyer_name}</dd>
-				<dt>{t('orders.email')}</dt>
+				<dt>{t('eventOrders.columnName')}</dt>
+				<dd>{selected.buyer_name ?? t('eventOrders.unknown')}</dd>
+				<dt>{t('eventOrders.email')}</dt>
 				<dd>{selected.buyer_email}</dd>
-				<dt>{t('orders.phone')}</dt>
-				<dd>{selected.buyer_phone}</dd>
-				<dt>{t('orders.columnValue')}</dt>
+				<dt>{t('eventOrders.phone')}</dt>
+				<dd>{selected.buyer_phone ?? t('eventOrders.unknown')}</dd>
+				<dt>{t('eventOrders.columnValue')}</dt>
 				<dd>{formatBRL(selected.total_cents)}</dd>
-				<dt>{t('orders.columnPaymentMethod')}</dt>
-				<dd>{selected.payment_method}</dd>
-				<dt>{t('orders.columnPaidAt')}</dt>
-				<dd>{formatDateTime(selected.paid_at)}</dd>
+				<dt>{t('eventOrders.columnPaymentMethod')}</dt>
+				<dd>{paymentMethodLabel(selected.payment_method)}</dd>
+				<dt>{t('eventOrders.columnPaidAt')}</dt>
+				<dd>{selected.paid_at ? formatDateTime(selected.paid_at) : t('eventOrders.unknown')}</dd>
 			</dl>
 
 			<section class="items">
-				<h4>{t('orders.tickets')}</h4>
+				<h4>{t('eventOrders.tickets')}</h4>
 				{#if selected.tickets.length === 0}
-					<p class="muted">{t('orders.noTickets')}</p>
+					<p class="muted">{t('eventOrders.noTickets')}</p>
 				{:else}
 					<table>
 						<thead>
 							<tr>
-								<th>{t('orders.columnName')}</th>
-								<th class="num-col">{t('orders.itemQty')}</th>
-								<th class="num-col">{t('orders.itemPrice')}</th>
+								<th>{t('eventOrders.columnName')}</th>
+								<th class="num-col">{t('eventOrders.itemQty')}</th>
+								<th class="num-col">{t('eventOrders.itemPrice')}</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -177,16 +154,16 @@
 			</section>
 
 			<section class="items">
-				<h4>{t('orders.extras')}</h4>
+				<h4>{t('eventOrders.extras')}</h4>
 				{#if selected.extras.length === 0}
-					<p class="muted">{t('orders.noExtras')}</p>
+					<p class="muted">{t('eventOrders.noExtras')}</p>
 				{:else}
 					<table>
 						<thead>
 							<tr>
-								<th>{t('orders.columnName')}</th>
-								<th class="num-col">{t('orders.itemQty')}</th>
-								<th class="num-col">{t('orders.itemPrice')}</th>
+								<th>{t('eventOrders.columnName')}</th>
+								<th class="num-col">{t('eventOrders.itemQty')}</th>
+								<th class="num-col">{t('eventOrders.itemPrice')}</th>
 							</tr>
 						</thead>
 						<tbody>

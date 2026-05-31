@@ -5,12 +5,14 @@ import type {
 	Batch,
 	Event,
 	EventDetail,
+	EventOrder,
 	EventStats,
 	ExtraBuyer,
 	ExtraItem,
 	ExtraSection,
 	Invitation,
 	Order,
+	OrderStatus,
 	Organization,
 	OrganizationMembership,
 	Pass,
@@ -157,6 +159,11 @@ export const api = {
 			body: { event_id, items, seat_picks }
 		}),
 	listOrders: (fetcher?: typeof fetch) => request<Order[]>('/orders', { fetcher }),
+	listEventOrders: (eventId: string, statuses: OrderStatus[] = [], fetcher?: typeof fetch) => {
+		const qs = statuses.map((s) => `status[]=${encodeURIComponent(s)}`).join('&');
+		const path = qs ? `/events/${eventId}/orders?${qs}` : `/events/${eventId}/orders`;
+		return request<EventOrder[]>(path, { fetcher });
+	},
 	getOrder: (id: string, fetcher?: typeof fetch) =>
 		request<Order>(`/orders/${id}`, { fetcher }),
 	getOrderPasses: (id: string, fetcher?: typeof fetch) =>

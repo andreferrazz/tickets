@@ -146,6 +146,28 @@ export interface Order {
 	items: OrderItem[];
 }
 
+export type PaymentMethod = 'PIX' | 'CARD';
+
+export interface EventOrderLine {
+	name: string;
+	quantity: number;
+	unit_price_cents: number;
+}
+
+export interface EventOrder {
+	id: string;
+	buyer_name: string | null;
+	buyer_email: string;
+	buyer_phone: string | null;
+	status: OrderStatus;
+	total_cents: number;
+	payment_method: PaymentMethod | null;
+	paid_at: string | null;
+	created_at: string;
+	tickets: EventOrderLine[];
+	extras: EventOrderLine[];
+}
+
 export interface Invitation {
 	id: string;
 	inviter_id: string;
