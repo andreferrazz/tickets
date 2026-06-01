@@ -50,13 +50,6 @@
 		if (!capacity || capacity <= 0) return 0;
 		return Math.min(100, Math.round((sold / capacity) * 100));
 	}
-
-	function onTicketCardKey(e: KeyboardEvent, ttId: string, ttName: string) {
-		if (e.key === 'Enter' || e.key === ' ') {
-			e.preventDefault();
-			buyerTarget = { kind: 'ticket', id: ttId, name: ttName };
-		}
-	}
 	
 	async function openBuyers(target: BuyerTarget) {
 		buyerModal = target;
