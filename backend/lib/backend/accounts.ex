@@ -202,6 +202,7 @@ defmodule Backend.Accounts do
   end
 
   defp classify_abacate_error({:invalid_data, _status, _msg}), do: :invalid_profile_data
+  defp classify_abacate_error({:invalid_data, 401, _msg}), do: :abacate_unavailable
   defp classify_abacate_error(_other), do: :abacate_unavailable
 
   defp abacate_pay,
