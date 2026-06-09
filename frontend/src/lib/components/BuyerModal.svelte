@@ -95,6 +95,12 @@
 						</tbody>
 					</table>
 				</div>
+				<div class="total-row">
+					<span>{t('common.total')}</span>
+					<span class="num-col">
+						{buyers.reduce((sum, b) => sum + b.quantity, 0)}
+					</span>
+				</div>
 			{/if}
 		</div>
 	</div>
@@ -145,6 +151,13 @@
 	th {
 		font-size: 0.85rem;
 		color: var(--muted);
+		font-weight: 600;
+	}
+	.total-row {
+		display: flex;
+		justify-content: space-between;
+		padding: 0.75rem;
+		border-top: 2px solid var(--border);
 		font-weight: 600;
 	}
 	.num-col {
