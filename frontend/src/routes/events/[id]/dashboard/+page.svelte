@@ -7,11 +7,8 @@
 	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
-	import type { EventStats, ExtraBuyer } from '$lib/types';
+	import type { EventStats } from '$lib/types';
 	import { onMount } from 'svelte';
-
-	type BuyerKind = 'extra' | 'ticket';
-	type BuyerTarget = { kind: BuyerKind; id: string; name: string };
 
 	let stats = $state<EventStats | null>(null);
 	let loading = $state(true);
@@ -23,10 +20,6 @@
 	async function refreshStats() {
 		stats = await api.getEventStats(page.params.id!);
 	}
-	let buyerModal = $state<BuyerTarget | null>(null);
-	let buyers = $state<ExtraBuyer[] | null>(null);
-	let buyersLoading = $state(false);
-	let buyersError = $state<string | null>(null);
 
 	onMount(async () => {
 		if (!auth.isAuthed) {
@@ -51,35 +44,8 @@
 		return Math.min(100, Math.round((sold / capacity) * 100));
 	}
 	
-	async function openBuyers(target: BuyerTarget) {
-		buyerModal = target;
-		buyers = null;
-		buyersError = null;
-		buyersLoading = true;
-		try {
-			buyers =
-				target.kind === 'ticket'
-					? await api.listTicketTypeBuyers(target.id)
-					: await api.listExtraBuyers(target.id);
-		} catch (e) {
-			buyersError = e instanceof ApiError ? e.message : t('dashboard.errorFallback');
-		} finally {
-			buyersLoading = false;
-		}
-	}
-
-	function closeBuyers() {
-		buyerModal = null;
-		buyers = null;
-		buyersError = null;
-	}
-
-	function onModalKey(e: KeyboardEvent) {
-		if (buyerModal && e.key === 'Escape') closeBuyers();
-	}
-
-	function onBackdropClick(e: MouseEvent) {
-		if (e.target === e.currentTarget) closeBuyers();
+	function openBuyers(target: BuyerTarget) {
+		buyerTarget = target;
 	}
 
 	function onTicketCardKey(e: KeyboardEvent, ttId: string, ttName: string) {
@@ -269,54 +235,6 @@
 		onChange={refreshStats}
 	/>
 {/if}
-<svelte:window on:keydown={onModalKey} />
-
-{#if buyerModal}
-	<div class="backdrop" onclick={onBackdropClick} role="presentation">
-		<div class="dialog card" role="dialog" aria-modal="true" aria-labelledby="buyers-title">
-			<div class="dialog-head">
-				<h3 id="buyers-title">
-					{t(
-						buyerModal.kind === 'ticket' ? 'dashboard.ticketBuyers' : 'dashboard.extraBuyers',
-						{ name: buyerModal.name },
-					)}
-				</h3>
-				<button type="button" class="secondary small" onclick={closeBuyers}>
-					{t('dashboard.close')}
-				</button>
-			</div>
-			{#if buyersLoading}
-				<p class="muted">{t('common.loading')}</p>
-			{:else if buyersError}
-				<div class="error">{buyersError}</div>
-			{:else if !buyers || buyers.length === 0}
-				<p class="muted">{t('dashboard.noBuyers')}</p>
-			{:else}
-				<div class="table-wrap">
-					<table>
-						<thead>
-							<tr>
-								<th>{t('dashboard.buyerName')}</th>
-								<th>{t('dashboard.buyerTaxId')}</th>
-								<th class="num-col">{t('dashboard.buyerQty')}</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each buyers as b (b.email)}
-								<tr>
-									<td>{b.name ?? b.email}</td>
-									<td>{b.tax_id ?? '—'}</td>
-									<td class="num-col">{b.quantity}</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
-			{/if}
-		</div>
-	</div>
-{/if}
-
 <BuyerModal target={buyerTarget} onClose={() => (buyerTarget = null)} />
 
 <style>
@@ -398,23 +316,6 @@
 	}
 	.ticket-row {
 		cursor: pointer;
-	}
-	.ticket-row:hover {
-		background: var(--surface-2);
-	}
-	.ticket-row:focus-visible {
-		outline: 2px solid var(--accent);
-		outline-offset: 2px;
-	}
-	.backdrop {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.6);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 1rem;
-		z-index: 100;
 	}
 	.ticket-row:hover {
 		background: var(--surface-2);
