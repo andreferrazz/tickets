@@ -52,7 +52,32 @@ defmodule BackendWeb.WebhookController do
     Orders.mark_refunded_by_checkout(id)
   end
 
+  # Boleto (and other transparent payments) confirm via `transparent.completed`.
+  # The boleto's `bole_` id is stored in the same `abacate_checkout_id` column,
+  # so the existing order lookups work unchanged.
+  defp dispatch_event(%{"event" => "transparent.completed", "data" => data}) do
+    with id when is_binary(id) <- transparent_id(data),
+         {:ok, order} <- Orders.mark_paid_by_checkout(id, %{payment_method: "BOLETO"}),
+         {:ok, order, _passes} <- Orders.fulfill_paid_order(order) do
+      {:ok, order}
+    end
+  end
+
+  defp dispatch_event(%{"event" => "transparent.refunded", "data" => data}) do
+    case transparent_id(data) do
+      id when is_binary(id) -> Orders.mark_refunded_by_checkout(id)
+      _ -> :ok
+    end
+  end
+
   defp dispatch_event(_), do: :ok
+
+  # The exact field path for the transparent payment id is undocumented; try the
+  # nested `transparent` object first, then a top-level `id`.
+  # TODO: verify against a real transparent.completed payload and tighten.
+  defp transparent_id(%{"transparent" => %{"id" => id}}) when is_binary(id), do: id
+  defp transparent_id(%{"id" => id}) when is_binary(id), do: id
+  defp transparent_id(_), do: nil
 
   # Abacate Pay's `checkout.completed` payload, by example:
   #   data.payerInformation.method     -> "CARD" | "PIX"

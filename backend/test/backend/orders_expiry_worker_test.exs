@@ -54,6 +54,28 @@ defmodule Backend.Orders.ExpiryWorkerTest do
     order
   end
 
+  defp place_boleto_order(buyer, event, tt, qty) do
+    {:ok, order} =
+      Orders.create_order(
+        buyer,
+        event.id,
+        [%{"item_type" => "ticket", "item_id" => tt.id, "quantity" => qty}],
+        [],
+        "BOLETO"
+      )
+
+    order
+  end
+
+  defp set_boleto_expiry(order_id, days_from_now) do
+    moment =
+      DateTime.utc_now()
+      |> DateTime.add(days_from_now * 24 * 60 * 60, :second)
+      |> DateTime.truncate(:second)
+
+    Repo.update_all(from(o in Order, where: o.id == ^order_id), set: [expires_at: moment])
+  end
+
   defp backdate(order_id, minutes_ago) do
     moment =
       DateTime.utc_now()
@@ -152,6 +174,52 @@ defmodule Backend.Orders.ExpiryWorkerTest do
 
       assert reload_order(order.id).status == "pending"
       assert reload_batch(batch.id).quantity_sold == 2
+    end
+
+    test "does not expire a pending boleto whose expiry is in the future" do
+      creator = make_creator()
+      buyer = make_user("buyer")
+      {event, tt, batch} = published_event_with_tickets(creator)
+      order = place_boleto_order(buyer, event, tt, 2)
+      backdate(order.id, 30)
+      set_boleto_expiry(order.id, 2)
+
+      # Default get_transparent is pending; the boleto window hasn't closed.
+      run_once()
+
+      assert reload_order(order.id).status == "pending"
+      assert reload_batch(batch.id).quantity_sold == 2
+    end
+
+    test "expires a pending boleto once its expiry has passed and releases stock" do
+      creator = make_creator()
+      buyer = make_user("buyer")
+      {event, tt, batch} = published_event_with_tickets(creator)
+      order = place_boleto_order(buyer, event, tt, 2)
+      backdate(order.id, 30)
+      set_boleto_expiry(order.id, -1)
+
+      run_once()
+
+      assert reload_order(order.id).status == "expired"
+      assert reload_batch(batch.id).quantity_sold == 0
+    end
+
+    test "fulfils a boleto when the transparent endpoint reports it paid" do
+      creator = make_creator()
+      buyer = make_user("buyer")
+      {event, tt, _batch} = published_event_with_tickets(creator)
+      order = place_boleto_order(buyer, event, tt, 2)
+      backdate(order.id, 30)
+
+      AbacatePayMock.put_checkout(order.abacate_checkout_id, %{status: "paid"})
+
+      run_once()
+
+      reloaded = reload_order(order.id)
+      assert reloaded.status == "paid"
+      assert reloaded.payment_method == "BOLETO"
+      assert Repo.aggregate(from(p in Pass, where: p.order_id == ^order.id), :count) == 2
     end
 
     test "expires orders with no abacate_checkout_id without calling Abacate Pay" do

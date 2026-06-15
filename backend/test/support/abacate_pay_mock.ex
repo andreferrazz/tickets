@@ -15,8 +15,20 @@ defmodule Backend.AbacatePayMock do
   end
 
   @impl Backend.AbacatePayBehaviour
-  def create_checkout(_items, _return_url, completion_url, _customer_id, _total_cents) do
+  def create_checkout(_items, _return_url, completion_url, _customer_id, _total_cents, _methods) do
     {:ok, %{id: "bill_test_#{:rand.uniform(99_999)}", url: completion_url}}
+  end
+
+  @impl Backend.AbacatePayBehaviour
+  def create_boleto(_total_cents, _name, _tax_id) do
+    id = "bole_test_#{:rand.uniform(99_999)}"
+
+    {:ok,
+     %{
+       id: id,
+       url: "https://app.abacatepay.com/pay/#{id}/boleto",
+       expires_at: DateTime.utc_now() |> DateTime.add(3, :day) |> DateTime.to_iso8601()
+     }}
   end
 
   @impl Backend.AbacatePayBehaviour
@@ -39,10 +51,25 @@ defmodule Backend.AbacatePayMock do
     end
   end
 
+  @impl Backend.AbacatePayBehaviour
+  def get_transparent(transparent_id) do
+    case Process.get({__MODULE__, :checkout, transparent_id}) do
+      nil ->
+        {:ok, %{status: "pending", payment_method: "BOLETO", card_installments: nil}}
+
+      {:error, _} = err ->
+        err
+
+      result when is_map(result) ->
+        {:ok,
+         Map.merge(%{status: "pending", payment_method: "BOLETO", card_installments: nil}, result)}
+    end
+  end
+
   @doc """
-  Overrides what `get_checkout/1` returns for `checkout_id` in the current
-  test process. Pass a map for a success response (merged onto the defaults)
-  or `{:error, reason}` to drive the error branch.
+  Overrides what `get_checkout/1` and `get_transparent/1` return for `checkout_id`
+  in the current test process. Pass a map for a success response (merged onto the
+  defaults) or `{:error, reason}` to drive the error branch.
   """
   def put_checkout(checkout_id, response) do
     Process.put({__MODULE__, :checkout, checkout_id}, response)

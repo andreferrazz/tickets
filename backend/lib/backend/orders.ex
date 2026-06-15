@@ -31,14 +31,14 @@ defmodule Backend.Orders do
 
   Returns `{:ok, order}` or `{:error, reason}`.
   """
-  def create_order(user, event_id, cart_items, seat_picks \\ []) do
+  def create_order(user, event_id, cart_items, seat_picks \\ [], payment_method \\ nil) do
     with {:ok, event} <- fetch_published_event(event_id),
          {:ok, line_items} <- resolve_items(event, cart_items),
          :ok <- ensure_extras_within_ticket_count(line_items),
          {:ok, picks} <- Seating.validate_picks(event, seat_picks, ticket_quantity(line_items)),
          total = compute_total(line_items),
          {:ok, order} <- reserve_order(user, event, total, line_items, picks) do
-      finalize_order(user, event, total, line_items, order)
+      finalize_order(user, event, total, line_items, order, payment_method)
     end
   end
 
@@ -67,7 +67,7 @@ defmodule Backend.Orders do
   # Free orders (total == 0) skip Abacate Pay entirely — there's nothing to
   # charge — and are marked paid + fulfilled inline. Paid orders go through
   # the usual checkout-then-webhook path.
-  defp finalize_order(_user, event, 0, _line_items, order) do
+  defp finalize_order(_user, event, 0, _line_items, order, _payment_method) do
     with {:ok, paid} <- mark_free_order_paid(order),
          {:ok, paid, _passes} <- fulfill_paid_order(%{paid | event_title: event.title}) do
       {:ok, paid}
@@ -78,10 +78,10 @@ defmodule Backend.Orders do
     end
   end
 
-  defp finalize_order(user, event, total, line_items, order) do
-    case build_checkout(order, line_items, user.abacate_customer_id, total) do
+  defp finalize_order(user, event, total, line_items, order, payment_method) do
+    case build_checkout(order, line_items, user, total, payment_method) do
       {:ok, checkout} ->
-        {:ok, attach_checkout(order, event, checkout)}
+        {:ok, attach_checkout(order, event, checkout, payment_method)}
 
       {:error, reason} ->
         cancel_order(order)
@@ -532,7 +532,14 @@ defmodule Backend.Orders do
     Repo.update_all(from(ei in ExtraItem, where: ei.id == ^id), inc: [quantity_sold: qty])
   end
 
-  defp build_checkout(order, line_items, customer_id, total_cents) do
+  # Boleto goes through the transparent endpoint (no product items, just the
+  # total + buyer identity); PIX/CARD use the hosted checkout restricted to the
+  # single method the buyer chose up front.
+  defp build_checkout(_order, _line_items, user, total_cents, "BOLETO") do
+    abacate_pay().create_boleto(total_cents, user.name, user.tax_id)
+  end
+
+  defp build_checkout(order, line_items, user, total_cents, payment_method) do
     with {:ok, abacate_items} <- collect_abacate_items(line_items) do
       frontend_url = Application.get_env(:backend, :frontend_url, "http://localhost:5173")
       return_url = "#{frontend_url}/orders"
@@ -542,8 +549,9 @@ defmodule Backend.Orders do
         abacate_items,
         return_url,
         completion_url,
-        customer_id,
-        total_cents
+        user.abacate_customer_id,
+        total_cents,
+        [payment_method]
       )
     end
   end
@@ -563,13 +571,37 @@ defmodule Backend.Orders do
     end)
   end
 
-  defp attach_checkout(order, event, %{id: checkout_id, url: payment_url}) do
+  # The chosen `payment_method` is known up front now (we restrict the checkout
+  # to it), so we store it at creation rather than waiting for the webhook. This
+  # also gives the ExpiryWorker a clean discriminator for boleto reconciliation.
+  defp attach_checkout(
+         order,
+         event,
+         %{id: checkout_id, url: payment_url} = checkout,
+         payment_method
+       ) do
+    changes = [
+      abacate_checkout_id: checkout_id,
+      abacate_payment_url: payment_url,
+      payment_method: payment_method,
+      expires_at: parse_expires_at(checkout[:expires_at])
+    ]
+
     {:ok, updated} =
       order
-      |> Ecto.Changeset.change(abacate_checkout_id: checkout_id, abacate_payment_url: payment_url)
+      |> Ecto.Changeset.change(changes)
       |> Repo.update()
 
     updated |> Repo.preload(:items) |> Map.put(:event_title, event.title)
+  end
+
+  defp parse_expires_at(nil), do: nil
+
+  defp parse_expires_at(iso8601) when is_binary(iso8601) do
+    case DateTime.from_iso8601(iso8601) do
+      {:ok, dt, _offset} -> DateTime.truncate(dt, :second)
+      {:error, _} -> nil
+    end
   end
 
   defp cancel_order(order) do

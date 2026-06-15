@@ -13,6 +13,7 @@ import type {
 	Invitation,
 	Order,
 	OrderStatus,
+	PaymentMethod,
 	Organization,
 	OrganizationMembership,
 	Pass,
@@ -153,10 +154,15 @@ export const api = {
 		request<{ deleted: true }>(`/seat-tables/${id}`, { method: 'DELETE' }),
 	getEventSeating: (id: string, fetcher?: typeof fetch) =>
 		request<Seating>(`/events/${id}/seating`, { fetcher }),
-	createOrder: (event_id: string, items: CartLine[], seat_picks: SeatPick[] = []) =>
+	createOrder: (
+		event_id: string,
+		items: CartLine[],
+		seat_picks: SeatPick[] = [],
+		payment_method?: PaymentMethod
+	) =>
 		request<Order>('/orders', {
 			method: 'POST',
-			body: { event_id, items, seat_picks }
+			body: { event_id, items, seat_picks, payment_method }
 		}),
 	listOrders: (fetcher?: typeof fetch) => request<Order[]>('/orders', { fetcher }),
 	listEventOrders: (eventId: string, statuses: OrderStatus[] = [], fetcher?: typeof fetch) => {

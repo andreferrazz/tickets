@@ -155,6 +155,52 @@ defmodule BackendWeb.WebhookControllerTest do
     end
   end
 
+  describe "transparent.completed side effects (boleto)" do
+    test "marks the boleto order paid and issues passes", %{conn: conn} do
+      {buyer, order} = paid_order_with_extras(ticket_qty: 2, payment_method: "BOLETO")
+      drain_mailbox()
+
+      body =
+        Jason.encode!(%{
+          event: "transparent.completed",
+          data: %{transparent: %{id: order.abacate_checkout_id}}
+        })
+
+      conn = post_webhook(conn, body)
+      assert json_response(conn, 200) == %{"ok" => true}
+
+      reloaded = Repo.get!(Backend.Orders.Order, order.id)
+      assert reloaded.status == "paid"
+      assert reloaded.payment_method == "BOLETO"
+      # 2 tickets + 1 extra = 3 passes
+      assert Repo.aggregate(from(p in Pass, where: p.order_id == ^order.id), :count) == 3
+      assert collect_subjects_for(buyer.email) != []
+    end
+
+    test "transparent.refunded marks the boleto order refunded", %{conn: conn} do
+      {_buyer, order} = paid_order_with_extras(ticket_qty: 1, payment_method: "BOLETO")
+      drain_mailbox()
+
+      paid =
+        Jason.encode!(%{
+          event: "transparent.completed",
+          data: %{transparent: %{id: order.abacate_checkout_id}}
+        })
+
+      _ = post_webhook(conn, paid)
+
+      refund =
+        Jason.encode!(%{
+          event: "transparent.refunded",
+          data: %{transparent: %{id: order.abacate_checkout_id}}
+        })
+
+      conn = post_webhook(build_conn(), refund)
+      assert json_response(conn, 200) == %{"ok" => true}
+      assert Repo.get!(Backend.Orders.Order, order.id).status == "refunded"
+    end
+  end
+
   defp drain_mailbox do
     receive do
       {:email, _} -> drain_mailbox()
@@ -218,10 +264,16 @@ defmodule BackendWeb.WebhookControllerTest do
     {:ok, %{user: buyer}} = Accounts.verify_code(buyer_email, code)
 
     {:ok, order} =
-      Orders.create_order(buyer, event.id, [
-        %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => ticket_qty},
-        %{"item_type" => "extra", "item_id" => extra.id, "quantity" => 1}
-      ])
+      Orders.create_order(
+        buyer,
+        event.id,
+        [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => ticket_qty},
+          %{"item_type" => "extra", "item_id" => extra.id, "quantity" => 1}
+        ],
+        [],
+        Keyword.get(opts, :payment_method)
+      )
 
     {buyer, order}
   end

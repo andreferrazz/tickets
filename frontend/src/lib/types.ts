@@ -146,7 +146,7 @@ export interface Order {
 	items: OrderItem[];
 }
 
-export type PaymentMethod = 'PIX' | 'CARD';
+export type PaymentMethod = 'PIX' | 'CARD' | 'BOLETO';
 
 export interface EventOrderLine {
 	name: string;

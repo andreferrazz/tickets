@@ -11,6 +11,10 @@ defmodule Backend.Orders.Order do
     field :abacate_checkout_id, :string
     field :abacate_payment_url, :string
     field :paid_at, :utc_datetime
+    # When the upstream payment expires. Set only for boleto orders (which take
+    # 1-3 days to pay); nil for PIX/CARD, where the ExpiryWorker falls back to
+    # the fixed time-based reservation window.
+    field :expires_at, :utc_datetime
     # Captured from the checkout.completed webhook so the dashboard can show
     # net revenue. `platform_fee_cents` is Abacate's authoritative figure;
     # method/installments are kept for display and as a fallback when the
@@ -29,7 +33,7 @@ defmodule Backend.Orders.Order do
   end
 
   @valid_statuses ~w(pending paid expired refunded)
-  @valid_payment_methods ~w(PIX CARD)
+  @valid_payment_methods ~w(PIX CARD BOLETO)
 
   def changeset(attrs) do
     %__MODULE__{}
@@ -41,6 +45,7 @@ defmodule Backend.Orders.Order do
       :abacate_checkout_id,
       :abacate_payment_url,
       :paid_at,
+      :expires_at,
       :payment_method,
       :card_installments,
       :platform_fee_cents
