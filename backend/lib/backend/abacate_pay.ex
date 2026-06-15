@@ -66,21 +66,23 @@ defmodule Backend.AbacatePay do
   end
 
   @doc """
-  Creates a checkout session with the given product items.
+  Creates a hosted checkout session with the given product items, restricted to
+  the payment methods in `methods` (e.g. `["PIX"]` or `["CARD"]`). The buyer
+  picks the concrete method on Abacate's hosted page.
 
   Returns `{:ok, %{id: bill_id, url: payment_url}}`.
   """
   @impl Backend.AbacatePayBehaviour
-  def create_checkout(items, return_url, completion_url, customer_id, total_cents) do
+  def create_checkout(items, return_url, completion_url, customer_id, total_cents, methods) do
     body =
       %{
         items: items,
-        methods: ["PIX", "CARD"],
-        card: %{maxInstallments: max_card_installments(total_cents)},
+        methods: methods,
         returnUrl: return_url,
         completionUrl: completion_url
       }
       |> maybe_put(:customerId, customer_id)
+      |> maybe_put_card(methods, total_cents)
 
     case Req.post("#{@base_url}/checkouts/create", json: body, headers: [auth_header()]) do
       {:ok, %{status: 200, body: %{"data" => %{"id" => id, "url" => url}}}} ->
@@ -94,8 +96,49 @@ defmodule Backend.AbacatePay do
     end
   end
 
+  @doc """
+  Creates a boleto via the *transparent* payment endpoint.
+
+  Boleto is not available through the hosted checkout `methods` array — it is a
+  transparent payment (`POST /v2/transparents/create`) with its own response and
+  webhook (`transparent.completed`). See
+  https://docs.abacatepay.com/pages/transparents/boleto.
+
+  `name` and `tax_id` are the buyer's CPF/CNPJ details (required by Abacate).
+  Returns `{:ok, %{id: bole_id, url: payment_url, expires_at: iso8601 | nil}}`.
+  """
+  @impl Backend.AbacatePayBehaviour
+  def create_boleto(total_cents, name, tax_id) do
+    body = %{
+      method: "BOLETO",
+      data: %{amount: total_cents, customer: %{name: name, taxId: tax_id}}
+    }
+
+    case Req.post("#{@base_url}/transparents/create", json: body, headers: [auth_header()]) do
+      {:ok, %{status: status, body: %{"data" => %{"id" => id, "url" => url} = data}}}
+      when status in 200..201 ->
+        {:ok, %{id: id, url: url, expires_at: data["expiresAt"]}}
+
+      {:ok, %{status: status, body: body}} ->
+        {:error, "abacate_pay boleto #{status}: #{inspect(body)}"}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  # Only configure installments when CARD is actually offered — Abacate rejects
+  # a checkout that carries a `card` config without CARD among its methods.
+  defp maybe_put_card(body, methods, total_cents) do
+    if "CARD" in methods do
+      Map.put(body, :card, %{maxInstallments: max_card_installments(total_cents)})
+    else
+      body
+    end
+  end
 
   @doc """
   Retrieves a checkout by id from Abacate Pay.
@@ -125,6 +168,34 @@ defmodule Backend.AbacatePay do
 
       {:ok, %{status: status, body: body}} ->
         {:error, "abacate_pay get_checkout #{status}: #{inspect(body)}"}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc """
+  Retrieves a transparent payment (boleto/PIX) by id for reconciliation.
+
+  Endpoint: `GET /v2/transparents/get?id=<id>`. Status is normalised the same
+  way as `get_checkout/1`. `payment_method` is always `"BOLETO"` here since we
+  only create transparent payments for boleto.
+  """
+  @impl Backend.AbacatePayBehaviour
+  def get_transparent(transparent_id) when is_binary(transparent_id) do
+    url = "#{@base_url}/transparents/get"
+
+    case Req.get(url, params: [id: transparent_id], headers: [auth_header()]) do
+      {:ok, %{status: 200, body: %{"data" => data}}} when is_map(data) ->
+        {:ok,
+         %{
+           status: normalize_checkout_status(data["status"]),
+           payment_method: "BOLETO",
+           card_installments: nil
+         }}
+
+      {:ok, %{status: status, body: body}} ->
+        {:error, "abacate_pay get_transparent #{status}: #{inspect(body)}"}
 
       {:error, reason} ->
         {:error, reason}

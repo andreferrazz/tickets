@@ -3,11 +3,12 @@
 	import { page } from '$app/state';
 	import { api, ApiError, formatBRL } from '$lib/api';
 	import SeatPicker from '$lib/components/SeatPicker.svelte';
+	import PaymentMethodModal from '$lib/components/PaymentMethodModal.svelte';
 	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { requestLogin } from '$lib/stores/loginModal.svelte';
-	import type { CartLine, EventDetail, SeatPick } from '$lib/types';
+	import type { CartLine, EventDetail, PaymentMethod, SeatPick } from '$lib/types';
 	import { onMount } from 'svelte';
 
 	let event = $state<EventDetail | null>(null);
@@ -15,6 +16,7 @@
 	let error = $state<string | null>(null);
 	let buyError = $state<string | null>(null);
 	let busy = $state(false);
+	let paymentModalOpen = $state(false);
 
 	let qty = $state<Record<string, number>>({});
 	let seatPicks = $state<SeatPick[]>([]);
@@ -111,10 +113,25 @@
 			const ok = await requestLogin();
 			if (!ok) return;
 		}
+		// Free orders skip Abacate entirely, so there's no method to choose.
+		if (total === 0) {
+			await submitOrder();
+		} else {
+			paymentModalOpen = true;
+		}
+	}
+
+	async function onPaymentMethod(method: PaymentMethod) {
+		paymentModalOpen = false;
+		await submitOrder(method);
+	}
+
+	async function submitOrder(method?: PaymentMethod) {
+		if (!event) return;
 		buyError = null;
 		busy = true;
 		try {
-			const order = await api.createOrder(event.id, lines, seatPicks);
+			const order = await api.createOrder(event.id, lines, seatPicks, method);
 			if (order.abacate_payment_url) {
 				window.location.href = order.abacate_payment_url;
 			} else {
@@ -315,6 +332,11 @@
 			</aside>
 		</div>
 	</article>
+	<PaymentMethodModal
+		open={paymentModalOpen}
+		onSelect={onPaymentMethod}
+		onClose={() => (paymentModalOpen = false)}
+	/>
 {/if}
 
 <style>

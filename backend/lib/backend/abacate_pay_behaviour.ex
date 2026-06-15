@@ -13,9 +13,27 @@ defmodule Backend.AbacatePayBehaviour do
               return_url :: String.t(),
               completion_url :: String.t(),
               customer_id :: String.t() | nil,
-              total_cents :: integer()
+              total_cents :: integer(),
+              methods :: [String.t()]
             ) ::
               {:ok, %{id: String.t(), url: String.t()}} | {:error, any()}
+
+  @callback create_boleto(
+              total_cents :: integer(),
+              name :: String.t(),
+              tax_id :: String.t()
+            ) ::
+              {:ok, %{id: String.t(), url: String.t(), expires_at: String.t() | nil}}
+              | {:error, any()}
+
+  @callback get_transparent(transparent_id :: String.t()) ::
+              {:ok,
+               %{
+                 status: String.t(),
+                 payment_method: String.t() | nil,
+                 card_installments: pos_integer() | nil
+               }}
+              | {:error, any()}
 
   @callback create_customer(
               email :: String.t(),

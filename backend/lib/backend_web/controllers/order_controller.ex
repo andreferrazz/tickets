@@ -4,11 +4,40 @@ defmodule BackendWeb.OrderController do
   alias Backend.Orders
   alias Backend.Tickets
 
+  @valid_payment_methods ~w(PIX CARD BOLETO)
+
   @doc "POST /api/v1/orders"
   def create(conn, %{"event_id" => event_id, "items" => items} = params) do
     seat_picks = Map.get(params, "seat_picks", [])
+    payment_method = Map.get(params, "payment_method")
 
-    case Orders.create_order(conn.assigns.current_user, event_id, items, seat_picks) do
+    with :ok <- validate_payment_method(payment_method) do
+      create_with_method(conn, event_id, items, seat_picks, payment_method)
+    else
+      {:error, :invalid_payment_method} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "invalid payment_method: #{inspect(payment_method)}"})
+    end
+  end
+
+  def create(conn, _),
+    do: conn |> put_status(:bad_request) |> json(%{error: "event_id and items required"})
+
+  # Paid orders require one of the supported methods; free orders (total 0)
+  # skip Abacate entirely, so a nil method is allowed and ignored downstream.
+  defp validate_payment_method(nil), do: :ok
+  defp validate_payment_method(m) when m in @valid_payment_methods, do: :ok
+  defp validate_payment_method(_), do: {:error, :invalid_payment_method}
+
+  defp create_with_method(conn, event_id, items, seat_picks, payment_method) do
+    case Orders.create_order(
+           conn.assigns.current_user,
+           event_id,
+           items,
+           seat_picks,
+           payment_method
+         ) do
       {:ok, order} ->
         conn |> put_status(:created) |> json(order_json(order))
 
@@ -51,9 +80,6 @@ defmodule BackendWeb.OrderController do
         conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
     end
   end
-
-  def create(conn, _),
-    do: conn |> put_status(:bad_request) |> json(%{error: "event_id and items required"})
 
   @doc "GET /api/v1/orders"
   def index(conn, _params) do

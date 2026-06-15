@@ -66,6 +66,37 @@ defmodule BackendWeb.OrderControllerTest do
       assert length(resp["items"]) == 1
     end
 
+    test "creates a boleto order when payment_method is BOLETO", %{conn: conn} do
+      {conn, _} = authed_conn(conn)
+      {event, tt} = setup_event_with_ticket()
+
+      conn =
+        post(conn, "/api/v1/orders", %{
+          event_id: event.id,
+          items: [%{item_type: "ticket", item_id: tt.id, quantity: 1}],
+          payment_method: "BOLETO"
+        })
+
+      resp = json_response(conn, 201)
+      # The boleto (transparent) path returns a boleto viewing URL.
+      assert resp["abacate_payment_url"] =~ "boleto"
+    end
+
+    test "returns 400 for an unknown payment_method", %{conn: conn} do
+      {conn, _} = authed_conn(conn)
+      {event, tt} = setup_event_with_ticket()
+
+      conn =
+        post(conn, "/api/v1/orders", %{
+          event_id: event.id,
+          items: [%{item_type: "ticket", item_id: tt.id, quantity: 1}],
+          payment_method: "BITCOIN"
+        })
+
+      assert %{"error" => error} = json_response(conn, 400)
+      assert error =~ "invalid payment_method"
+    end
+
     test "returns 409 when out of stock", %{conn: conn} do
       {conn, _} = authed_conn(conn)
       {event, tt} = setup_event_with_ticket()

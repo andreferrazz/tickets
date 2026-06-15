@@ -46,6 +46,27 @@ defmodule Backend.Orders.ExpiryWorker do
     {:noreply, state}
   end
 
+  # Boleto takes 1-3 days to pay, so we hold the reservation until the boleto's
+  # own `expires_at` rather than the 15-minute window. Poll the transparent
+  # endpoint each cycle; only expire once the boleto has actually expired.
+  defp reconcile(%{payment_method: "BOLETO"} = order) do
+    case abacate_pay().get_transparent(order.abacate_checkout_id) do
+      {:ok, %{status: "paid"} = info} ->
+        recover_paid_order(order, info)
+
+      {:ok, %{status: status}} when status in ~w(cancelled expired refunded) ->
+        Backend.Orders.mark_expired(order)
+
+      {:ok, %{status: "pending"}} ->
+        if boleto_expired?(order), do: Backend.Orders.mark_expired(order)
+
+      {:error, reason} ->
+        Logger.warning(
+          "expiry_worker: get_transparent failed for order=#{order.id} boleto=#{order.abacate_checkout_id}: #{inspect(reason)}"
+        )
+    end
+  end
+
   # Free orders and orders that never got an Abacate Pay checkout: there's
   # no upstream state to consult, so fall back to time-based expiry.
   defp reconcile(%{abacate_checkout_id: nil} = order) do
@@ -84,6 +105,13 @@ defmodule Backend.Orders.ExpiryWorker do
         )
     end
   end
+
+  # A boleto with no recorded expiry is treated as not-yet-expired so we never
+  # release stock on a payment the buyer can still complete.
+  defp boleto_expired?(%{expires_at: nil}), do: false
+
+  defp boleto_expired?(%{expires_at: expires_at}),
+    do: DateTime.compare(DateTime.utc_now(), expires_at) == :gt
 
   defp abacate_pay,
     do: Application.get_env(:backend, :abacate_pay_module, Backend.AbacatePay)

@@ -82,6 +82,48 @@ defmodule Backend.OrdersTest do
       assert item.unit_price_cents == batch.price_cents
     end
 
+    test "boleto orders go through the transparent endpoint and store method + expiry" do
+      creator = make_creator()
+      buyer = make_buyer()
+      {event, tt, _batch} = published_event_with_tickets(creator)
+
+      assert {:ok, order} =
+               Orders.create_order(
+                 buyer,
+                 event.id,
+                 [%{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}],
+                 [],
+                 "BOLETO"
+               )
+
+      assert order.status == "pending"
+      assert order.payment_method == "BOLETO"
+      assert String.starts_with?(order.abacate_checkout_id, "bole_")
+      assert order.abacate_payment_url =~ "boleto"
+      # Boleto orders hold their reservation until the boleto expires.
+      assert %DateTime{} = order.expires_at
+      assert DateTime.compare(order.expires_at, DateTime.utc_now()) == :gt
+    end
+
+    test "PIX/CARD orders leave expires_at nil and store the chosen method" do
+      creator = make_creator()
+      buyer = make_buyer()
+      {event, tt, _batch} = published_event_with_tickets(creator)
+
+      assert {:ok, order} =
+               Orders.create_order(
+                 buyer,
+                 event.id,
+                 [%{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}],
+                 [],
+                 "PIX"
+               )
+
+      assert order.payment_method == "PIX"
+      assert is_nil(order.expires_at)
+      assert String.starts_with?(order.abacate_checkout_id, "bill_")
+    end
+
     test "returns out_of_stock when active batch lacks capacity" do
       creator = make_creator()
       buyer = make_buyer()
