@@ -117,7 +117,15 @@
 				<thead>
 					<tr>
 						<th>{t('eventOrders.columnName')}</th>
-						<th class="col-mobile num-col">{t('eventOrders.columnTickets')}</th>
+						<th class="num-col">
+							{t('eventOrders.columnTickets')}
+							<button
+								type="button"
+								class="help"
+								title={t('eventOrders.columnTicketsHelp')}
+								aria-label={t('eventOrders.columnTicketsHelp')}>?</button
+							>
+						</th>
 						<th>{t('common.status')}</th>
 						<th class="col-detail">{t('eventOrders.columnValue')}</th>
 						<th class="col-detail">{t('eventOrders.columnPaymentMethod')}</th>
@@ -133,8 +141,8 @@
 							onclick={() => (selected = o)}
 							onkeydown={(e) => onRowKey(e, o)}
 						>
-							<td>{o.buyer_name ?? o.buyer_email}</td>
-							<td class="col-mobile num-col">{lineSum(o.tickets)}</td>
+							<td class="name-cell">{o.buyer_name ?? o.buyer_email}</td>
+							<td class="num-col">{o.validated_count}/{lineSum(o.tickets)}</td>
 							<td><span class="badge {o.status}">{tStatus(o.status)}</span></td>
 							<td class="col-detail">{formatBRL(o.total_cents)}</td>
 							<td class="col-detail">{paymentMethodLabel(o.payment_method)}</td>
@@ -273,10 +281,6 @@
 	.check input {
 		width: auto;
 	}
-	/* Ticket/extra count columns are shown on mobile only. */
-	.col-mobile {
-		display: none;
-	}
 	.table-wrap {
 		overflow-x: auto;
 		padding: 0;
@@ -373,16 +377,46 @@
 	.num-col {
 		text-align: right;
 	}
+	/* Cap long buyer names so one outlier can't stretch the table. */
+	.name-cell {
+		max-width: 30ch;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	/* Inline "?" affordance carrying the column's explanatory tooltip. */
+	.help {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.1rem;
+		height: 1.1rem;
+		padding: 0;
+		background: none;
+		border: 1px solid var(--border);
+		border-radius: 50%;
+		font-size: 0.7rem;
+		font-weight: 600;
+		line-height: 1;
+		color: var(--muted);
+		cursor: help;
+		user-select: none;
+	}
+	.help:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
 
 	@media (max-width: 640px) {
-		.col-mobile {
-			display: table-cell;
-		}
 		.col-detail {
 			display: none;
 		}
 		.status-filter {
 			flex-basis: 100%;
+		}
+		/* Tighter cap on narrow screens; truncation rules come from the base. */
+		.name-cell {
+			max-width: 12ch;
 		}
 	}
 </style>

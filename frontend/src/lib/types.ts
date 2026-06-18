@@ -179,6 +179,8 @@ export interface EventOrder {
 	created_at: string;
 	tickets: EventOrderLine[];
 	extras: EventOrderLine[];
+	/** Checked-in ticket passes; paired with the ticket total as validated/total. */
+	validated_count: number;
 }
 
 export interface Invitation {

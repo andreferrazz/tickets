@@ -302,6 +302,29 @@ defmodule BackendWeb.OrderControllerTest do
       assert o["paid_at"] == nil
       assert [%{"name" => "Standard", "quantity" => 1, "unit_price_cents" => 4000}] = o["tickets"]
       assert o["extras"] == []
+      # No passes checked in yet.
+      assert o["validated_count"] == 0
+    end
+
+    # GET /api/v1/events/$EVENT_ID/orders — validated_count tracks checked-in passes
+    test "validated_count counts checked-in ticket passes", %{conn: conn} do
+      {owner_conn, owner, event, tt} = authed_org_creator(conn)
+      {_buyer_conn, buyer} = authed_conn(conn)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 2}
+        ])
+
+      {:ok, [first_pass | _], :created} = Tickets.issue_for_order(order)
+      {:ok, _, :checked_in} = Tickets.check_in(first_pass, owner)
+
+      conn = get(owner_conn, "/api/v1/events/#{event.id}/orders")
+      o = conn |> json_response(200) |> Enum.find(&(&1["id"] == order.id))
+
+      # 1 of 2 ticket passes scanned.
+      assert o["validated_count"] == 1
+      assert [%{"quantity" => 2}] = o["tickets"]
     end
 
     # GET /api/v1/events/$EVENT_ID/orders?status[]=paid
