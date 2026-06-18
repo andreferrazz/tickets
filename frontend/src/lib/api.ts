@@ -25,7 +25,8 @@ import type {
 	Seating,
 	TicketType,
 	User,
-	CartLine
+	CartLine,
+	ValidateResult
 } from '$lib/types';
 
 const BASE = PUBLIC_API_URL;
@@ -174,6 +175,11 @@ export const api = {
 		request<Order>(`/orders/${id}`, { fetcher }),
 	getOrderPasses: (id: string, fetcher?: typeof fetch) =>
 		request<Pass[]>(`/orders/${id}/passes`, { fetcher }),
+	validatePass: (eventId: string, token: string) =>
+		request<ValidateResult>(`/events/${eventId}/passes/validate`, {
+			method: 'POST',
+			body: { token }
+		}),
 	listInvitations: (fetcher?: typeof fetch) =>
 		request<Invitation[]>('/invitations', { fetcher }),
 	createInvitation: (email: string, organization_id?: string) =>
