@@ -150,6 +150,61 @@ defmodule Backend.InvitationsTest do
     end
   end
 
+  describe "staff invitations" do
+    test "leader can invite a scan-only staff member" do
+      creator = creator_user()
+
+      assert {:ok, inv} =
+               Invitations.create_invitation(creator, %{
+                 "email" => "scanner@example.com",
+                 "role" => "staff"
+               })
+
+      assert inv.role == "staff"
+    end
+
+    test "rejects an unsupported invited role" do
+      creator = creator_user()
+
+      assert {:error, :invalid_role} =
+               Invitations.create_invitation(creator, %{
+                 "email" => "x@example.com",
+                 "role" => "leader"
+               })
+    end
+
+    test "accepting a staff invite creates a staff membership without promoting the user" do
+      creator = creator_user()
+
+      {:ok, inv} =
+        Invitations.create_invitation(creator, %{
+          "email" => "scan@example.com",
+          "role" => "staff"
+        })
+
+      assert {:ok, %{user: user, organization: org}} = Invitations.accept_invitation(inv.token)
+      assert user.role == "buyer"
+      assert org.role == "staff"
+      assert Backend.Organizations.member?(user.id, org.id)
+      refute Backend.Organizations.can_manage?(user.id, org.id)
+    end
+
+    test "verify_code does not promote a staff invitee to creator" do
+      creator = creator_user()
+
+      {:ok, _} =
+        Invitations.create_invitation(creator, %{
+          "email" => "staffcode@example.com",
+          "role" => "staff"
+        })
+
+      {:ok, code} = Accounts.request_code("staffcode@example.com")
+      {:ok, %{user: user}} = Accounts.verify_code("staffcode@example.com", code)
+
+      assert user.role == "buyer"
+    end
+  end
+
   defp expire!(inv) do
     past = DateTime.add(DateTime.utc_now(), -3600, :second) |> DateTime.truncate(:second)
 

@@ -16,6 +16,8 @@ import type {
 	PaymentMethod,
 	Organization,
 	OrganizationMembership,
+	OrgMember,
+	OrgRole,
 	Pass,
 	Payout,
 	PayoutSettings,
@@ -182,10 +184,20 @@ export const api = {
 		}),
 	listInvitations: (fetcher?: typeof fetch) =>
 		request<Invitation[]>('/invitations', { fetcher }),
-	createInvitation: (email: string, organization_id?: string) =>
+	createInvitation: (email: string, organization_id?: string, role?: OrgRole) =>
 		request<Invitation>('/invitations', {
 			method: 'POST',
-			body: organization_id ? { email, organization_id } : { email }
+			body: {
+				email,
+				...(organization_id ? { organization_id } : {}),
+				...(role ? { role } : {})
+			}
+		}),
+	listMembers: (orgId: string) => request<OrgMember[]>(`/organizations/${orgId}/members`),
+	setMemberRole: (orgId: string, userId: string, role: OrgRole) =>
+		request<{ user_id: string; role: OrgRole }>(`/organizations/${orgId}/members/${userId}`, {
+			method: 'PATCH',
+			body: { role }
 		}),
 	acceptInvitation: (token: string) =>
 		request<AuthResponse>('/invitations/accept', { method: 'POST', body: { token } }),

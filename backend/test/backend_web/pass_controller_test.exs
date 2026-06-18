@@ -80,6 +80,18 @@ defmodule BackendWeb.PassControllerTest do
       assert second["pass"]["checked_in_at"] == first["pass"]["checked_in_at"]
     end
 
+    test "allows a scan-only staff member of the org to check in a pass", %{conn: conn} do
+      {_creator_conn, creator} = authed_conn(build_conn(), "creator")
+      {event, pass} = seed_pass(creator)
+
+      {staff_conn, staff} = authed_conn(conn, "buyer")
+      [org] = Backend.Organizations.list_led_by(creator.id)
+      {:ok, _} = Backend.Organizations.add_member(org.id, staff.id, "staff")
+
+      resp = post(staff_conn, path(event.id), %{token: pass.token}) |> json_response(200)
+      assert resp["status"] == "checked_in"
+    end
+
     test "allows admin to check in any pass", %{conn: conn} do
       {_creator_conn, creator} = authed_conn(build_conn(), "creator")
       {event, pass} = seed_pass(creator)

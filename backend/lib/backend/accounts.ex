@@ -138,10 +138,7 @@ defmodule Backend.Accounts do
 
     if invite do
       Repo.transaction(fn ->
-        {:ok, updated} =
-          user
-          |> User.changeset(%{role: "creator", invited_by: invite.inviter_id})
-          |> Repo.update()
+        updated = promote_or_keep(user, invite)
 
         case attach_membership(invite, updated) do
           {:ok, _} -> :ok
@@ -160,6 +157,20 @@ defmodule Backend.Accounts do
   end
 
   defp maybe_promote_to_creator(user), do: {:ok, user}
+
+  # Staff invitations never grant the global `creator` role — staff may only
+  # scan, so they stay `buyer` (which keeps the `:creator` router pipeline
+  # blocking them). Every other invited role is promoted buyer→creator.
+  defp promote_or_keep(user, %{role: "staff"}), do: user
+
+  defp promote_or_keep(user, invite) do
+    {:ok, updated} =
+      user
+      |> User.changeset(%{role: "creator", invited_by: invite.inviter_id})
+      |> Repo.update()
+
+    updated
+  end
 
   # ---------------------------------------------------------------------------
   # Profile completion + Abacate Pay customer
@@ -249,6 +260,10 @@ defmodule Backend.Accounts do
       org -> {:ok, org}
     end
   end
+
+  # A `staff` invitation must not promote the user — they stay `buyer` and only
+  # gain the scan-only membership attached separately by `attach_membership/2`.
+  defp apply_invitation_role(%User{role: "buyer"} = user, %{role: "staff"}), do: {:ok, user}
 
   defp apply_invitation_role(%User{role: "buyer"} = user, invitation) do
     user

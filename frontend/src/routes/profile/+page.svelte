@@ -36,7 +36,9 @@
 	}
 
 	function roleLabel(role: Role): string {
-		return role === 'leader' ? t('profile.orgs.roleLeader') : t('profile.orgs.roleParticipant');
+		if (role === 'leader') return t('profile.orgs.roleLeader');
+		if (role === 'staff') return t('profile.orgs.roleStaff');
+		return t('profile.orgs.roleParticipant');
 	}
 </script>
 

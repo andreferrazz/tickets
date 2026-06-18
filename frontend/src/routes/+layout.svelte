@@ -26,6 +26,8 @@
 	onMount(async () => {
 		const { registerSW } = await import('virtual:pwa-register');
 		registerSW({ immediate: true });
+		// Needed so the nav can decide whether to show the staff "Scan" entry.
+		if (auth.isAuthed) auth.loadMemberships();
 	});
 
 	// Force authed users to complete their profile before navigating anywhere
@@ -71,6 +73,9 @@
 				>
 				{#if auth.isCreator}
 					<a href="/events/new">{t('nav.newEvent')}</a>
+				{/if}
+				{#if auth.hasStaffMembership}
+					<a href="/scan" class:active={page.url.pathname.startsWith('/scan')}>{t('nav.scan')}</a>
 				{/if}
 				{#if auth.isAdmin}
 					<a href="/admin/invitations">{t('nav.invitations')}</a>

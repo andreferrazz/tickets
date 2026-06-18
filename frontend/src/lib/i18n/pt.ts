@@ -3,6 +3,7 @@ export const pt = {
 	'nav.events': 'Eventos',
 	'nav.myOrders': 'Meus pedidos',
 	'nav.newEvent': '+ Novo evento',
+	'nav.scan': 'Validar',
 	'nav.invitations': 'Convites',
 	'nav.logout': 'Sair',
 	'nav.login': 'Entrar',
@@ -189,6 +190,10 @@ export const pt = {
 	'scan.noCamera': 'Nenhuma câmera encontrada neste dispositivo.',
 	'scan.cameraDenied': 'Não foi possível acessar a câmera. Verifique as permissões.',
 	'scan.errorFallback': 'Falha ao validar o ingresso.',
+	'scan.landingTitle': 'Validar ingressos',
+	'scan.landingSubtitle': 'Escolha um evento para começar a validar ingressos.',
+	'scan.landingEmpty': 'Nenhum evento disponível para validação.',
+	'scan.openScanner': 'Validar',
 
 	'withdraw.title': 'Sacar dinheiro',
 	'withdraw.pixKey': 'Chave PIX',
@@ -348,7 +353,14 @@ export const pt = {
 
 	// Org-scoped invitations (leader inviting participants to their org)
 	'orgInvitations.title': 'Convidar para {org}',
-	'orgInvitations.subtitle': 'Envie um link para que a pessoa entre como participante.',
+	'orgInvitations.subtitle':
+		'Envie um link de convite e escolha se a pessoa entra como participante ou apenas para validar ingressos.',
+
+	// Org team management (leader changing member roles)
+	'orgMembers.title': 'Membros',
+	'orgMembers.roleLabel': 'Função',
+	'orgMembers.roleHint': 'Validadores só podem validar ingressos; participantes gerenciam o evento.',
+	'orgMembers.changeErrorFallback': 'Falha ao alterar a função.',
 
 	// Profile
 	'profile.title': 'Perfil',
@@ -360,6 +372,7 @@ export const pt = {
 	'profile.orgs.errorFallback': 'Falha ao carregar organizações.',
 	'profile.orgs.roleLeader': 'Líder',
 	'profile.orgs.roleParticipant': 'Participante',
+	'profile.orgs.roleStaff': 'Validador',
 	'profile.orgs.manageInvites': 'Gerenciar convites',
 
 	// Status badges

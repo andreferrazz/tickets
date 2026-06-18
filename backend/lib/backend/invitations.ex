@@ -74,18 +74,30 @@ defmodule Backend.Invitations do
   end
 
   defp resolve_target(inviter, attrs, _email) do
-    case get_field(attrs, "organization_id") do
-      nil ->
-        case Organizations.list_led_by(inviter.id) do
-          [org] -> {:ok, org.id, "participant"}
-          [] -> {:error, :forbidden}
-          _ -> {:error, :organization_id_required}
-        end
+    with {:ok, role} <- member_role(attrs) do
+      case get_field(attrs, "organization_id") do
+        nil ->
+          case Organizations.list_led_by(inviter.id) do
+            [org] -> {:ok, org.id, role}
+            [] -> {:error, :forbidden}
+            _ -> {:error, :organization_id_required}
+          end
 
-      org_id ->
-        if Organizations.leader?(inviter.id, org_id),
-          do: {:ok, org_id, "participant"},
-          else: {:error, :forbidden}
+        org_id ->
+          if Organizations.leader?(inviter.id, org_id),
+            do: {:ok, org_id, role},
+            else: {:error, :forbidden}
+      end
+    end
+  end
+
+  # A leader may invite a `participant` (full management) or scan-only `staff`,
+  # never another `leader`. Defaults to `participant` when the caller omits role.
+  defp member_role(attrs) do
+    case get_field(attrs, "role") do
+      nil -> {:ok, "participant"}
+      role when role in ["participant", "staff"] -> {:ok, role}
+      _ -> {:error, :invalid_role}
     end
   end
 

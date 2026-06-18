@@ -392,7 +392,15 @@ defmodule BackendWeb.OrderControllerTest do
              |> get("/api/v1/events/#{event.id}/orders")
              |> json_response(404)
 
-      # 3. Outsider (no membership at all) -> 404.
+      # 3. Scan-only staff member of the same org -> 404 (denied; no existence leak).
+      {staff_conn, staff} = authed_conn(conn)
+      {:ok, _} = Backend.Organizations.add_member(org_id, staff.id, "staff")
+
+      assert staff_conn
+             |> get("/api/v1/events/#{event.id}/orders")
+             |> json_response(404)
+
+      # 4. Outsider (no membership at all) -> 404.
       {outsider_conn, _outsider} = authed_conn(conn)
 
       assert outsider_conn

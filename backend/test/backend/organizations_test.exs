@@ -286,4 +286,84 @@ defmodule Backend.OrganizationsTest do
       assert "Org2Draft" in titles
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Scan-only staff role
+  # ---------------------------------------------------------------------------
+
+  describe "can_manage?/2" do
+    test "true for leader and participant, false for staff and non-members" do
+      {leader, org} = leader_with_org()
+      participant = user_with_role("creator", "p")
+      {:ok, _} = Organizations.add_member(org.id, participant.id, "participant")
+      staff = user_with_role("buyer", "s")
+      {:ok, _} = Organizations.add_member(org.id, staff.id, "staff")
+      outsider = user_with_role("buyer", "out")
+
+      assert Organizations.can_manage?(leader.id, org.id)
+      assert Organizations.can_manage?(participant.id, org.id)
+      refute Organizations.can_manage?(staff.id, org.id)
+      refute Organizations.can_manage?(outsider.id, org.id)
+      # Staff still count as members so the scan endpoint accepts them.
+      assert Organizations.member?(staff.id, org.id)
+    end
+  end
+
+  describe "set_member_role/3" do
+    test "leader flips a participant to staff and back" do
+      {_leader, org} = leader_with_org()
+      member = user_with_role("buyer", "m")
+      {:ok, _} = Organizations.add_member(org.id, member.id, "participant")
+
+      assert {:ok, updated} = Organizations.set_member_role(org.id, member.id, "staff")
+      assert updated.role == "staff"
+      refute Organizations.can_manage?(member.id, org.id)
+
+      assert {:ok, back} = Organizations.set_member_role(org.id, member.id, "participant")
+      assert back.role == "participant"
+      assert Organizations.can_manage?(member.id, org.id)
+    end
+
+    test "refuses to change the leader's role" do
+      {leader, org} = leader_with_org()
+      assert {:error, :forbidden} = Organizations.set_member_role(org.id, leader.id, "staff")
+      assert Organizations.leader?(leader.id, org.id)
+    end
+
+    test "refuses an unsupported target role" do
+      {_leader, org} = leader_with_org()
+      member = user_with_role("buyer", "m")
+      {:ok, _} = Organizations.add_member(org.id, member.id, "participant")
+      assert {:error, :forbidden} = Organizations.set_member_role(org.id, member.id, "leader")
+    end
+
+    test "returns :not_found for a non-member" do
+      {_leader, org} = leader_with_org()
+      outsider = user_with_role("buyer", "out")
+      assert {:error, :not_found} = Organizations.set_member_role(org.id, outsider.id, "staff")
+    end
+  end
+
+  describe "list_members/1" do
+    test "returns each member's user_id, email and role" do
+      {leader, org} = leader_with_org()
+      staff = user_with_role("buyer", "s")
+      {:ok, _} = Organizations.add_member(org.id, staff.id, "staff")
+
+      roles = org.id |> Organizations.list_members() |> Map.new(&{&1.user_id, &1.role})
+      assert roles[leader.id] == "leader"
+      assert roles[staff.id] == "staff"
+    end
+  end
+
+  describe "staff are scan-only" do
+    test "staff member cannot edit the org's event" do
+      {leader, org} = leader_with_org()
+      staff = user_with_role("buyer", "s")
+      {:ok, _} = Organizations.add_member(org.id, staff.id, "staff")
+      event = event_in(leader, org)
+
+      assert {:error, :forbidden} = Events.update_event(staff, event.id, %{"title" => "Nope"})
+    end
+  end
 end

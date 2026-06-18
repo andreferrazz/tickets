@@ -143,7 +143,7 @@ defmodule Backend.Events do
       org_id when is_binary(org_id) ->
         cond do
           user.role == "admin" -> {:ok, org_id}
-          Organizations.member?(user.id, org_id) -> {:ok, org_id}
+          Organizations.can_manage?(user.id, org_id) -> {:ok, org_id}
           true -> {:error, :forbidden}
         end
     end
@@ -932,13 +932,14 @@ defmodule Backend.Events do
     end
   end
 
-  # Returns `{:ok, resource}` if the user is an admin or a member of the
-  # event's organization, else `{:error, :forbidden}`. Centralized so every
-  # `fetch_owned_*` helper shares the same rule.
+  # Returns `{:ok, resource}` if the user is an admin or may manage the event's
+  # organization (leader/participant), else `{:error, :forbidden}`. Centralized
+  # so every `fetch_owned_*` helper shares the same rule. `staff` members are
+  # excluded here — they may only scan, not mutate or view org resources.
   defp authorize_org_action(%{role: "admin"}, _event, resource), do: {:ok, resource}
 
   defp authorize_org_action(user, event, resource) do
-    if Organizations.member?(user.id, event.organization_id),
+    if Organizations.can_manage?(user.id, event.organization_id),
       do: {:ok, resource},
       else: {:error, :forbidden}
   end

@@ -202,7 +202,13 @@ export interface Organization {
 	updated_at?: string;
 }
 
-export type OrgRole = 'leader' | 'participant';
+export type OrgRole = 'leader' | 'participant' | 'staff';
+
+export interface OrgMember {
+	user_id: string;
+	email: string;
+	role: OrgRole;
+}
 
 export interface InvitedOrganization {
 	id: string;

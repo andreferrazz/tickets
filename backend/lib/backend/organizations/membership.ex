@@ -14,7 +14,7 @@ defmodule Backend.Organizations.Membership do
     timestamps(type: :utc_datetime)
   end
 
-  @valid_roles ~w(leader participant)
+  @valid_roles ~w(leader participant staff)
 
   def changeset(attrs) do
     %__MODULE__{}
