@@ -3,9 +3,9 @@
 	import { page } from '$app/state';
 	import { api, ApiError, formatBRL } from '$lib/api';
 	import { formatDateTime } from '$lib/datetime';
-	import { t } from '$lib/i18n';
+	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
-	import type { EventOrder, PaymentMethod } from '$lib/types';
+	import type { EventOrder, EventOrderLine, OrderStatus, PaymentMethod } from '$lib/types';
 	import { onMount } from 'svelte';
 
 	let orders = $state<EventOrder[] | null>(null);
@@ -13,13 +13,31 @@
 	let error = $state<string | null>(null);
 	let selected = $state<EventOrder | null>(null);
 
+	// Statuses offered in the filter; paid is the only one selected by default.
+	const statusOptions: OrderStatus[] = ['paid', 'pending', 'expired'];
+	let query = $state('');
+	let statuses = $state<OrderStatus[]>(['paid']);
+
+	const filtered = $derived(
+		(orders ?? []).filter((o) => {
+			if (!statuses.includes(o.status)) return false;
+			const q = query.trim().toLowerCase();
+			if (!q) return true;
+			return (o.buyer_name ?? o.buyer_email).toLowerCase().includes(q);
+		})
+	);
+
+	const lineSum = (lines: EventOrderLine[]) =>
+		lines.reduce((acc, l) => acc + l.quantity, 0);
+
 	onMount(async () => {
 		if (!auth.isAuthed) {
 			await goto(`/auth/login?next=/events/${page.params.id}/orders`);
 			return;
 		}
 		try {
-			orders = await api.listEventOrders(page.params.id!, ['paid']);
+			// Fetch every status; the paid/not-paid toggle filters client-side.
+			orders = await api.listEventOrders(page.params.id!, []);
 		} catch (e) {
 			if (e instanceof ApiError && e.status === 404) {
 				error = t('eventOrders.notAuthorized');
@@ -37,6 +55,8 @@
 				return t('eventOrders.paymentMethod.PIX');
 			case 'CARD':
 				return t('eventOrders.paymentMethod.CARD');
+			case 'BOLETO':
+				return t('eventOrders.paymentMethod.BOLETO');
 			default:
 				return t('eventOrders.unknown');
 		}
@@ -72,34 +92,61 @@
 {:else if !orders || orders.length === 0}
 	<p class="muted">{t('eventOrders.empty')}</p>
 {:else}
-	<div class="card table-wrap">
-		<table class="orders">
-			<thead>
-				<tr>
-					<th>{t('eventOrders.columnName')}</th>
-					<th>{t('eventOrders.columnValue')}</th>
-					<th>{t('eventOrders.columnPaymentMethod')}</th>
-					<th>{t('eventOrders.columnPaidAt')}</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each orders as o (o.id)}
-					<tr
-						class="clickable"
-						role="button"
-						tabindex="0"
-						onclick={() => (selected = o)}
-						onkeydown={(e) => onRowKey(e, o)}
-					>
-						<td>{o.buyer_name ?? o.buyer_email}</td>
-						<td>{formatBRL(o.total_cents)}</td>
-						<td>{paymentMethodLabel(o.payment_method)}</td>
-						<td>{o.paid_at ? formatDateTime(o.paid_at) : t('eventOrders.unknown')}</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
+	<div class="filters">
+		<input
+			class="search"
+			placeholder={t('eventOrders.searchPlaceholder')}
+			bind:value={query}
+		/>
+		<fieldset class="status-filter">
+			<legend>{t('eventOrders.filterStatus')}</legend>
+			{#each statusOptions as s (s)}
+				<label class="check">
+					<input type="checkbox" value={s} bind:group={statuses} />
+					{tStatus(s)}
+				</label>
+			{/each}
+		</fieldset>
 	</div>
+
+	{#if filtered.length === 0}
+		<p class="muted">{t('eventOrders.noResults')}</p>
+	{:else}
+		<div class="card table-wrap">
+			<table class="orders">
+				<thead>
+					<tr>
+						<th>{t('eventOrders.columnName')}</th>
+						<th class="col-mobile num-col">{t('eventOrders.columnTickets')}</th>
+						<th>{t('common.status')}</th>
+						<th class="col-detail">{t('eventOrders.columnValue')}</th>
+						<th class="col-detail">{t('eventOrders.columnPaymentMethod')}</th>
+						<th class="col-detail">{t('eventOrders.columnPaidAt')}</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each filtered as o (o.id)}
+						<tr
+							class="clickable"
+							role="button"
+							tabindex="0"
+							onclick={() => (selected = o)}
+							onkeydown={(e) => onRowKey(e, o)}
+						>
+							<td>{o.buyer_name ?? o.buyer_email}</td>
+							<td class="col-mobile num-col">{lineSum(o.tickets)}</td>
+							<td><span class="badge {o.status}">{tStatus(o.status)}</span></td>
+							<td class="col-detail">{formatBRL(o.total_cents)}</td>
+							<td class="col-detail">{paymentMethodLabel(o.payment_method)}</td>
+							<td class="col-detail"
+								>{o.paid_at ? formatDateTime(o.paid_at) : t('eventOrders.unknown')}</td
+							>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	{/if}
 {/if}
 
 {#if selected}
@@ -113,6 +160,8 @@
 			</div>
 
 			<dl class="summary">
+				<dt>{t('common.status')}</dt>
+				<dd><span class="badge {selected.status}">{tStatus(selected.status)}</span></dd>
 				<dt>{t('eventOrders.columnName')}</dt>
 				<dd>{selected.buyer_name ?? t('eventOrders.unknown')}</dd>
 				<dt>{t('eventOrders.email')}</dt>
@@ -188,6 +237,45 @@
 		justify-content: space-between;
 		align-items: center;
 		margin: 1rem 0 1.5rem;
+	}
+	.filters {
+		display: flex;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+		align-items: center;
+		margin-bottom: 1rem;
+	}
+	.filters .search {
+		flex: 1 1 16rem;
+		width: auto;
+	}
+	.status-filter {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.25rem 0.85rem;
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		padding: 0.4rem 0.75rem;
+		margin: 0;
+	}
+	.status-filter legend {
+		padding: 0 0.35rem;
+		font-size: 0.85rem;
+		color: var(--muted);
+	}
+	.check {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		white-space: nowrap;
+	}
+	.check input {
+		width: auto;
+	}
+	/* Ticket/extra count columns are shown on mobile only. */
+	.col-mobile {
+		display: none;
 	}
 	.table-wrap {
 		overflow-x: auto;
@@ -284,5 +372,17 @@
 	}
 	.num-col {
 		text-align: right;
+	}
+
+	@media (max-width: 640px) {
+		.col-mobile {
+			display: table-cell;
+		}
+		.col-detail {
+			display: none;
+		}
+		.status-filter {
+			flex-basis: 100%;
+		}
 	}
 </style>

@@ -133,6 +133,19 @@ export interface Pass {
 	qr_png_base64: string;
 }
 
+export interface ValidateResult {
+	status: 'checked_in' | 'already_checked_in';
+	pass: {
+		id: string;
+		kind: 'ticket' | 'extra';
+		item_name: string;
+		seat_label: string | null;
+		event_id: string;
+		order_id: string;
+		checked_in_at: string | null;
+	};
+}
+
 export interface Order {
 	id: string;
 	user_id: string;

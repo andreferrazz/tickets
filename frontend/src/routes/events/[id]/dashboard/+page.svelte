@@ -114,6 +114,9 @@
 				></div>
 			</div>
 			<div class="muted small">{t('dashboard.checkInsHint')}</div>
+			<a href="/events/{stats.event_id}/scan" class="btn small scan-btn">
+				{t('dashboard.scanTickets')}
+			</a>
 		</div>
 		<div class="card kpi">
 			<div class="muted small">{t('dashboard.ordersPaid')}</div>
@@ -329,6 +332,10 @@
 		align-self: flex-start;
 	}
 	.view-orders-btn {
+		margin-top: 0.5rem;
+		align-self: flex-start;
+	}
+	.scan-btn {
 		margin-top: 0.5rem;
 		align-self: flex-start;
 	}
