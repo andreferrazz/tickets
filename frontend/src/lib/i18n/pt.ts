@@ -6,6 +6,8 @@ export const pt = {
 	'nav.invitations': 'Convites',
 	'nav.logout': 'Sair',
 	'nav.login': 'Entrar',
+	'nav.openMenu': 'Abrir menu',
+	'nav.closeMenu': 'Fechar menu',
 
 	// Theme toggle
 	'theme.toggleToDark': 'Tema escuro',

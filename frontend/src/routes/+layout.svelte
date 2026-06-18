@@ -14,6 +14,15 @@
 
 	let { children } = $props();
 
+	let menuOpen = $state(false);
+
+	// Collapse the mobile menu after navigating so the panel doesn't linger
+	// over the new page.
+	$effect(() => {
+		page.url.pathname;
+		menuOpen = false;
+	});
+
 	onMount(async () => {
 		const { registerSW } = await import('virtual:pwa-register');
 		registerSW({ immediate: true });
@@ -45,7 +54,16 @@
 <nav class="nav">
 	<div class="nav-inner">
 		<a href="/" class="brand">🎟 Tickets</a>
-		<div class="nav-links">
+		<button
+			class="secondary small nav-toggle"
+			aria-expanded={menuOpen}
+			aria-controls="nav-links"
+			aria-label={menuOpen ? t('nav.closeMenu') : t('nav.openMenu')}
+			onclick={() => (menuOpen = !menuOpen)}
+		>
+			{menuOpen ? '✕' : '☰'}
+		</button>
+		<div id="nav-links" class="nav-links" class:open={menuOpen}>
 			<a href="/" class:active={page.url.pathname === '/'}>{t('nav.events')}</a>
 			{#if auth.isAuthed}
 				<a href="/orders" class:active={page.url.pathname.startsWith('/orders')}
@@ -111,6 +129,12 @@
 		align-items: center;
 		flex-wrap: wrap;
 	}
+	.nav-toggle {
+		display: none;
+		min-width: 2.4rem;
+		font-size: 1.1rem;
+		line-height: 1;
+	}
 	.nav-links :global(a) {
 		color: var(--muted);
 		padding: 0.4rem 0.6rem;
@@ -135,5 +159,33 @@
 	:global(.btn.small) {
 		padding: 0.4rem 0.75rem;
 		font-size: 0.85rem;
+	}
+
+	@media (max-width: 640px) {
+		.nav-toggle {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+		}
+		.nav-links {
+			display: none;
+			flex-direction: column;
+			align-items: stretch;
+			gap: 0.25rem;
+			flex-basis: 100%;
+			padding-top: 0.5rem;
+		}
+		.nav-links.open {
+			display: flex;
+		}
+		/* Let each entry fill the dropdown width so taps land easily. */
+		.nav-links :global(a),
+		.nav-links :global(button) {
+			width: 100%;
+			text-align: left;
+		}
+		.who {
+			order: 1;
+		}
 	}
 </style>
