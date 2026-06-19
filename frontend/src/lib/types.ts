@@ -143,6 +143,7 @@ export interface ValidateResult {
 		event_id: string;
 		order_id: string;
 		checked_in_at: string | null;
+		extras: { name: string; quantity: number }[];
 	};
 }
 

@@ -38,6 +38,25 @@ defmodule Backend.Tickets do
     Repo.all(from p in Pass, where: p.order_id == ^id, order_by: [asc: p.inserted_at])
   end
 
+  @doc """
+  Extra line items (name + quantity) for an extra pass's order; `[]` otherwise.
+
+  The single combined extras pass (see `build_extra_row/1`) only carries the
+  generic name "Extras", so staff scanning it can't tell what to hand over. This
+  surfaces the underlying purchased items for display on the scan result.
+  """
+  @spec extra_line_items(Pass.t()) :: [%{name: String.t(), quantity: integer()}]
+  def extra_line_items(%Pass{kind: "extra", order_id: order_id}) do
+    Repo.all(
+      from i in OrderItem,
+        where: i.order_id == ^order_id and i.item_type == "extra",
+        order_by: [asc: i.inserted_at],
+        select: %{name: i.item_name, quantity: i.quantity}
+    )
+  end
+
+  def extra_line_items(%Pass{}), do: []
+
   @doc "Looks up a pass by its QR token."
   @spec fetch_by_token(String.t()) :: {:ok, Pass.t()} | {:error, :not_found}
   def fetch_by_token(token) when is_binary(token) do

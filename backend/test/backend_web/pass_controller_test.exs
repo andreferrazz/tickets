@@ -28,7 +28,7 @@ defmodule BackendWeb.PassControllerTest do
     {put_req_header(conn, "authorization", "Bearer #{token}"), user}
   end
 
-  defp seed_pass(creator) do
+  defp seed_event(creator) do
     {:ok, event} =
       Events.create_event(creator, %{
         "title" => "Pass Fest",
@@ -41,9 +41,19 @@ defmodule BackendWeb.PassControllerTest do
     {:ok, _batch} =
       Events.create_batch(creator, tt.id, %{"price_cents" => 1000, "quantity_total" => 10})
 
-    buyer_email = "buyer_#{:rand.uniform(999_999)}@pass_ctrl.test"
-    {:ok, code} = Accounts.request_code(buyer_email)
-    {:ok, %{user: buyer}} = Accounts.verify_code(buyer_email, code)
+    {event, tt}
+  end
+
+  defp make_buyer do
+    email = "buyer_#{:rand.uniform(999_999)}@pass_ctrl.test"
+    {:ok, code} = Accounts.request_code(email)
+    {:ok, %{user: buyer}} = Accounts.verify_code(email, code)
+    buyer
+  end
+
+  defp seed_pass(creator) do
+    {event, tt} = seed_event(creator)
+    buyer = make_buyer()
 
     {:ok, order} =
       Orders.create_order(buyer, event.id, [
@@ -52,6 +62,39 @@ defmodule BackendWeb.PassControllerTest do
 
     {:ok, [pass], _} = Tickets.issue_for_order(order)
     {event, pass}
+  end
+
+  # Seeds an order with two extra items and returns the single combined extra pass.
+  defp seed_extra_pass(creator) do
+    {event, tt} = seed_event(creator)
+    {:ok, section} = Events.create_section(creator, event.id, %{"title" => "Add-ons"})
+
+    {:ok, shirt} =
+      Events.create_extra(creator, event.id, %{
+        "name" => "T-Shirt",
+        "price_cents" => 4000,
+        "section_id" => section.id
+      })
+
+    {:ok, cap} =
+      Events.create_extra(creator, event.id, %{
+        "name" => "Cap",
+        "price_cents" => 2500,
+        "section_id" => section.id
+      })
+
+    buyer = make_buyer()
+
+    {:ok, order} =
+      Orders.create_order(buyer, event.id, [
+        %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1},
+        %{"item_type" => "extra", "item_id" => shirt.id, "quantity" => 2},
+        %{"item_type" => "extra", "item_id" => cap.id, "quantity" => 1}
+      ])
+
+    {:ok, passes, _} = Tickets.issue_for_order(order)
+    extra_pass = Enum.find(passes, &(&1.kind == "extra"))
+    {event, extra_pass}
   end
 
   describe "POST validate" do
@@ -67,8 +110,23 @@ defmodule BackendWeb.PassControllerTest do
       assert resp["pass"]["id"] == pass.id
       assert resp["pass"]["kind"] == "ticket"
       assert resp["pass"]["event_id"] == event.id
-      assert resp["pass"]["event_id"] == event.id
+      assert resp["pass"]["extras"] == []
       assert is_binary(resp["pass"]["checked_in_at"])
+    end
+
+    test "returns the purchased items for an extra pass", %{conn: conn} do
+      {conn, creator} = authed_conn(conn, "creator")
+      {event, extra_pass} = seed_extra_pass(creator)
+
+      resp = post(conn, path(event.id), %{token: extra_pass.token}) |> json_response(200)
+
+      assert resp["status"] == "checked_in"
+      assert resp["pass"]["kind"] == "extra"
+
+      assert resp["pass"]["extras"] == [
+               %{"name" => "T-Shirt", "quantity" => 2},
+               %{"name" => "Cap", "quantity" => 1}
+             ]
     end
 
     test "returns already_checked_in on second scan with original timestamp", %{conn: conn} do
