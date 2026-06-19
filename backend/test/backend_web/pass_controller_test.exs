@@ -4,6 +4,7 @@ defmodule BackendWeb.PassControllerTest do
   alias Backend.{Accounts, Events, Orders, Tickets}
 
   defp path(event_id), do: "/api/v1/events/#{event_id}/passes/validate"
+  defp path(event_id), do: "/api/v1/events/#{event_id}/passes/validate"
 
   defp authed_conn(conn, role) do
     email = "#{role}_#{:rand.uniform(999_999)}@pass_ctrl.test"
@@ -59,11 +60,13 @@ defmodule BackendWeb.PassControllerTest do
       {event, pass} = seed_pass(creator)
 
       conn = post(conn, path(event.id), %{token: pass.token})
+      conn = post(conn, path(event.id), %{token: pass.token})
       resp = json_response(conn, 200)
 
       assert resp["status"] == "checked_in"
       assert resp["pass"]["id"] == pass.id
       assert resp["pass"]["kind"] == "ticket"
+      assert resp["pass"]["event_id"] == event.id
       assert resp["pass"]["event_id"] == event.id
       assert is_binary(resp["pass"]["checked_in_at"])
     end
@@ -71,7 +74,10 @@ defmodule BackendWeb.PassControllerTest do
     test "returns already_checked_in on second scan with original timestamp", %{conn: conn} do
       {conn, creator} = authed_conn(conn, "creator")
       {event, pass} = seed_pass(creator)
+      {event, pass} = seed_pass(creator)
 
+      first = post(conn, path(event.id), %{token: pass.token}) |> json_response(200)
+      second = post(conn, path(event.id), %{token: pass.token}) |> json_response(200)
       first = post(conn, path(event.id), %{token: pass.token}) |> json_response(200)
       second = post(conn, path(event.id), %{token: pass.token}) |> json_response(200)
 
@@ -95,8 +101,11 @@ defmodule BackendWeb.PassControllerTest do
     test "allows admin to check in any pass", %{conn: conn} do
       {_creator_conn, creator} = authed_conn(build_conn(), "creator")
       {event, pass} = seed_pass(creator)
+      {_creator_conn, creator} = authed_conn(build_conn(), "creator")
+      {event, pass} = seed_pass(creator)
 
       {admin_conn, _admin} = authed_conn(conn, "admin")
+      resp = post(admin_conn, path(event.id), %{token: pass.token}) |> json_response(200)
       resp = post(admin_conn, path(event.id), %{token: pass.token}) |> json_response(200)
       assert resp["status"] == "checked_in"
     end
@@ -105,43 +114,71 @@ defmodule BackendWeb.PassControllerTest do
       {_creator_conn, creator} = authed_conn(build_conn(), "creator")
       {event, pass} = seed_pass(creator)
 
-      {other_conn, _other} = authed_conn(conn, "creator")
-      resp = post(other_conn, path(event.id), %{token: pass.token})
-      assert json_response(resp, 403) == %{"error" => "not authorized for this event"}
-    end
+      test "returns 403 when the caller is not in the event's organization", %{conn: conn} do
+        {_creator_conn, creator} = authed_conn(build_conn(), "creator")
+        {event, pass} = seed_pass(creator)
 
-    test "rejects a pass that belongs to a different event", %{conn: conn} do
-      {conn, creator} = authed_conn(conn, "creator")
-      {_event_a, pass} = seed_pass(creator)
-      {event_b, _pass_b} = seed_pass(creator)
+        {other_conn, _other} = authed_conn(conn, "creator")
+        resp = post(other_conn, path(event.id), %{token: pass.token})
+        resp = post(other_conn, path(event.id), %{token: pass.token})
+        assert json_response(resp, 403) == %{"error" => "not authorized for this event"}
+      end
 
-      resp = post(conn, path(event_b.id), %{token: pass.token})
+      test "rejects a pass that belongs to a different event", %{conn: conn} do
+        {conn, creator} = authed_conn(conn, "creator")
+        {_event_a, pass} = seed_pass(creator)
+        {event_b, _pass_b} = seed_pass(creator)
 
-      assert json_response(resp, 422) == %{"error" => "pass belongs to a different event"}
-      # The mismatched pass must NOT be checked in.
-      {:ok, reloaded} = Tickets.fetch_by_token(pass.token)
-      assert is_nil(reloaded.checked_in_at)
-    end
+        resp = post(conn, path(event_b.id), %{token: pass.token})
 
-    test "returns 404 for unknown token", %{conn: conn} do
-      {conn, creator} = authed_conn(conn, "creator")
-      {event, _pass} = seed_pass(creator)
+        assert json_response(resp, 422) == %{"error" => "pass belongs to a different event"}
+        # The mismatched pass must NOT be checked in.
+        {:ok, reloaded} = Tickets.fetch_by_token(pass.token)
+        assert is_nil(reloaded.checked_in_at)
+      end
 
-      resp = post(conn, path(event.id), %{token: "does-not-exist"})
-      assert json_response(resp, 404) == %{"error" => "pass not found"}
-    end
+      test "rejects a pass that belongs to a different event", %{conn: conn} do
+        {conn, creator} = authed_conn(conn, "creator")
+        {_event_a, pass} = seed_pass(creator)
+        {event_b, _pass_b} = seed_pass(creator)
 
-    test "returns 401 without auth", %{conn: conn} do
-      resp = post(conn, path(Ecto.UUID.generate()), %{token: "anything"})
-      assert json_response(resp, 401)
-    end
+        resp = post(conn, path(event_b.id), %{token: pass.token})
 
-    test "returns 400 without a token in the body", %{conn: conn} do
-      {conn, creator} = authed_conn(conn, "creator")
-      {event, _pass} = seed_pass(creator)
+        assert json_response(resp, 422) == %{"error" => "pass belongs to a different event"}
+        # The mismatched pass must NOT be checked in.
+        {:ok, reloaded} = Tickets.fetch_by_token(pass.token)
+        assert is_nil(reloaded.checked_in_at)
+      end
 
-      resp = post(conn, path(event.id), %{})
-      assert json_response(resp, 400) == %{"error" => "token required"}
+      test "returns 404 for unknown token", %{conn: conn} do
+        {conn, creator} = authed_conn(conn, "creator")
+        {event, _pass} = seed_pass(creator)
+
+        resp = post(conn, path(event.id), %{token: "does-not-exist"})
+        {conn, creator} = authed_conn(conn, "creator")
+        {event, _pass} = seed_pass(creator)
+
+        resp = post(conn, path(event.id), %{token: "does-not-exist"})
+        assert json_response(resp, 404) == %{"error" => "pass not found"}
+      end
+
+      test "returns 401 without auth", %{conn: conn} do
+        resp = post(conn, path(Ecto.UUID.generate()), %{token: "anything"})
+        resp = post(conn, path(Ecto.UUID.generate()), %{token: "anything"})
+        assert json_response(resp, 401)
+      end
+
+      test "returns 400 without a token in the body", %{conn: conn} do
+        {conn, creator} = authed_conn(conn, "creator")
+        {event, _pass} = seed_pass(creator)
+
+        resp = post(conn, path(event.id), %{})
+        {conn, creator} = authed_conn(conn, "creator")
+        {event, _pass} = seed_pass(creator)
+
+        resp = post(conn, path(event.id), %{})
+        assert json_response(resp, 400) == %{"error" => "token required"}
+      end
     end
   end
 end

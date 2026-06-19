@@ -135,8 +135,7 @@ export const pt = {
 	'eventOrders.columnPaymentMethod': 'Pago com',
 	'eventOrders.columnPaidAt': 'Pago em',
 	'eventOrders.columnTickets': 'Ingressos',
-	'eventOrders.columnTicketsHelp':
-		'Ingressos validados na entrada do evento em relação ao total de ingressos do pedido (validados/total).',
+	'eventOrders.columnTicketsHelp': 'Ingressos validados na entrada do evento em relação ao total de ingressos do pedido (validados/total).',
 	'eventOrders.searchPlaceholder': 'Filtrar por nome...',
 	'eventOrders.filterStatus': 'Filtrar por status',
 	'eventOrders.noResults': 'Nenhum pedido encontrado.',
