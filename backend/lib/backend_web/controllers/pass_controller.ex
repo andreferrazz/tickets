@@ -16,6 +16,10 @@ defmodule BackendWeb.PassController do
 
   Idempotent: subsequent scans return `status: "already_checked_in"` with the
   original `checked_in_at`.
+
+  For an extra pass, the response includes `extras`: the order's purchased
+  extra line items (`name` + `quantity`) so staff can see what to hand over.
+  Ticket passes return `extras: []`.
   """
   def validate(conn, %{"event_id" => event_id, "token" => token}) when is_binary(token) do
     user = conn.assigns.current_user
@@ -72,7 +76,8 @@ defmodule BackendWeb.PassController do
       seat_label: pass.seat_label,
       event_id: pass.event_id,
       order_id: pass.order_id,
-      checked_in_at: pass.checked_in_at
+      checked_in_at: pass.checked_in_at,
+      extras: Tickets.extra_line_items(pass)
     }
   end
 end

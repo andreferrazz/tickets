@@ -139,6 +139,30 @@ defmodule Backend.TicketsTest do
     end
   end
 
+  describe "extra_line_items/1" do
+    test "returns the order's extra items (name + quantity) for an extra pass" do
+      creator = make_user("creator")
+      buyer = make_user()
+      {event, tt, extra} = event_with_inventory(creator)
+      order = place_order(buyer, event, tt, extra, ticket_qty: 1)
+      {:ok, passes, _} = Tickets.issue_for_order(order)
+      extra_pass = Enum.find(passes, &(&1.kind == "extra"))
+
+      assert Tickets.extra_line_items(extra_pass) == [%{name: "T-Shirt", quantity: 2}]
+    end
+
+    test "returns [] for a ticket pass" do
+      creator = make_user("creator")
+      buyer = make_user()
+      {event, tt, extra} = event_with_inventory(creator)
+      order = place_order(buyer, event, tt, extra, ticket_qty: 1)
+      {:ok, passes, _} = Tickets.issue_for_order(order)
+      ticket_pass = Enum.find(passes, &(&1.kind == "ticket"))
+
+      assert Tickets.extra_line_items(ticket_pass) == []
+    end
+  end
+
   describe "qr_png/1" do
     test "returns binary PNG data" do
       creator = make_user("creator")
