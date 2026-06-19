@@ -138,7 +138,8 @@ defmodule Backend.Orders do
   # ---------------------------------------------------------------------------
 
   @doc """
-  Lists orders for `event_id`, newest first, with items and buyer preloaded.
+  Lists orders for `event_id`, newest first, with items, buyer, and passes
+  preloaded. Passes feed the validated/total ticket count in the orders view.
 
   Authorization: `user` must be an admin or a *leader* of the event's
   organization. Plain participants are denied — orders carry buyer PII
@@ -199,7 +200,7 @@ defmodule Backend.Orders do
     base
     |> filter_by_status(statuses)
     |> Repo.all()
-    |> Repo.preload([:items, :user])
+    |> Repo.preload([:items, :user, :passes])
   end
 
   defp filter_by_status(query, []), do: query

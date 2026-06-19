@@ -82,11 +82,28 @@ class AuthStore {
 		return this.#inflight;
 	}
 
-	/** True when the user is a member of `orgId` or has the admin role. */
+	/**
+	 * True when the user may manage `orgId`: an admin, or a `leader`/`participant`
+	 * member. `staff` members are scan-only and excluded here.
+	 */
 	canManageOrg(orgId: string | null | undefined): boolean {
 		if (!orgId) return false;
 		if (this.user?.role === 'admin') return true;
+		return !!this.memberships?.some(
+			(m) => m.id === orgId && (m.role === 'leader' || m.role === 'participant')
+		);
+	}
+
+	/** True when the user may scan `orgId`'s tickets: an admin or any member (incl. staff). */
+	canScan(orgId: string | null | undefined): boolean {
+		if (!orgId) return false;
+		if (this.user?.role === 'admin') return true;
 		return !!this.memberships?.some((m) => m.id === orgId);
+	}
+
+	/** True when the user holds a scan-only `staff` membership in any org. */
+	get hasStaffMembership(): boolean {
+		return !!this.memberships?.some((m) => m.role === 'staff');
 	}
 
 	get isAuthed(): boolean {

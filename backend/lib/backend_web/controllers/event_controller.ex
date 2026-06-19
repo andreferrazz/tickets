@@ -27,15 +27,16 @@ defmodule BackendWeb.EventController do
     end
   end
 
-  # Published events are public. Drafts/cancelled are only visible to members
+  # Published events are public. Drafts/cancelled are only visible to managers
   # of the event's organization (or an admin) — return 404 to anyone else to
-  # avoid leaking existence.
+  # avoid leaking existence. `staff` members can still load published events to
+  # scan them, but cannot see drafts.
   defp visible?(%{status: "published"}, _user), do: true
   defp visible?(_event, nil), do: false
   defp visible?(_event, %{role: "admin"}), do: true
 
   defp visible?(%{organization_id: org_id}, %{id: uid}) when is_binary(org_id),
-    do: Backend.Organizations.member?(uid, org_id)
+    do: Backend.Organizations.can_manage?(uid, org_id)
 
   defp visible?(_event, _user), do: false
 

@@ -5,23 +5,30 @@
 	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
-	import type { Invitation, OrganizationMembership } from '$lib/types';
+	import type { Invitation, OrganizationMembership, OrgMember, OrgRole } from '$lib/types';
 	import { onMount } from 'svelte';
 
 	const orgId = $derived(page.params.id);
 
 	let leadership = $state<OrganizationMembership | null>(null);
 	let invitations = $state<Invitation[]>([]);
+	let members = $state<OrgMember[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let email = $state('');
+	let inviteRole = $state<OrgRole>('participant');
 	let sendError = $state<string | null>(null);
 	let busy = $state(false);
+	let memberError = $state<string | null>(null);
 
 	const visible = $derived(invitations.filter((i) => i.organization_id === orgId));
 
 	async function reload() {
 		invitations = await api.listInvitations();
+	}
+
+	async function reloadMembers() {
+		members = await api.listMembers(orgId!);
 	}
 
 	onMount(async () => {
@@ -37,7 +44,7 @@
 				return;
 			}
 			leadership = m;
-			await reload();
+			await Promise.all([reload(), reloadMembers()]);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : t('invitations.errorFallback');
 		} finally {
@@ -50,13 +57,28 @@
 		sendError = null;
 		busy = true;
 		try {
-			await api.createInvitation(email, orgId);
+			await api.createInvitation(email, orgId, inviteRole);
 			email = '';
+			inviteRole = 'participant';
 			await reload();
 		} catch (e) {
 			sendError = e instanceof ApiError ? e.message : t('invitations.sendErrorFallback');
 		} finally {
 			busy = false;
+		}
+	}
+
+	// Flips an existing member between participant and scan-only staff. The
+	// leader row has no control, so `role` here is always participant/staff.
+	async function changeRole(member: OrgMember, role: OrgRole) {
+		if (role === member.role) return;
+		memberError = null;
+		try {
+			await api.setMemberRole(orgId!, member.user_id, role);
+			await reloadMembers();
+		} catch (e) {
+			memberError = e instanceof ApiError ? e.message : t('orgMembers.changeErrorFallback');
+			await reloadMembers();
 		}
 	}
 </script>
@@ -75,14 +97,49 @@
 				placeholder="amigo@exemplo.com"
 				required
 			/>
+			<select bind:value={inviteRole} aria-label={t('orgMembers.roleLabel')}>
+				<option value="participant">{t('profile.orgs.roleParticipant')}</option>
+				<option value="staff">{t('profile.orgs.roleStaff')}</option>
+			</select>
 			<button type="submit" disabled={busy || !email}>
 				{busy ? t('invitations.sending') : t('invitations.send')}
 			</button>
 		</div>
+		<p class="muted small">{t('orgMembers.roleHint')}</p>
 		{#if sendError}
 			<div class="error">{sendError}</div>
 		{/if}
 	</form>
+
+	<h2>{t('orgMembers.title')}</h2>
+	{#if memberError}
+		<div class="error">{memberError}</div>
+	{/if}
+	{#if members.length === 0}
+		<p class="muted">{t('common.loading')}</p>
+	{:else}
+		<div class="stack">
+			{#each members as m (m.user_id)}
+				<div class="line card">
+					<div>
+						<strong>{m.email}</strong>
+					</div>
+					{#if m.role === 'leader'}
+						<span class="badge leader">{t('profile.orgs.roleLeader')}</span>
+					{:else}
+						<select
+							value={m.role}
+							aria-label={t('orgMembers.roleLabel')}
+							onchange={(e) => changeRole(m, e.currentTarget.value as OrgRole)}
+						>
+							<option value="participant">{t('profile.orgs.roleParticipant')}</option>
+							<option value="staff">{t('profile.orgs.roleStaff')}</option>
+						</select>
+					{/if}
+				</div>
+			{/each}
+		</div>
+	{/if}
 
 	{#if loading}
 		<p class="muted">{t('common.loading')}</p>

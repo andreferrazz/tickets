@@ -189,8 +189,14 @@ defmodule BackendWeb.OrderController do
       paid_at: order.paid_at,
       created_at: order.inserted_at,
       tickets: Enum.map(tickets, &line_json/1),
-      extras: Enum.map(extras, &line_json/1)
+      extras: Enum.map(extras, &line_json/1),
+      validated_count: validated_ticket_count(order.passes)
     }
+  end
+
+  # Checked-in ticket passes ("validated"); one pass row exists per ticket unit.
+  defp validated_ticket_count(passes) do
+    Enum.count(passes, &(&1.kind == "ticket" and &1.checked_in_at))
   end
 
   defp line_json(item) do

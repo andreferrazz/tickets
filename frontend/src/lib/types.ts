@@ -179,6 +179,8 @@ export interface EventOrder {
 	created_at: string;
 	tickets: EventOrderLine[];
 	extras: EventOrderLine[];
+	/** Checked-in ticket passes; paired with the ticket total as validated/total. */
+	validated_count: number;
 }
 
 export interface Invitation {
@@ -200,7 +202,13 @@ export interface Organization {
 	updated_at?: string;
 }
 
-export type OrgRole = 'leader' | 'participant';
+export type OrgRole = 'leader' | 'participant' | 'staff';
+
+export interface OrgMember {
+	user_id: string;
+	email: string;
+	role: OrgRole;
+}
 
 export interface InvitedOrganization {
 	id: string;

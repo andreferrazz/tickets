@@ -28,6 +28,7 @@ defmodule Backend.Orders.Order do
     belongs_to :user, Backend.Accounts.User
     belongs_to :event, Backend.Events.Event
     has_many :items, Backend.Orders.OrderItem
+    has_many :passes, Backend.Tickets.Pass
 
     timestamps(type: :utc_datetime)
   end

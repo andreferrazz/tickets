@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { afterNavigate, goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api, ApiError } from '$lib/api';
 	import QrScanner from '$lib/components/QrScanner.svelte';
@@ -14,6 +14,13 @@
 	let allowed = $state(false);
 	let error = $state<string | null>(null);
 
+	// Back target: the route the user came from. Falls back to the event page on
+	// a direct load (refresh / deep link), since staff can't reach the dashboard.
+	let backHref = $state(`/events/${page.params.id}`);
+	afterNavigate(({ from }) => {
+		if (from?.url?.pathname) backHref = from.url.pathname + from.url.search;
+	});
+
 	// Banner shown after each scan; its presence pauses the camera until dismissed.
 	type ScanOutcome = { tone: 'ok' | 'warn' | 'error'; title: string; detail?: string };
 	let outcome = $state<ScanOutcome | null>(null);
@@ -27,7 +34,7 @@
 		try {
 			await auth.loadMemberships();
 			event = await api.getEvent(page.params.id!);
-			allowed = auth.canManageOrg(event.organization_id);
+			allowed = auth.canScan(event.organization_id);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : t('scan.errorFallback');
 		} finally {
@@ -90,7 +97,7 @@
 {:else}
 	<header class="head">
 		<h1>{t('scan.title')}</h1>
-		<a href="/events/{page.params.id}/dashboard" class="btn secondary small">←</a>
+		<a href={backHref} class="btn secondary small">←</a>
 	</header>
 	{#if event}<p class="muted">{event.title}</p>{/if}
 

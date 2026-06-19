@@ -3,11 +3,17 @@ defmodule Backend.Organizations do
   Organization and membership management.
 
   An Organization owns events. Each organization has exactly one member with
-  role `"leader"` (enforced by a partial unique index) and zero or more
-  `"participant"` members. Both leaders and participants can mutate the org's
-  events; only the leader can invite new members or delete the organization.
-  Admin users are not members of any organization and bypass these checks via
-  their global role.
+  role `"leader"` (enforced by a partial unique index) plus zero or more
+  `"participant"` and `"staff"` members.
+
+    * `leader` / `participant` — may mutate the org's events (see `can_manage?/2`).
+    * `staff` — scan-only: counts as a member (`member?/2`) so the scan endpoint
+      accepts them, but `can_manage?/2` is false so they cannot touch events,
+      orders, or the org itself.
+
+  Only the leader can invite new members, change member roles, or delete the
+  organization. Admin users are not members of any organization and bypass these
+  checks via their global role.
   """
 
   import Ecto.Query
@@ -167,6 +173,29 @@ defmodule Backend.Organizations do
     )
   end
 
+  @doc """
+  Changes `target_user_id`'s role within `organization_id`. Leader-only
+  mutation — the caller must already be authorized. Only `participant` ⇄ `staff`
+  transitions are allowed: returns `{:error, :forbidden}` when the target is the
+  `leader` or `new_role` is anything other than `"participant"`/`"staff"`, and
+  `{:error, :not_found}` when `target_user_id` is not a member. Leadership moves
+  go through `transfer_leadership/3` instead.
+  """
+  def set_member_role(organization_id, target_user_id, new_role)
+      when is_binary(organization_id) and is_binary(target_user_id) and
+             new_role in ["participant", "staff"] do
+    case Repo.one(
+           from m in Membership,
+             where: m.organization_id == ^organization_id and m.user_id == ^target_user_id
+         ) do
+      nil -> {:error, :not_found}
+      %Membership{role: "leader"} -> {:error, :forbidden}
+      %Membership{} = membership -> membership |> Membership.role_changeset(new_role) |> Repo.update()
+    end
+  end
+
+  def set_member_role(_organization_id, _target_user_id, _new_role), do: {:error, :forbidden}
+
   @doc "Returns true if `user_id` belongs to `organization_id` (any role)."
   def member?(user_id, organization_id) when is_binary(user_id) and is_binary(organization_id) do
     Repo.exists?(
@@ -176,6 +205,24 @@ defmodule Backend.Organizations do
   end
 
   def member?(_user_id, _organization_id), do: false
+
+  @doc """
+  Returns true if `user_id` may manage `organization_id`'s events — i.e. holds a
+  `leader` or `participant` membership. `staff` members are members
+  (`member?/2`) but not managers, so they fail this check.
+  """
+  def can_manage?(user_id, organization_id)
+      when is_binary(user_id) and is_binary(organization_id) do
+    Repo.exists?(
+      from m in Membership,
+        where:
+          m.user_id == ^user_id and
+            m.organization_id == ^organization_id and
+            m.role in ["leader", "participant"]
+    )
+  end
+
+  def can_manage?(_user_id, _organization_id), do: false
 
   @doc "Returns true if `user_id` is the leader of `organization_id`."
   def leader?(user_id, organization_id) when is_binary(user_id) and is_binary(organization_id) do
@@ -232,6 +279,23 @@ defmodule Backend.Organizations do
   end
 
   def list_memberships_for_user(_), do: []
+
+  @doc """
+  Returns `[%{user_id, email, role}]` for every member of `organization_id`,
+  ordered by email. Used by the leader's team-management UI.
+  """
+  def list_members(organization_id) when is_binary(organization_id) do
+    Repo.all(
+      from m in Membership,
+        join: u in Backend.Accounts.User,
+        on: u.id == m.user_id,
+        where: m.organization_id == ^organization_id,
+        order_by: [asc: u.email],
+        select: %{user_id: u.id, email: u.email, role: m.role}
+    )
+  end
+
+  def list_members(_), do: []
 
   @doc "Returns the orgs `user_id` leads."
   def list_led_by(user_id) when is_binary(user_id) do

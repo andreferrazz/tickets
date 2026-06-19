@@ -9,9 +9,10 @@ defmodule BackendWeb.InvitationController do
   Admin: body `{ "email": "...", "organization_name": "..." }` — creates a
   brand new org and a leader invitation.
 
-  Leader: body `{ "email": "...", "organization_id": "..." }` — invites a
-  participant to their org. `organization_id` is optional when the leader
-  belongs to only one org.
+  Leader: body `{ "email": "...", "organization_id": "...", "role": "..." }` —
+  invites a member to their org. `organization_id` is optional when the leader
+  belongs to only one org; `role` is `"participant"` (default) or scan-only
+  `"staff"`.
   """
   def create(conn, %{"email" => _} = params) do
     case Invitations.create_invitation(conn.assigns.current_user, params) do
@@ -40,6 +41,11 @@ defmodule BackendWeb.InvitationController do
         conn
         |> put_status(:unprocessable_entity)
         |> json(%{error: "organization_id required"})
+
+      {:error, :invalid_role} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "role must be participant or staff"})
 
       {:error, :email_required} ->
         conn |> put_status(:bad_request) |> json(%{error: "email required"})

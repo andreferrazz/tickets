@@ -19,7 +19,7 @@ defmodule Backend.Invitations.Invitation do
   end
 
   @valid_statuses ~w(pending accepted expired)
-  @valid_roles ~w(leader participant)
+  @valid_roles ~w(leader participant staff)
 
   def changeset(attrs) do
     %__MODULE__{}
