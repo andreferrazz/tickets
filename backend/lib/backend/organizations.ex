@@ -188,9 +188,14 @@ defmodule Backend.Organizations do
            from m in Membership,
              where: m.organization_id == ^organization_id and m.user_id == ^target_user_id
          ) do
-      nil -> {:error, :not_found}
-      %Membership{role: "leader"} -> {:error, :forbidden}
-      %Membership{} = membership -> membership |> Membership.role_changeset(new_role) |> Repo.update()
+      nil ->
+        {:error, :not_found}
+
+      %Membership{role: "leader"} ->
+        {:error, :forbidden}
+
+      %Membership{} = membership ->
+        membership |> Membership.role_changeset(new_role) |> Repo.update()
     end
   end
 
@@ -310,4 +315,18 @@ defmodule Backend.Organizations do
   end
 
   def list_led_by(_), do: []
+
+  @doc "Returns the orgs `user_id` can manage (leader or participant)."
+  def list_managed_by(user_id) when is_binary(user_id) do
+    Repo.all(
+      from o in Organization,
+        join: m in Membership,
+        on: m.organization_id == o.id,
+        where: m.user_id == ^user_id and m.role in ["leader", "participant"],
+        order_by: [asc: o.name],
+        select: o
+    )
+  end
+
+  def list_managed_by(_), do: []
 end

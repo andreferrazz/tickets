@@ -309,6 +309,24 @@ defmodule Backend.OrganizationsTest do
     end
   end
 
+  describe "list_managed_by/1" do
+    test "returns orgs where the user is leader or participant, excluding staff" do
+      {leader, led_org} = leader_with_org("lead")
+      {_other_leader, other_org} = leader_with_org("other")
+
+      participant = leader
+      {:ok, _} = Organizations.add_member(other_org.id, participant.id, "participant")
+
+      managed_ids = participant.id |> Organizations.list_managed_by() |> Enum.map(& &1.id)
+      assert led_org.id in managed_ids
+      assert other_org.id in managed_ids
+
+      staff = user_with_role("buyer", "staff")
+      {:ok, _} = Organizations.add_member(led_org.id, staff.id, "staff")
+      assert Organizations.list_managed_by(staff.id) == []
+    end
+  end
+
   describe "set_member_role/3" do
     test "leader flips a participant to staff and back" do
       {_leader, org} = leader_with_org()
