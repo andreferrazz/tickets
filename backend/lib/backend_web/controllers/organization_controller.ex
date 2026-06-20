@@ -4,6 +4,25 @@ defmodule BackendWeb.OrganizationController do
   alias Backend.Organizations
 
   @doc """
+  GET /api/v1/organizations/:id — fetch one org.
+
+  Admins (bypass) or leader/participant members. Used by the invitations page
+  to render its title for admins, who have no membership row to read it from.
+  """
+  def show(conn, %{"id" => id}) do
+    case Organizations.get_organization_for(conn.assigns.current_user, id) do
+      {:ok, org} ->
+        json(conn, organization_json(org))
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "organization not found"})
+
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+    end
+  end
+
+  @doc """
   PATCH /api/v1/organizations/:id — rename an organization.
 
   Leader-only (admins bypass). Used by the post-invite flow where the new

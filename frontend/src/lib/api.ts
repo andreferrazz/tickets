@@ -201,6 +201,11 @@ export const api = {
 		}),
 	acceptInvitation: (token: string) =>
 		request<AuthResponse>('/invitations/accept', { method: 'POST', body: { token } }),
+	listUsers: (fetcher?: typeof fetch) => request<User[]>('/admin/users', { fetcher }),
+	impersonateUser: (id: string) =>
+		request<{ token: string }>(`/admin/users/${id}/impersonate`, { method: 'POST', body: {} }),
+	getOrganization: (id: string, fetcher?: typeof fetch) =>
+		request<Organization>(`/organizations/${id}`, { fetcher }),
 	updateOrganization: (id: string, body: { name: string }) =>
 		request<Organization>(`/organizations/${id}`, { method: 'PATCH', body }),
 	deleteOrganization: (id: string) =>

@@ -154,6 +154,32 @@ defmodule Backend.AccountsTest do
     end
   end
 
+  describe "list_users/0 and get_user/1" do
+    test "lists created users ordered by name then email" do
+      _a = verified_user("zlast@example.com")
+      _b = verified_user("afirst@example.com")
+
+      emails = Accounts.list_users() |> Enum.map(& &1.email)
+      # Both have nil names, so ordering falls through to email ascending.
+      assert Enum.find_index(emails, &(&1 == "afirst@example.com")) <
+               Enum.find_index(emails, &(&1 == "zlast@example.com"))
+    end
+
+    test "get_user/1 returns the user and nil for unknown id" do
+      user = verified_user("lookup@example.com")
+      assert Accounts.get_user(user.id).id == user.id
+      assert nil == Accounts.get_user(Ecto.UUID.generate())
+    end
+  end
+
+  describe "create_session/1" do
+    test "issues a token that resolves back to the user" do
+      user = verified_user("session@example.com")
+      assert {:ok, token} = Accounts.create_session(user)
+      assert Accounts.get_user_by_token(token).id == user.id
+    end
+  end
+
   describe "logout/1" do
     test "invalidates the session" do
       code = request_fresh_code("logout@example.com")

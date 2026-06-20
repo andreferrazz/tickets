@@ -89,6 +89,18 @@ defmodule Backend.Accounts do
   end
 
   # ---------------------------------------------------------------------------
+  # User listing / lookup (admin)
+  # ---------------------------------------------------------------------------
+
+  @doc "Lists every user, ordered by name then email. Used by the admin user page."
+  def list_users do
+    Repo.all(from u in User, order_by: [asc: u.name, asc: u.email])
+  end
+
+  @doc "Fetches a user by id, or nil when none exists."
+  def get_user(id), do: Repo.get(User, id)
+
+  # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
 
@@ -294,7 +306,13 @@ defmodule Backend.Accounts do
     |> Repo.update()
   end
 
-  defp create_session(user) do
+  @doc """
+  Mints a 30-day session token for `user` and returns `{:ok, token}`.
+
+  Used by the code-login and invite-accept flows, and by admin impersonation
+  (`AdminUserController.impersonate/2`) to issue a "log in as this user" link.
+  """
+  def create_session(user) do
     token = generate_token()
     expires_at = DateTime.add(DateTime.utc_now(), @session_ttl_days * 86_400, :second)
 

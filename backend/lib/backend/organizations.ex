@@ -34,6 +34,28 @@ defmodule Backend.Organizations do
   def get_organization(id), do: Repo.get(Organization, id)
 
   @doc """
+  Fetches an org the caller may manage: the system admin (bypass) or a
+  leader/participant member. Returns `{:error, :not_found}` for a missing org
+  and `{:error, :forbidden}` when the caller may not view it.
+  """
+  def get_organization_for(user, organization_id) do
+    case Repo.get(Organization, organization_id) do
+      nil ->
+        {:error, :not_found}
+
+      org ->
+        if authorized_to_view?(user, organization_id) do
+          {:ok, org}
+        else
+          {:error, :forbidden}
+        end
+    end
+  end
+
+  defp authorized_to_view?(%{role: "admin"}, _org_id), do: true
+  defp authorized_to_view?(user, org_id), do: can_manage?(user.id, org_id)
+
+  @doc """
   Updates `organization_id` on behalf of `user`. Leader-only (admins bypass).
   Used by the post-invite rename flow: a fresh leader is shown a form to set
   the org's name immediately after accepting.

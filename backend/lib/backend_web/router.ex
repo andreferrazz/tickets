@@ -89,6 +89,7 @@ defmodule BackendWeb.Router do
 
     post "/events/:event_id/passes/validate", PassController, :validate
 
+    get "/organizations/:id", OrganizationController, :show
     patch "/organizations/:id", OrganizationController, :update
     delete "/organizations/:id", OrganizationController, :delete
 
@@ -114,6 +115,16 @@ defmodule BackendWeb.Router do
     # are rejected by the Invitations context with :forbidden.
     post "/invitations", InvitationController, :create
     get "/invitations", InvitationController, :index
+  end
+
+  # ---------------------------------------------------------------------------
+  # Authenticated — admin only
+  # ---------------------------------------------------------------------------
+  scope "/api/v1", BackendWeb do
+    pipe_through [:api, :authenticated, :admin]
+
+    get "/admin/users", AdminUserController, :index
+    post "/admin/users/:id/impersonate", AdminUserController, :impersonate
   end
 
   # ---------------------------------------------------------------------------
