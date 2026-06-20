@@ -10,9 +10,10 @@ defmodule Backend.Invitations do
       sent, the role is `"leader"`, and the new user becomes the leader once
       they accept.
 
-    * **Leader → new participant**: a leader invites someone to their own
-      organization. The role is `"participant"`. Participants cannot invite
-      others, so a leader is always the inviter on this branch.
+    * **Leader/participant → new participant**: any manager (a `"leader"` or
+      `"participant"` member) invites someone to their own organization. The
+      role is `"participant"` (or scan-only `"staff"`). Scan-only `"staff"`
+      members are not managers and cannot invite.
 
   Acceptance is consumed via a 24-hour tokenized link:
   `accept_invitation/1` validates the token and delegates to
@@ -38,11 +39,13 @@ defmodule Backend.Invitations do
     * admin — `"organization_name"` is optional. When omitted (or blank), the
       new org is named `"<email-local-part>'s Org"`; the new leader can
       rename it via `PATCH /api/v1/organizations/:id` after accepting.
-    * leader — `"organization_id"` (optional if they lead exactly one org).
+    * leader/participant — `"organization_id"` (optional if they manage exactly
+      one org).
 
   Returns `{:error, :forbidden}` if the inviter is neither an admin nor a
-  leader of some organization, `{:error, :organization_id_required}` if a
-  leader has multiple orgs and didn't pass one, `{:error, :already_invited}`
+  manager (leader/participant) of some organization,
+  `{:error, :organization_id_required}` if a manager has multiple orgs and
+  didn't pass one, `{:error, :already_invited}`
   if a pending invitation for the same email already exists, and
   `{:error, :already_member}` if the email belongs to an existing user who is
   already in the target org.
@@ -77,21 +80,21 @@ defmodule Backend.Invitations do
     with {:ok, role} <- member_role(attrs) do
       case get_field(attrs, "organization_id") do
         nil ->
-          case Organizations.list_led_by(inviter.id) do
+          case Organizations.list_managed_by(inviter.id) do
             [org] -> {:ok, org.id, role}
             [] -> {:error, :forbidden}
             _ -> {:error, :organization_id_required}
           end
 
         org_id ->
-          if Organizations.leader?(inviter.id, org_id),
+          if Organizations.can_manage?(inviter.id, org_id),
             do: {:ok, org_id, role},
             else: {:error, :forbidden}
       end
     end
   end
 
-  # A leader may invite a `participant` (full management) or scan-only `staff`,
+  # A manager may invite a `participant` (full management) or scan-only `staff`,
   # never another `leader`. Defaults to `participant` when the caller omits role.
   defp member_role(attrs) do
     case get_field(attrs, "role") do
@@ -152,8 +155,8 @@ defmodule Backend.Invitations do
   Returns invitations relevant to `user`, newest first.
 
     * Admin: invitations they themselves sent.
-    * Leader: every invitation issued for any org they lead, regardless of
-      which leader sent it.
+    * Manager (leader/participant): every invitation issued for any org they
+      manage, regardless of which manager sent it.
     * Anyone else: invitations they personally sent (typically empty).
   """
   def list_invitations(%{role: "admin"} = user) do
@@ -165,11 +168,11 @@ defmodule Backend.Invitations do
   end
 
   def list_invitations(user) do
-    led_org_ids = Organizations.list_led_by(user.id) |> Enum.map(& &1.id)
+    managed_org_ids = Organizations.list_managed_by(user.id) |> Enum.map(& &1.id)
 
     Repo.all(
       from i in Invitation,
-        where: i.inviter_id == ^user.id or i.organization_id in ^led_org_ids,
+        where: i.inviter_id == ^user.id or i.organization_id in ^managed_org_ids,
         order_by: [desc: i.inserted_at]
     )
   end

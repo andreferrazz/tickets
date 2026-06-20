@@ -33,6 +33,16 @@ defmodule BackendWeb.InvitationControllerTest do
     {auth, user, org}
   end
 
+  # A member of an existing org with the given org `role`. The global role is
+  # `creator` so the request clears the :creator pipeline and we actually
+  # exercise the invitation authorization (participant may invite, staff may not).
+  defp member_conn(conn, role) do
+    {_leader_auth, _leader, org} = leader_conn(conn)
+    {auth, user} = authed_conn(conn, "creator")
+    {:ok, _} = Organizations.add_member(org.id, user.id, role)
+    {auth, user, org}
+  end
+
   describe "POST /api/v1/invitations" do
     test "admin sends a leader invitation that creates a new organization",
          %{conn: conn} do
@@ -83,6 +93,32 @@ defmodule BackendWeb.InvitationControllerTest do
       resp = json_response(conn, 201)
       assert resp["role"] == "participant"
       assert resp["organization_id"] == org.id
+    end
+
+    test "participant invites a participant to their org", %{conn: conn} do
+      {auth, _user, org} = member_conn(conn, "participant")
+
+      conn =
+        post(auth, "/api/v1/invitations", %{
+          email: "byparticipant@example.com",
+          organization_id: org.id
+        })
+
+      resp = json_response(conn, 201)
+      assert resp["role"] == "participant"
+      assert resp["organization_id"] == org.id
+    end
+
+    test "scan-only staff cannot invite", %{conn: conn} do
+      {auth, _user, org} = member_conn(conn, "staff")
+
+      conn =
+        post(auth, "/api/v1/invitations", %{
+          email: "nope@example.com",
+          organization_id: org.id
+        })
+
+      assert json_response(conn, 403)
     end
 
     test "creator with no org gets 403", %{conn: conn} do

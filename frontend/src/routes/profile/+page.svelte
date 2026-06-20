@@ -71,7 +71,7 @@
 								<span class="badge" class:leader={m.role === 'leader'}
 									>{roleLabel(m.role)}</span
 								>
-								{#if m.role === 'leader'}
+								{#if m.role === 'leader' || m.role === 'participant'}
 									<a class="manage" href="/organizations/{m.id}/invitations"
 										>{t('profile.orgs.manageInvites')}</a
 									>

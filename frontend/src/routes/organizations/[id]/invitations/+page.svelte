@@ -10,7 +10,7 @@
 
 	const orgId = $derived(page.params.id);
 
-	let leadership = $state<OrganizationMembership | null>(null);
+	let membership = $state<OrganizationMembership | null>(null);
 	let invitations = $state<Invitation[]>([]);
 	let members = $state<OrgMember[]>([]);
 	let loading = $state(true);
@@ -22,6 +22,8 @@
 	let memberError = $state<string | null>(null);
 
 	const visible = $derived(invitations.filter((i) => i.organization_id === orgId));
+	// Member list / role changes stay leader-only; participants manage invites only.
+	const isLeader = $derived(membership?.role === 'leader');
 
 	async function reload() {
 		invitations = await api.listInvitations();
@@ -38,13 +40,16 @@
 		}
 		try {
 			const memberships = await auth.loadMemberships(true);
-			const m = memberships.find((row) => row.id === orgId && row.role === 'leader');
+			const m = memberships.find(
+				(row) => row.id === orgId && (row.role === 'leader' || row.role === 'participant')
+			);
 			if (!m) {
 				await goto('/');
 				return;
 			}
-			leadership = m;
-			await Promise.all([reload(), reloadMembers()]);
+			membership = m;
+			await reload();
+			if (m.role === 'leader') await reloadMembers();
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : t('invitations.errorFallback');
 		} finally {
@@ -83,8 +88,8 @@
 	}
 </script>
 
-{#if leadership}
-	<h1>{t('orgInvitations.title', { org: leadership.name })}</h1>
+{#if membership}
+	<h1>{t('orgInvitations.title', { org: membership.name })}</h1>
 	<p class="muted">{t('orgInvitations.subtitle')}</p>
 
 	<form onsubmit={send} class="card stack" style="margin: 1rem 0;">
@@ -111,34 +116,36 @@
 		{/if}
 	</form>
 
-	<h2>{t('orgMembers.title')}</h2>
-	{#if memberError}
-		<div class="error">{memberError}</div>
-	{/if}
-	{#if members.length === 0}
-		<p class="muted">{t('common.loading')}</p>
-	{:else}
-		<div class="stack">
-			{#each members as m (m.user_id)}
-				<div class="line card">
-					<div>
-						<strong>{m.email}</strong>
+	{#if isLeader}
+		<h2>{t('orgMembers.title')}</h2>
+		{#if memberError}
+			<div class="error">{memberError}</div>
+		{/if}
+		{#if members.length === 0}
+			<p class="muted">{t('common.loading')}</p>
+		{:else}
+			<div class="stack">
+				{#each members as m (m.user_id)}
+					<div class="line card">
+						<div>
+							<strong>{m.email}</strong>
+						</div>
+						{#if m.role === 'leader'}
+							<span class="badge leader">{t('profile.orgs.roleLeader')}</span>
+						{:else}
+							<select
+								value={m.role}
+								aria-label={t('orgMembers.roleLabel')}
+								onchange={(e) => changeRole(m, e.currentTarget.value as OrgRole)}
+							>
+								<option value="participant">{t('profile.orgs.roleParticipant')}</option>
+								<option value="staff">{t('profile.orgs.roleStaff')}</option>
+							</select>
+						{/if}
 					</div>
-					{#if m.role === 'leader'}
-						<span class="badge leader">{t('profile.orgs.roleLeader')}</span>
-					{:else}
-						<select
-							value={m.role}
-							aria-label={t('orgMembers.roleLabel')}
-							onchange={(e) => changeRole(m, e.currentTarget.value as OrgRole)}
-						>
-							<option value="participant">{t('profile.orgs.roleParticipant')}</option>
-							<option value="staff">{t('profile.orgs.roleStaff')}</option>
-						</select>
-					{/if}
-				</div>
-			{/each}
-		</div>
+				{/each}
+			</div>
+		{/if}
 	{/if}
 
 	{#if loading}
