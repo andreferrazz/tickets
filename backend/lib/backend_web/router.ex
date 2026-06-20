@@ -118,6 +118,16 @@ defmodule BackendWeb.Router do
   end
 
   # ---------------------------------------------------------------------------
+  # Authenticated — admin only
+  # ---------------------------------------------------------------------------
+  scope "/api/v1", BackendWeb do
+    pipe_through [:api, :authenticated, :admin]
+
+    get "/admin/users", AdminUserController, :index
+    post "/admin/users/:id/impersonate", AdminUserController, :impersonate
+  end
+
+  # ---------------------------------------------------------------------------
   # Webhooks — no session auth, HMAC validated in controller
   # ---------------------------------------------------------------------------
   scope "/webhooks", BackendWeb do

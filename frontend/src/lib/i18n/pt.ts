@@ -5,6 +5,7 @@ export const pt = {
 	'nav.newEvent': '+ Novo evento',
 	'nav.scan': 'Validar',
 	'nav.invitations': 'Convites',
+	'nav.users': 'Usuários',
 	'nav.logout': 'Sair',
 	'nav.login': 'Entrar',
 	'nav.openMenu': 'Abrir menu',
@@ -353,6 +354,24 @@ export const pt = {
 	'invitations.empty': 'Nenhum convite enviado ainda.',
 	'invitations.errorFallback': 'Falha ao carregar',
 	'invitations.sendErrorFallback': 'Falha ao enviar',
+
+	// Admin: user list + impersonation ("log in as user") links
+	'adminUsers.title': 'Usuários',
+	'adminUsers.subtitle': 'Gere um link para acessar a conta de um usuário.',
+	'adminUsers.searchPlaceholder': 'Filtrar por nome ou e-mail...',
+	'adminUsers.copyLink': 'Copiar link de acesso',
+	'adminUsers.copying': 'Gerando...',
+	'adminUsers.copied': 'Link copiado!',
+	'adminUsers.empty': 'Nenhum usuário encontrado.',
+	'adminUsers.noName': '(sem nome)',
+	'adminUsers.errorFallback': 'Falha ao carregar usuários.',
+	'adminUsers.copyErrorFallback': 'Falha ao gerar o link.',
+
+	// Impersonation link consumer (/auth/impersonate)
+	'impersonate.loading': 'Entrando...',
+	'impersonate.errorTitle': 'Link inválido',
+	'impersonate.errorFallback': 'Não foi possível acessar com este link.',
+	'impersonate.goLogin': 'Ir para o login',
 
 	// Org-scoped invitations (leader inviting participants to their org)
 	'orgInvitations.title': 'Convidar para {org}',

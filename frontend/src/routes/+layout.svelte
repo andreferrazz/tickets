@@ -79,6 +79,7 @@
 				{/if}
 				{#if auth.isAdmin}
 					<a href="/admin/invitations">{t('nav.invitations')}</a>
+					<a href="/admin/users">{t('nav.users')}</a>
 				{/if}
 				<a href="/profile" class="who">{auth.user?.email}</a>
 				<button class="secondary small" onclick={logout}>{t('nav.logout')}</button>
