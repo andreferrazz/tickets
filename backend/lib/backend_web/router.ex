@@ -89,6 +89,7 @@ defmodule BackendWeb.Router do
 
     post "/events/:event_id/passes/validate", PassController, :validate
 
+    get "/organizations/:id", OrganizationController, :show
     patch "/organizations/:id", OrganizationController, :update
     delete "/organizations/:id", OrganizationController, :delete
 

@@ -201,6 +201,8 @@ export const api = {
 		}),
 	acceptInvitation: (token: string) =>
 		request<AuthResponse>('/invitations/accept', { method: 'POST', body: { token } }),
+	getOrganization: (id: string, fetcher?: typeof fetch) =>
+		request<Organization>(`/organizations/${id}`, { fetcher }),
 	updateOrganization: (id: string, body: { name: string }) =>
 		request<Organization>(`/organizations/${id}`, { method: 'PATCH', body }),
 	deleteOrganization: (id: string) =>

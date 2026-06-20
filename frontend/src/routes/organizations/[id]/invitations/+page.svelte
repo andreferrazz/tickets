@@ -43,13 +43,18 @@
 			const m = memberships.find(
 				(row) => row.id === orgId && (row.role === 'leader' || row.role === 'participant')
 			);
-			if (!m) {
+			if (m) {
+				membership = m;
+			} else if (auth.isAdmin) {
+				// Admins have no membership row; fetch the org for its name and act as leader.
+				const org = await api.getOrganization(orgId!);
+				membership = { id: org.id, name: org.name, role: 'leader' };
+			} else {
 				await goto('/');
 				return;
 			}
-			membership = m;
 			await reload();
-			if (m.role === 'leader') await reloadMembers();
+			if (membership.role === 'leader') await reloadMembers();
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : t('invitations.errorFallback');
 		} finally {

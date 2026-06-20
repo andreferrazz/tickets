@@ -26,6 +26,36 @@ defmodule BackendWeb.OrganizationControllerTest do
     {auth, user, org}
   end
 
+  describe "GET /api/v1/organizations/:id" do
+    test "leader fetches their org", %{conn: conn} do
+      {auth, _user, org} = leader_setup(conn)
+      conn = get(auth, "/api/v1/organizations/#{org.id}")
+      assert json_response(conn, 200)["name"] == org.name
+    end
+
+    test "admin can fetch any org", %{conn: conn} do
+      {_, _, org} = leader_setup(conn)
+      {admin_conn, _} = authed_conn(conn, "admin")
+
+      conn = get(admin_conn, "/api/v1/organizations/#{org.id}")
+      assert json_response(conn, 200)["id"] == org.id
+    end
+
+    test "non-member non-admin gets 403", %{conn: conn} do
+      {_, _, org} = leader_setup(conn)
+      {outsider_auth, _} = authed_conn(conn, "creator")
+
+      conn = get(outsider_auth, "/api/v1/organizations/#{org.id}")
+      assert %{"error" => _} = json_response(conn, 403)
+    end
+
+    test "returns 404 for unknown org", %{conn: conn} do
+      {admin_conn, _} = authed_conn(conn, "admin")
+      conn = get(admin_conn, "/api/v1/organizations/#{Ecto.UUID.generate()}")
+      assert %{"error" => _} = json_response(conn, 404)
+    end
+  end
+
   describe "PATCH /api/v1/organizations/:id" do
     test "leader renames their org", %{conn: conn} do
       {auth, _user, org} = leader_setup(conn)
