@@ -173,6 +173,7 @@ export const pt = {
 	'dashboard.ticketBuyers': 'Compradores · {name}',
 	'dashboard.withdraw': 'Sacar dinheiro',
 	'dashboard.scanTickets': 'Validar ingressos',
+	'dashboard.manageInvitations': 'Gerenciar convites',
 
 	// Ticket scanning / check-in
 	'scan.title': 'Validar ingressos',

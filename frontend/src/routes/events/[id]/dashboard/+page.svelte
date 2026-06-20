@@ -63,7 +63,15 @@
 {:else}
 	<header class="head">
 		<h1>{t('dashboard.title')}</h1>
-		<a href="/events/{stats.event_id}" class="btn secondary small">←</a>
+		<div class="head-actions">
+			<a
+				href="/organizations/{stats.organization.id}/invitations"
+				class="btn secondary small"
+			>
+				{t('dashboard.manageInvitations')}
+			</a>
+			<a href="/events/{stats.event_id}" class="btn secondary small">←</a>
+		</div>
 	</header>
 
 	<section class="kpis">
@@ -246,6 +254,11 @@
 		justify-content: space-between;
 		align-items: center;
 		margin: 1rem 0 1.5rem;
+	}
+	.head-actions {
+		display: flex;
+		gap: 0.5rem;
+		align-items: center;
 	}
 	.kpis {
 		display: grid;
