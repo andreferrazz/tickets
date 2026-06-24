@@ -65,6 +65,7 @@ async function request<T>(path: string, opts: FetchOptions = {}): Promise<T> {
 		body: opts.body === undefined ? undefined : JSON.stringify(opts.body)
 	});
 	if (!res.ok) {
+		if (res.status === 401 && auth.token) auth.clear(); // stale/expired/revoked session
 		let msg = `${res.status}`;
 		let fieldErrors: FieldErrors | undefined;
 		try {
