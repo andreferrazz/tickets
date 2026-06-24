@@ -79,16 +79,15 @@
 
 	onMount(async () => {
 		try {
-			const [loaded] = await Promise.all([
-				api.getEvent(page.params.id!),
-				auth.isAuthed ? auth.loadMemberships() : Promise.resolve()
-			]);
-			event = loaded;
+			event = await api.getEvent(page.params.id!);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : t('event.errorFallback');
 		} finally {
 			loading = false;
 		}
+		// Best-effort: memberships only gate the edit affordance (canEdit) and must never
+		// block viewing a public event. A stale token is cleared globally in request().
+		if (auth.isAuthed) void auth.loadMemberships().catch(() => {});
 	});
 
 	function bump(key: string, delta: number, max: number) {
