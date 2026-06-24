@@ -2,8 +2,14 @@
 <html lang="pt-BR">
   <body style="font-family: sans-serif; color: #222;">
     <h1>Seus ingressos — <%= event_title %></h1>
-    <p>Seu pagamento foi confirmado. 🎉</p>
-    <p>Apresente o QR Code abaixo na entrada do evento. Cada ingresso tem seu próprio código.</p>
+    <p>Olá! Seu pagamento para o nosso Arraiá foi confirmado com sucesso! 🎉</p>
+    <p>Apresente o QR Code abaixo na entrada do evento. Cada ingresso possui um código exclusivo.</p>
+    <p>
+      <strong>Local:</strong> CEAL - Rua Itaberá, 1012, Santa Efigênia, Belo Horizonte/MG - CEP 30260-320<br />
+      (Entrada pela quadra da CEAL)<br />
+      <strong>Data:</strong> 12 de julho<br />
+      <strong>Horário:</strong> das 16h às 19h
+    </p>
 
     <%= for pass <- passes do %>
       <div style="border:1px solid #ccc;padding:16px;margin:16px 0;border-radius:8px;">
@@ -15,6 +21,6 @@
     <p>Detalhes do pedido:
       <a href="<%= order_url %>"><%= order_url %></a>
     </p>
-    <p style="color:#888;">— Equipe Tickets</p>
+    <p>Te vejo lá! 🌽🍿</p>
   </body>
 </html>

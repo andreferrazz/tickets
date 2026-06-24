@@ -162,9 +162,18 @@ defmodule Backend.Mailer do
 
   defp tickets_text_fallback(order, passes) do
     """
-    Seus ingressos para #{order.event_title} estão neste email.
-    Quantidade: #{length(passes)}.
+    Olá! Seu pagamento para o nosso Arraiá foi confirmado com sucesso! 🎉
+
+    Apresente o QR Code abaixo na entrada do evento. Cada ingresso possui um código exclusivo.
+    Local: CEAL - Rua Itaberá, 1012, Santa Efigênia, Belo Horizonte/MG - CEP 30260-320
+    (Entrada pela quadra da CEAL)
+    Data: 12 de julho
+    Horário: das 16h às 19h
+
+    Seus ingressos para #{order.event_title} estão neste email. Quantidade: #{length(passes)}.
     Detalhes: #{order_url(order)}
+
+    Te vejo lá! 🌽🍿
     """
   end
 
