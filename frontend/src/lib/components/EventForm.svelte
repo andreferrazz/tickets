@@ -17,8 +17,8 @@
 	let location = $state(initial.location ?? '');
 	let starts_at = $state(initial.starts_at ? toLocalInputValue(initial.starts_at) : '');
 	let cover_image_url = $state(initial.cover_image_url ?? '');
-	let status = $state<'draft' | 'published'>(
-		initial.status === 'published' ? 'published' : 'draft'
+	let status = $state<'draft' | 'published' | 'closed'>(
+		initial.status === 'published' || initial.status === 'closed' ? initial.status : 'draft'
 	);
 	let seat_selection_enabled = $state<boolean>(initial.seat_selection_enabled ?? false);
 	let seats_per_table = $state<number | undefined>(initial.seats_per_table ?? undefined);
@@ -79,6 +79,7 @@
 		<select id="status" bind:value={status}>
 			<option value="draft">{t('eventForm.draft')}</option>
 			<option value="published">{t('eventForm.published')}</option>
+			<option value="closed">{t('eventForm.closed')}</option>
 		</select>
 	</div>
 	<div class="seats">

@@ -38,7 +38,7 @@ defmodule Backend.Events do
   @doc """
   Returns events visible to `user`, ordered by start time.
 
-  Anonymous (`nil`) and buyers see only published events. Creators
+  Anonymous (`nil`) and buyers see only published and closed events. Creators
   additionally see their own drafts/cancelled events. Admins see everything.
   Soft-deleted events are never returned.
   """
@@ -57,7 +57,7 @@ defmodule Backend.Events do
       from e in Event,
         where:
           is_nil(e.deleted_at) and
-            (e.status == "published" or e.organization_id in ^org_ids),
+            (e.status in ["published", "closed"] or e.organization_id in ^org_ids),
         order_by: [asc: e.starts_at]
     )
   end
@@ -67,7 +67,7 @@ defmodule Backend.Events do
 
     Repo.all(
       from e in Event,
-        where: is_nil(e.deleted_at) and e.status == "published",
+        where: is_nil(e.deleted_at) and e.status in ["published", "closed"],
         order_by: [asc: e.starts_at]
     )
   end

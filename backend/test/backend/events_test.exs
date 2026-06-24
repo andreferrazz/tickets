@@ -38,6 +38,17 @@ defmodule Backend.EventsTest do
     event
   end
 
+  defp closed_event(user) do
+    {:ok, event} =
+      Events.create_event(user, %{
+        "title" => "Closed Event",
+        "starts_at" => "2027-01-01T10:00:00Z",
+        "status" => "closed"
+      })
+
+    event
+  end
+
   # ---------------------------------------------------------------------------
   # Events CRUD
   # ---------------------------------------------------------------------------
@@ -69,13 +80,23 @@ defmodule Backend.EventsTest do
   end
 
   describe "list_events/0" do
-    test "returns only published events" do
+    test "returns published and closed events to anonymous users" do
       user = creator_user()
       published_event(user)
+      closed_event(user)
       Events.create_event(user, %{"title" => "Draft", "starts_at" => "2027-01-01T00:00:00Z"})
 
-      events = Events.list_events()
-      assert Enum.all?(events, &(&1.status == "published"))
+      statuses = Events.list_events() |> Enum.map(& &1.status) |> Enum.uniq() |> Enum.sort()
+      assert statuses == ["closed", "published"]
+    end
+
+    test "shows closed events to buyers who do not own them" do
+      owner = creator_user()
+      closed = closed_event(owner)
+      buyer = buyer_user()
+
+      ids = buyer |> Events.list_events() |> Enum.map(& &1.id)
+      assert closed.id in ids
     end
   end
 

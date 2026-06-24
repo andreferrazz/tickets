@@ -9,16 +9,17 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let query = $state('');
+	// Closed events are returned by the API but hidden until the user opts in.
+	let showClosed = $state(false);
 
-	const filtered = $derived(
-		query
-			? events.filter(
-					(e) =>
-						e.title.toLowerCase().includes(query.toLowerCase()) ||
-						e.location.toLowerCase().includes(query.toLowerCase())
-				)
-			: events
-	);
+	const filtered = $derived.by(() => {
+		const q = query.toLowerCase();
+		return events.filter((e) => {
+			if (!showClosed && e.status === 'closed') return false;
+			if (!q) return true;
+			return e.title.toLowerCase().includes(q) || e.location.toLowerCase().includes(q);
+		});
+	});
 
 	onMount(async () => {
 		try {
@@ -39,6 +40,11 @@
 <div class="search-bar">
 	<input placeholder={t('home.searchPlaceholder')} bind:value={query} />
 </div>
+
+<label class="check show-closed">
+	<input type="checkbox" bind:checked={showClosed} />
+	{t('home.showClosed')}
+</label>
 
 {#if loading}
 	<p class="muted">{t('common.loading')}</p>
@@ -73,7 +79,21 @@
 		margin: 1.5rem 0;
 	}
 	.search-bar {
+		margin-bottom: 0.75rem;
+	}
+	.show-closed {
 		margin-bottom: 1rem;
+	}
+	.check {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		white-space: nowrap;
+		color: var(--muted);
+		font-size: 0.875rem;
+	}
+	.check input {
+		width: auto;
 	}
 	.grid {
 		display: grid;

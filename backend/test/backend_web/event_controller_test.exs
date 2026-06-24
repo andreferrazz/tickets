@@ -175,6 +175,21 @@ defmodule BackendWeb.EventControllerTest do
       assert json_response(conn, 200)["title"] == "PublicShow"
     end
 
+    test "anonymous user gets 200 for closed event", %{conn: conn} do
+      {creator_conn, user} = authed_conn(conn, "creator")
+      _ = creator_conn
+
+      {:ok, event} =
+        Events.create_event(user, %{
+          "title" => "ClosedShow",
+          "starts_at" => "2027-01-05T00:00:00Z",
+          "status" => "closed"
+        })
+
+      conn = get(conn, "/api/v1/events/#{event.id}")
+      assert json_response(conn, 200)["title"] == "ClosedShow"
+    end
+
     test "anonymous user gets 404 for draft event", %{conn: conn} do
       {creator_conn, user} = authed_conn(conn, "creator")
       _ = creator_conn

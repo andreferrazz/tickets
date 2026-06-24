@@ -163,6 +163,23 @@ defmodule Backend.OrdersTest do
                ])
     end
 
+    test "returns event_not_available for closed event" do
+      creator = make_creator()
+      buyer = make_buyer()
+
+      {:ok, event} =
+        Events.create_event(creator, %{
+          "title" => "Closed",
+          "starts_at" => "2027-01-01T00:00:00Z",
+          "status" => "closed"
+        })
+
+      assert {:error, :event_not_available} =
+               Orders.create_order(buyer, event.id, [
+                 %{"item_type" => "ticket", "item_id" => Ecto.UUID.generate(), "quantity" => 1}
+               ])
+    end
+
     test "returns no_items for empty cart" do
       creator = make_creator()
       buyer = make_buyer()

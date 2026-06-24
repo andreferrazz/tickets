@@ -77,6 +77,9 @@
 		!!auth.isCreator && !!event && auth.canManageOrg(event.organization_id)
 	);
 
+	// Closed events stay viewable but no longer sell: block cart edits and checkout.
+	const isClosed = $derived(event?.status === 'closed');
+
 	onMount(async () => {
 		try {
 			event = await api.getEvent(page.params.id!);
@@ -91,6 +94,7 @@
 	});
 
 	function bump(key: string, delta: number, max: number) {
+		if (isClosed) return;
 		const cur = qty[key] ?? 0;
 		const next = Math.max(0, Math.min(max, cur + delta));
 		qty = { ...qty, [key]: next };
@@ -106,7 +110,7 @@
 	}
 
 	async function buy() {
-		if (!event || lines.length === 0) return;
+		if (!event || isClosed || lines.length === 0) return;
 		if (!seatsReady) return;
 		if (!auth.isAuthed || !auth.user?.profile_complete) {
 			const ok = await requestLogin();
@@ -211,11 +215,13 @@
 									<div class="qty">
 										<button
 											class="secondary small"
+											disabled={isClosed}
 											onclick={() => bump(`t:${tk.id}`, -1, remaining)}>−</button
 										>
 										<span>{qty[`t:${tk.id}`] ?? 0}</span>
 										<button
 											class="secondary small"
+											disabled={isClosed}
 											onclick={() => bump(`t:${tk.id}`, 1, remaining)}>+</button
 										>
 									</div>
@@ -263,13 +269,13 @@
 									<div class="qty">
 										<button
 											class="secondary small"
-											disabled={remaining === 0}
+											disabled={isClosed || remaining === 0}
 											onclick={() => bump(`x:${x.id}`, -1, remaining)}>−</button
 										>
 										<span>{qty[`x:${x.id}`] ?? 0}</span>
 										<button
 											class="secondary small"
-											disabled={remaining === 0}
+											disabled={isClosed || remaining === 0}
 											onclick={() => bump(`x:${x.id}`, 1, remaining)}>+</button
 										>
 									</div>
@@ -322,10 +328,13 @@
 					<span>{t('common.total')}</span>
 					<strong>{formatBRL(total)}</strong>
 				</div>
+				{#if isClosed}
+					<div class="notice">{t('event.salesClosed')}</div>
+				{/if}
 				{#if buyError}
 					<div class="error">{buyError}</div>
 				{/if}
-				<button disabled={lines.length === 0 || !seatsReady || busy} onclick={buy}>
+				<button disabled={isClosed || lines.length === 0 || !seatsReady || busy} onclick={buy}>
 					{busy ? t('event.buying') : t('event.buy')}
 				</button>
 			</aside>
