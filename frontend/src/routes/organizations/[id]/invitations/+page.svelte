@@ -5,6 +5,7 @@
 	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
+	import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';
 	import type { Invitation, OrganizationMembership, OrgMember, OrgRole } from '$lib/types';
 	import { onMount } from 'svelte';
 
@@ -22,8 +23,11 @@
 	let memberError = $state<string | null>(null);
 
 	const visible = $derived(invitations.filter((i) => i.organization_id === orgId));
-	// Member list / role changes stay leader-only; participants manage invites only.
-	const isLeader = $derived(membership?.role === 'leader');
+	// Managers (leader + participant) see the member list and may change roles and
+	// remove members. The leader row is protected; staff manage nothing.
+	const isManager = $derived(
+		membership?.role === 'leader' || membership?.role === 'participant'
+	);
 
 	async function reload() {
 		invitations = await api.listInvitations();
@@ -54,7 +58,7 @@
 				return;
 			}
 			await reload();
-			if (membership.role === 'leader') await reloadMembers();
+			if (isManager) await reloadMembers();
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : t('invitations.errorFallback');
 		} finally {
@@ -91,6 +95,25 @@
 			await reloadMembers();
 		}
 	}
+
+	// Removes a non-leader member. Hidden on the caller's own row, so this never
+	// removes the acting user; the backend rejects self- and leader-removal too.
+	async function removeMember(member: OrgMember) {
+		const ok = await confirmDialog({
+			message: t('orgMembers.removeConfirm', { email: member.email }),
+			confirmText: t('orgMembers.remove'),
+			danger: true
+		});
+		if (!ok) return;
+		memberError = null;
+		try {
+			await api.removeMember(orgId!, member.user_id);
+			await reloadMembers();
+		} catch (e) {
+			memberError = e instanceof ApiError ? e.message : t('orgMembers.removeErrorFallback');
+			await reloadMembers();
+		}
+	}
 </script>
 
 {#if membership}
@@ -121,7 +144,7 @@
 		{/if}
 	</form>
 
-	{#if isLeader}
+	{#if isManager}
 		<h2>{t('orgMembers.title')}</h2>
 		{#if memberError}
 			<div class="error">{memberError}</div>
@@ -138,14 +161,21 @@
 						{#if m.role === 'leader'}
 							<span class="badge leader">{t('profile.orgs.roleLeader')}</span>
 						{:else}
-							<select
-								value={m.role}
-								aria-label={t('orgMembers.roleLabel')}
-								onchange={(e) => changeRole(m, e.currentTarget.value as OrgRole)}
-							>
-								<option value="participant">{t('profile.orgs.roleParticipant')}</option>
-								<option value="staff">{t('profile.orgs.roleStaff')}</option>
-							</select>
+							<div class="controls">
+								<select
+									value={m.role}
+									aria-label={t('orgMembers.roleLabel')}
+									onchange={(e) => changeRole(m, e.currentTarget.value as OrgRole)}
+								>
+									<option value="participant">{t('profile.orgs.roleParticipant')}</option>
+									<option value="staff">{t('profile.orgs.roleStaff')}</option>
+								</select>
+								{#if m.user_id !== auth.user?.id}
+									<button type="button" class="danger" onclick={() => removeMember(m)}>
+										{t('orgMembers.remove')}
+									</button>
+								{/if}
+							</div>
 						{/if}
 					</div>
 				{/each}
@@ -186,6 +216,11 @@
 	}
 	.small {
 		font-size: 0.85rem;
+	}
+	.controls {
+		display: flex;
+		gap: 0.5rem;
+		align-items: center;
 	}
 	.row :global(input) {
 		flex: 1;

@@ -11,9 +11,10 @@ defmodule Backend.Organizations do
       accepts them, but `can_manage?/2` is false so they cannot touch events,
       orders, or the org itself.
 
-  Only the leader can invite new members, change member roles, or delete the
-  organization. Admin users are not members of any organization and bypass these
-  checks via their global role.
+  Only the leader can invite new members or delete the organization, but leaders
+  and participants (managers, see `can_manage?/2`) may change member roles and
+  remove members. Admin users are not members of any organization and bypass
+  these checks via their global role.
   """
 
   import Ecto.Query
@@ -222,6 +223,27 @@ defmodule Backend.Organizations do
   end
 
   def set_member_role(_organization_id, _target_user_id, _new_role), do: {:error, :forbidden}
+
+  @doc """
+  Removes `target_user_id` from `organization_id`. Manager-only mutation — the
+  caller must already be authorized (leader or participant). Refuses with
+  `{:error, :forbidden}` when the target is the `leader` (use
+  `transfer_leadership/3` / `delete_organization/2` instead) and
+  `{:error, :not_found}` when `target_user_id` is not a member.
+  """
+  def remove_member(organization_id, target_user_id)
+      when is_binary(organization_id) and is_binary(target_user_id) do
+    case Repo.one(
+           from m in Membership,
+             where: m.organization_id == ^organization_id and m.user_id == ^target_user_id
+         ) do
+      nil -> {:error, :not_found}
+      %Membership{role: "leader"} -> {:error, :forbidden}
+      %Membership{} = membership -> Repo.delete(membership)
+    end
+  end
+
+  def remove_member(_organization_id, _target_user_id), do: {:error, :forbidden}
 
   @doc "Returns true if `user_id` belongs to `organization_id` (any role)."
   def member?(user_id, organization_id) when is_binary(user_id) and is_binary(organization_id) do

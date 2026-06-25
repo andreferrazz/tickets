@@ -381,11 +381,14 @@ export const pt = {
 	'orgInvitations.subtitle':
 		'Envie um link de convite e escolha se a pessoa entra como participante ou apenas para validar ingressos.',
 
-	// Org team management (leader changing member roles)
+	// Org team management (leaders and participants changing roles / removing members)
 	'orgMembers.title': 'Membros',
 	'orgMembers.roleLabel': 'Função',
 	'orgMembers.roleHint': 'Validadores só podem validar ingressos; participantes gerenciam o evento.',
 	'orgMembers.changeErrorFallback': 'Falha ao alterar a função.',
+	'orgMembers.remove': 'Remover',
+	'orgMembers.removeConfirm': 'Remover {email} da organização?',
+	'orgMembers.removeErrorFallback': 'Falha ao remover o membro.',
 
 	// Profile
 	'profile.title': 'Perfil',

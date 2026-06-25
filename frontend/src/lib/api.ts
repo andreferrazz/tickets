@@ -200,6 +200,8 @@ export const api = {
 			method: 'PATCH',
 			body: { role }
 		}),
+	removeMember: (orgId: string, userId: string) =>
+		request<void>(`/organizations/${orgId}/members/${userId}`, { method: 'DELETE' }),
 	acceptInvitation: (token: string) =>
 		request<AuthResponse>('/invitations/accept', { method: 'POST', body: { token } }),
 	listUsers: (fetcher?: typeof fetch) => request<User[]>('/admin/users', { fetcher }),
