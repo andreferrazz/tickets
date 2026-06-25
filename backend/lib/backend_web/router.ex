@@ -95,6 +95,7 @@ defmodule BackendWeb.Router do
 
     get "/organizations/:id/members", MembershipController, :index
     patch "/organizations/:id/members/:user_id", MembershipController, :update
+    delete "/organizations/:id/members/:user_id", MembershipController, :delete
   end
 
   # ---------------------------------------------------------------------------

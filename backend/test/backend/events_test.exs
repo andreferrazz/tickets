@@ -38,6 +38,17 @@ defmodule Backend.EventsTest do
     event
   end
 
+  defp closed_event(user) do
+    {:ok, event} =
+      Events.create_event(user, %{
+        "title" => "Closed Event",
+        "starts_at" => "2027-01-01T10:00:00Z",
+        "status" => "closed"
+      })
+
+    event
+  end
+
   # ---------------------------------------------------------------------------
   # Events CRUD
   # ---------------------------------------------------------------------------
@@ -69,13 +80,23 @@ defmodule Backend.EventsTest do
   end
 
   describe "list_events/0" do
-    test "returns only published events" do
+    test "returns published and closed events to anonymous users" do
       user = creator_user()
       published_event(user)
+      closed_event(user)
       Events.create_event(user, %{"title" => "Draft", "starts_at" => "2027-01-01T00:00:00Z"})
 
-      events = Events.list_events()
-      assert Enum.all?(events, &(&1.status == "published"))
+      statuses = Events.list_events() |> Enum.map(& &1.status) |> Enum.uniq() |> Enum.sort()
+      assert statuses == ["closed", "published"]
+    end
+
+    test "shows closed events to buyers who do not own them" do
+      owner = creator_user()
+      closed = closed_event(owner)
+      buyer = buyer_user()
+
+      ids = buyer |> Events.list_events() |> Enum.map(& &1.id)
+      assert closed.id in ids
     end
   end
 
@@ -677,6 +698,61 @@ defmodule Backend.EventsTest do
       assert stats.totals.gross_revenue_cents == 5_000
       assert stats.totals.fees_cents == 80
       assert stats.totals.net_revenue_cents == 4_920
+    end
+
+    test "free order incurs no fee and doesn't reduce net revenue" do
+      creator = creator_user()
+      buyer = buyer_user()
+      event = published_event(creator)
+      {:ok, tt} = Events.create_ticket_type(creator, event.id, %{"name" => "Free"})
+
+      {:ok, _batch} =
+        Events.create_batch(creator, tt.id, %{"price_cents" => 0, "quantity_total" => 10})
+
+      # Free orders are finalized + marked paid inline, with no payment_method
+      # and no platform_fee_cents recorded.
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      assert order.status == "paid"
+
+      assert {:ok, stats} = Events.event_stats(creator, event.id)
+      assert stats.totals.orders_paid == 1
+      assert stats.totals.gross_revenue_cents == 0
+      assert stats.totals.fees_cents == 0
+      assert stats.totals.net_revenue_cents == 0
+    end
+
+    test "free order alongside a paid order only charges the paid order's fee" do
+      creator = creator_user()
+      buyer = buyer_user()
+      {event, paid_tt, _batch} = stats_event_with_ticket(creator)
+      {:ok, free_tt} = Events.create_ticket_type(creator, event.id, %{"name" => "Free"})
+
+      {:ok, _batch} =
+        Events.create_batch(creator, free_tt.id, %{"price_cents" => 0, "quantity_total" => 10})
+
+      {:ok, _free_order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => free_tt.id, "quantity" => 1}
+        ])
+
+      {:ok, paid_order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => paid_tt.id, "quantity" => 1}
+        ])
+
+      {:ok, _} =
+        Orders.mark_paid_by_checkout(paid_order.abacate_checkout_id, %{payment_method: "PIX"})
+
+      assert {:ok, stats} = Events.event_stats(creator, event.id)
+      assert stats.totals.orders_paid == 2
+      assert stats.totals.gross_revenue_cents == 5_000
+      # Only the paid PIX order's 80-cent fee — the free order contributes 0.
+      assert stats.totals.fees_cents == 80
+      assert stats.totals.net_revenue_cents == 5_000 - 80
     end
 
     test "admin can read another creator's stats" do

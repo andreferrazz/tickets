@@ -28,7 +28,7 @@ defmodule Backend.Events.Event do
     timestamps(type: :utc_datetime)
   end
 
-  @valid_statuses ~w(draft published cancelled)
+  @valid_statuses ~w(draft published cancelled closed)
 
   @doc "Changeset for creating a new event (requires organization_id)."
   def changeset(attrs) do

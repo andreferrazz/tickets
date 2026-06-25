@@ -17,6 +17,7 @@ export function tStatus(status: string): string {
 		draft: 'status.draft',
 		published: 'status.published',
 		cancelled: 'status.cancelled',
+		closed: 'status.closed',
 		pending: 'status.pending',
 		paid: 'status.paid',
 		expired: 'status.expired',

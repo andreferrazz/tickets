@@ -194,7 +194,8 @@ button.danger {
 	background: var(--tone-info-bg);
 	color: var(--tone-info-fg);
 }
-.badge.sold-out {
+.badge.sold-out,
+.badge.closed {
 	background: var(--tone-error-bg);
 	color: var(--tone-error-fg);
 }

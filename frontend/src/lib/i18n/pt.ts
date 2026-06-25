@@ -81,6 +81,7 @@ export const pt = {
 	'home.title': 'Próximos eventos',
 	'home.subtitle': 'Encontre ingressos e complementos para eventos perto de você.',
 	'home.searchPlaceholder': 'Buscar eventos...',
+	'home.showClosed': 'Mostrar eventos encerrados',
 	'home.noResults': 'Nenhum evento encontrado.',
 	'home.errorFallback': 'Falha ao carregar eventos',
 	'home.guestTitle': 'Entre para ver os eventos',
@@ -92,6 +93,7 @@ export const pt = {
 	'event.addons': 'Complementos',
 	'event.noTickets': 'Nenhum ingresso disponível.',
 	'event.soldOut': 'Esgotado',
+	'event.salesClosed': 'As vendas para este evento estão encerradas.',
 	'event.remainingCount': 'Restam {count}',
 	'event.orderSummary': 'Resumo do pedido',
 	'event.noItems': 'Nenhum item selecionado.',
@@ -247,6 +249,7 @@ export const pt = {
 	'eventForm.status': 'Status',
 	'eventForm.draft': 'Rascunho',
 	'eventForm.published': 'Publicado',
+	'eventForm.closed': 'Encerrado',
 	'eventForm.saveFailed': 'Falha ao salvar',
 	'eventForm.seatSelection': 'Permitir escolha de lugar (mesas)',
 	'eventForm.seatsPerTable': 'Lugares por mesa',
@@ -378,11 +381,14 @@ export const pt = {
 	'orgInvitations.subtitle':
 		'Envie um link de convite e escolha se a pessoa entra como participante ou apenas para validar ingressos.',
 
-	// Org team management (leader changing member roles)
+	// Org team management (leaders and participants changing roles / removing members)
 	'orgMembers.title': 'Membros',
 	'orgMembers.roleLabel': 'Função',
 	'orgMembers.roleHint': 'Validadores só podem validar ingressos; participantes gerenciam o evento.',
 	'orgMembers.changeErrorFallback': 'Falha ao alterar a função.',
+	'orgMembers.remove': 'Remover',
+	'orgMembers.removeConfirm': 'Remover {email} da organização?',
+	'orgMembers.removeErrorFallback': 'Falha ao remover o membro.',
 
 	// Profile
 	'profile.title': 'Perfil',
@@ -401,6 +407,7 @@ export const pt = {
 	'status.draft': 'Rascunho',
 	'status.published': 'Publicado',
 	'status.cancelled': 'Cancelado',
+	'status.closed': 'Encerrado',
 	'status.pending': 'Pendente',
 	'status.paid': 'Pago',
 	'status.expired': 'Expirado',

@@ -39,12 +39,25 @@ defmodule BackendWeb.MembershipControllerTest do
       assert roles[member.id] == "staff"
     end
 
-    test "non-leader members get 403", %{conn: conn} do
-      {_auth, _leader, org} = leader_setup(conn)
+    test "a participant can list members", %{conn: conn} do
+      {_auth, leader, org} = leader_setup(conn)
       {participant_auth, participant} = authed_conn(conn, "creator")
       {:ok, _} = Organizations.add_member(org.id, participant.id, "participant")
 
-      assert participant_auth
+      rows =
+        participant_auth |> get("/api/v1/organizations/#{org.id}/members") |> json_response(200)
+
+      ids = Enum.map(rows, & &1["user_id"])
+      assert leader.id in ids
+      assert participant.id in ids
+    end
+
+    test "a staff member gets 403", %{conn: conn} do
+      {_auth, _leader, org} = leader_setup(conn)
+      {staff_auth, staff} = authed_conn(conn, "buyer")
+      {:ok, _} = Organizations.add_member(org.id, staff.id, "staff")
+
+      assert staff_auth
              |> get("/api/v1/organizations/#{org.id}/members")
              |> json_response(403)
     end
@@ -84,14 +97,106 @@ defmodule BackendWeb.MembershipControllerTest do
              |> json_response(404)
     end
 
+    test "a participant can flip another member's role", %{conn: conn} do
+      {_auth, _leader, org} = leader_setup(conn)
+      {participant_auth, participant} = authed_conn(conn, "creator")
+      {:ok, _} = Organizations.add_member(org.id, participant.id, "participant")
+      {_, member} = authed_conn(conn, "buyer")
+      {:ok, _} = Organizations.add_member(org.id, member.id, "staff")
+
+      resp =
+        participant_auth
+        |> patch("/api/v1/organizations/#{org.id}/members/#{member.id}", %{role: "participant"})
+        |> json_response(200)
+
+      assert resp["role"] == "participant"
+    end
+
     test "a staff member cannot change roles (403)", %{conn: conn} do
       {_auth, _leader, org} = leader_setup(conn)
       {staff_auth, staff} = authed_conn(conn, "buyer")
       {:ok, _} = Organizations.add_member(org.id, staff.id, "staff")
 
       assert staff_auth
-             |> patch("/api/v1/organizations/#{org.id}/members/#{staff.id}", %{role: "participant"})
+             |> patch("/api/v1/organizations/#{org.id}/members/#{staff.id}", %{
+               role: "participant"
+             })
              |> json_response(403)
+    end
+  end
+
+  describe "DELETE /api/v1/organizations/:id/members/:user_id" do
+    test "leader removes a member", %{conn: conn} do
+      {auth, _leader, org} = leader_setup(conn)
+      {_, member} = authed_conn(conn, "buyer")
+      {:ok, _} = Organizations.add_member(org.id, member.id, "staff")
+
+      assert auth
+             |> delete("/api/v1/organizations/#{org.id}/members/#{member.id}")
+             |> response(204)
+
+      refute Organizations.member?(member.id, org.id)
+    end
+
+    test "a participant removes a member", %{conn: conn} do
+      {_auth, _leader, org} = leader_setup(conn)
+      {participant_auth, participant} = authed_conn(conn, "creator")
+      {:ok, _} = Organizations.add_member(org.id, participant.id, "participant")
+      {_, member} = authed_conn(conn, "buyer")
+      {:ok, _} = Organizations.add_member(org.id, member.id, "staff")
+
+      assert participant_auth
+             |> delete("/api/v1/organizations/#{org.id}/members/#{member.id}")
+             |> response(204)
+
+      refute Organizations.member?(member.id, org.id)
+    end
+
+    test "refuses self-removal with 403", %{conn: conn} do
+      {_auth, _leader, org} = leader_setup(conn)
+      {participant_auth, participant} = authed_conn(conn, "creator")
+      {:ok, _} = Organizations.add_member(org.id, participant.id, "participant")
+
+      assert participant_auth
+             |> delete("/api/v1/organizations/#{org.id}/members/#{participant.id}")
+             |> json_response(403)
+
+      assert Organizations.member?(participant.id, org.id)
+    end
+
+    test "refuses to remove the leader with 403", %{conn: conn} do
+      {_auth, leader, org} = leader_setup(conn)
+      {participant_auth, participant} = authed_conn(conn, "creator")
+      {:ok, _} = Organizations.add_member(org.id, participant.id, "participant")
+
+      assert participant_auth
+             |> delete("/api/v1/organizations/#{org.id}/members/#{leader.id}")
+             |> json_response(403)
+
+      assert Organizations.leader?(leader.id, org.id)
+    end
+
+    test "a staff member cannot remove anyone (403)", %{conn: conn} do
+      {_auth, _leader, org} = leader_setup(conn)
+      {staff_auth, staff} = authed_conn(conn, "buyer")
+      {:ok, _} = Organizations.add_member(org.id, staff.id, "staff")
+      {_, member} = authed_conn(conn, "buyer")
+      {:ok, _} = Organizations.add_member(org.id, member.id, "participant")
+
+      assert staff_auth
+             |> delete("/api/v1/organizations/#{org.id}/members/#{member.id}")
+             |> json_response(403)
+
+      assert Organizations.member?(member.id, org.id)
+    end
+
+    test "returns 404 for a non-member target", %{conn: conn} do
+      {auth, _leader, org} = leader_setup(conn)
+      {_, outsider} = authed_conn(conn, "buyer")
+
+      assert auth
+             |> delete("/api/v1/organizations/#{org.id}/members/#{outsider.id}")
+             |> json_response(404)
     end
   end
 end

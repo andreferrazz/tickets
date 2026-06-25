@@ -30,7 +30,7 @@ export interface Event {
 	starts_at: string;
 	ends_at: string | null;
 	cover_image_url: string | null;
-	status: 'draft' | 'published' | 'cancelled';
+	status: 'draft' | 'published' | 'cancelled' | 'closed';
 	seat_selection_enabled: boolean;
 	seats_per_table: number | null;
 	created_at: string;

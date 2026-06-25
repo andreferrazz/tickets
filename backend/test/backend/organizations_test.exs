@@ -362,6 +362,38 @@ defmodule Backend.OrganizationsTest do
     end
   end
 
+  describe "remove_member/2" do
+    test "removes a participant" do
+      {_leader, org} = leader_with_org()
+      member = user_with_role("buyer", "m")
+      {:ok, _} = Organizations.add_member(org.id, member.id, "participant")
+
+      assert {:ok, _} = Organizations.remove_member(org.id, member.id)
+      refute Organizations.member?(member.id, org.id)
+    end
+
+    test "removes a staff member" do
+      {_leader, org} = leader_with_org()
+      staff = user_with_role("buyer", "s")
+      {:ok, _} = Organizations.add_member(org.id, staff.id, "staff")
+
+      assert {:ok, _} = Organizations.remove_member(org.id, staff.id)
+      refute Organizations.member?(staff.id, org.id)
+    end
+
+    test "refuses to remove the leader" do
+      {leader, org} = leader_with_org()
+      assert {:error, :forbidden} = Organizations.remove_member(org.id, leader.id)
+      assert Organizations.leader?(leader.id, org.id)
+    end
+
+    test "returns :not_found for a non-member" do
+      {_leader, org} = leader_with_org()
+      outsider = user_with_role("buyer", "out")
+      assert {:error, :not_found} = Organizations.remove_member(org.id, outsider.id)
+    end
+  end
+
   describe "list_members/1" do
     test "returns each member's user_id, email and role" do
       {leader, org} = leader_with_org()
