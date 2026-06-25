@@ -138,23 +138,38 @@ defmodule BackendWeb.OrderController do
   not yet paid. See `Orders.cancel_order/2`.
   """
   def cancel(conn, %{"id" => id}) do
-    case Orders.cancel_order(conn.assigns.current_user, id) do
-      {:ok, order} ->
-        json(conn, order_json(order))
-
-      {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "order not found"})
-
-      {:error, :not_cancellable} ->
-        conn |> put_status(:unprocessable_entity) |> json(%{error: "order cannot be cancelled"})
-
-      {:error, :already_paid} ->
-        conn |> put_status(:conflict) |> json(%{error: "order already paid"})
-
-      {:error, :payment_check_failed} ->
-        conn |> put_status(:bad_gateway) |> json(%{error: "payment status check failed"})
-    end
+    cancel_response(conn, Orders.cancel_order(conn.assigns.current_user, id), &order_json/1)
   end
+
+  @doc """
+  POST /api/v1/events/:event_id/orders/:order_id/cancel
+
+  Cancels an order on behalf of an event manager (admin, leader, or
+  participant of the event's organization). See `Orders.cancel_event_order/2`.
+  """
+  def cancel_event_order(conn, %{"order_id" => order_id}) do
+    cancel_response(
+      conn,
+      Orders.cancel_event_order(conn.assigns.current_user, order_id),
+      &event_order_json/1
+    )
+  end
+
+  # Shared response mapping for both the buyer and manager cancel endpoints;
+  # only the success serialization (`render`) differs.
+  defp cancel_response(conn, {:ok, order}, render), do: json(conn, render.(order))
+
+  defp cancel_response(conn, {:error, :not_found}, _render),
+    do: conn |> put_status(:not_found) |> json(%{error: "order not found"})
+
+  defp cancel_response(conn, {:error, :not_cancellable}, _render),
+    do: conn |> put_status(:unprocessable_entity) |> json(%{error: "order cannot be cancelled"})
+
+  defp cancel_response(conn, {:error, :already_paid}, _render),
+    do: conn |> put_status(:conflict) |> json(%{error: "order already paid"})
+
+  defp cancel_response(conn, {:error, :payment_check_failed}, _render),
+    do: conn |> put_status(:bad_gateway) |> json(%{error: "payment status check failed"})
 
   @doc """
   GET /api/v1/orders/:id/passes

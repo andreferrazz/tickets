@@ -674,4 +674,44 @@ defmodule Backend.OrdersTest do
       assert {:error, :not_found} = Orders.cancel_order(other, order.id)
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # cancel_event_order/2 (manager-initiated)
+  # ---------------------------------------------------------------------------
+
+  describe "cancel_event_order/2" do
+    test "a manager cancels a buyer's free order, deleting its passes" do
+      creator = make_creator()
+      buyer = make_buyer()
+      {event, tt, batch} = published_event_with_tickets(creator, price_cents: 0)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 2}
+        ])
+
+      # The creator is a leader of the event's org, so a manager of it.
+      assert {:ok, cancelled} = Orders.cancel_event_order(creator, order.id)
+      assert cancelled.status == "cancelled"
+      # Preloaded for the event-orders JSON (buyer + passes).
+      assert cancelled.user.id == buyer.id
+      assert cancelled.passes == []
+      assert reload_batch(batch.id).quantity_sold == 0
+      assert Tickets.list_for_order(order) == []
+    end
+
+    test "returns not_found when the user cannot manage the event's org" do
+      creator = make_creator()
+      buyer = make_buyer()
+      outsider = make_buyer()
+      {event, tt, _batch} = published_event_with_tickets(creator)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      assert {:error, :not_found} = Orders.cancel_event_order(outsider, order.id)
+    end
+  end
 end

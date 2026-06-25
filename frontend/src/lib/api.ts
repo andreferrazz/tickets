@@ -183,6 +183,8 @@ export const api = {
 		const path = qs ? `/events/${eventId}/orders?${qs}` : `/events/${eventId}/orders`;
 		return request<EventOrder[]>(path, { fetcher });
 	},
+	cancelEventOrder: (eventId: string, orderId: string) =>
+		request<EventOrder>(`/events/${eventId}/orders/${orderId}/cancel`, { method: 'POST' }),
 	getOrder: (id: string, fetcher?: typeof fetch) =>
 		request<Order>(`/orders/${id}`, { fetcher }),
 	cancelOrder: (id: string) => request<Order>(`/orders/${id}/cancel`, { method: 'POST' }),
