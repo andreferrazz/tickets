@@ -33,7 +33,7 @@ defmodule Backend.Orders.Order do
     timestamps(type: :utc_datetime)
   end
 
-  @valid_statuses ~w(pending paid expired refunded)
+  @valid_statuses ~w(pending paid expired refunded cancelled)
   @valid_payment_methods ~w(PIX CARD BOLETO)
 
   def changeset(attrs) do

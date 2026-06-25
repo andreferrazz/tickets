@@ -170,6 +170,67 @@ defmodule BackendWeb.OrderControllerTest do
     end
   end
 
+  describe "POST /api/v1/orders/:id/cancel" do
+    test "cancels the buyer's pending order", %{conn: conn} do
+      {conn, user} = authed_conn(conn)
+      {event, tt} = setup_event_with_ticket()
+
+      {:ok, order} =
+        Orders.create_order(user, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      conn = post(conn, "/api/v1/orders/#{order.id}/cancel")
+      resp = json_response(conn, 200)
+      assert resp["id"] == order.id
+      assert resp["status"] == "cancelled"
+    end
+
+    test "returns 409 when Abacate reports the order already paid", %{conn: conn} do
+      {conn, user} = authed_conn(conn)
+      {event, tt} = setup_event_with_ticket()
+
+      {:ok, order} =
+        Orders.create_order(user, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      Backend.AbacatePayMock.put_checkout(order.abacate_checkout_id, %{status: "paid"})
+
+      conn = post(conn, "/api/v1/orders/#{order.id}/cancel")
+      assert json_response(conn, 409)["error"] == "order already paid"
+    end
+
+    test "returns 422 for a non-cancellable (already paid) order", %{conn: conn} do
+      {conn, user} = authed_conn(conn)
+      {event, tt} = setup_event_with_ticket()
+
+      {:ok, order} =
+        Orders.create_order(user, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      {:ok, _} = Orders.mark_paid_by_checkout(order.abacate_checkout_id)
+
+      conn = post(conn, "/api/v1/orders/#{order.id}/cancel")
+      assert json_response(conn, 422)["error"] == "order cannot be cancelled"
+    end
+
+    test "returns 404 for another user's order", %{conn: conn} do
+      {other_conn, _other} = authed_conn(conn)
+      {_buyer_conn, buyer} = authed_conn(conn)
+      {event, tt} = setup_event_with_ticket()
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      conn = post(other_conn, "/api/v1/orders/#{order.id}/cancel")
+      assert json_response(conn, 404)
+    end
+  end
+
   describe "GET /api/v1/orders/:id/passes" do
     test "returns the buyer's passes with base64 QR PNGs", %{conn: conn} do
       {conn, user} = authed_conn(conn)

@@ -31,6 +31,15 @@ import type {
 	ValidateResult
 } from '$lib/types';
 
+/**
+ * Whether the buyer may cancel this order. Only orders with no payment
+ * collected qualify: free orders (paid inline, total 0) and still-pending
+ * orders. The backend re-confirms pending orders with Abacate before acting.
+ */
+export function isCancellable(order: Pick<Order, 'status' | 'total_cents'>): boolean {
+	return order.status === 'pending' || (order.status === 'paid' && order.total_cents === 0);
+}
+
 const BASE = PUBLIC_API_URL;
 if (!BASE) {
 	throw new Error('PUBLIC_API_URL is required (e.g. http://localhost:4000/api/v1)');
@@ -176,6 +185,7 @@ export const api = {
 	},
 	getOrder: (id: string, fetcher?: typeof fetch) =>
 		request<Order>(`/orders/${id}`, { fetcher }),
+	cancelOrder: (id: string) => request<Order>(`/orders/${id}/cancel`, { method: 'POST' }),
 	getOrderPasses: (id: string, fetcher?: typeof fetch) =>
 		request<Pass[]>(`/orders/${id}/passes`, { fetcher }),
 	validatePass: (eventId: string, token: string) =>

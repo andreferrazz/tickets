@@ -39,6 +39,20 @@ defmodule Backend.Tickets do
   end
 
   @doc """
+  Deletes every pass for `order`, returning the count removed.
+
+  Used when a free order is cancelled: its passes were issued at creation, and
+  since `check_in/2` resolves a pass purely by token (no order-status check),
+  the QR codes would otherwise keep validating. The `seat_assignments.pass_id`
+  FK is `on_delete: :nilify_all`, so this is safe for seated orders.
+  """
+  @spec delete_for_order(Order.t()) :: non_neg_integer()
+  def delete_for_order(%Order{id: id}) do
+    {count, _} = Repo.delete_all(from p in Pass, where: p.order_id == ^id)
+    count
+  end
+
+  @doc """
   Extra line items (name + quantity) for an extra pass's order; `[]` otherwise.
 
   The single combined extras pass (see `build_extra_row/1`) only carries the
