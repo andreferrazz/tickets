@@ -142,11 +142,10 @@ defmodule Backend.Orders do
   Lists orders for `event_id`, newest first, with items, buyer, and passes
   preloaded. Passes feed the validated/total ticket count in the orders view.
 
-  Authorization: `user` must be an admin or a *leader* of the event's
-  organization. Plain participants are denied — orders carry buyer PII
-  (email/phone) and shouldn't be visible to everyone with write access on
-  the event. Returns `{:error, :not_found}` for denied users and for missing
-  events alike, to avoid leaking event existence.
+  Authorization: `user` must be an admin or a manager (leader or participant,
+  see `Organizations.can_manage?/2`) of the event's organization. Scan-only
+  `staff` members and outsiders are denied. Returns `{:error, :not_found}` for
+  denied users and for missing events alike, to avoid leaking event existence.
 
   `statuses` is an optional list filtering on `Order.status`. When empty or
   nil, all statuses are returned. Unknown values short-circuit the query and
@@ -186,7 +185,7 @@ defmodule Backend.Orders do
         {:error, :not_found}
 
       event ->
-        if Organizations.leader?(user_id, event.organization_id),
+        if Organizations.can_manage?(user_id, event.organization_id),
           do: {:ok, event},
           else: {:error, :not_found}
     end
@@ -277,6 +276,43 @@ defmodule Backend.Orders do
   def cancel_order(user, order_id) do
     with {:ok, order} <- get_order(user, order_id) do
       cancel_owned_order(order)
+    end
+  end
+
+  @doc """
+  Cancels `order_id` on behalf of an event manager (admin, or a leader/
+  participant of the event's organization — see `Organizations.can_manage?/2`).
+
+  Applies the same cancellability rules as `cancel_order/2` (free orders and
+  Abacate-confirmed-unpaid pending orders only). Returns `{:ok, order}` with
+  `:items`, `:user`, and `:passes` preloaded for the event-orders view, or the
+  same `{:error, ...}` reasons as `cancel_order/2`.
+  """
+  def cancel_event_order(user, order_id) do
+    with {:ok, order} <- fetch_manageable_order(user, order_id),
+         {:ok, cancelled} <- cancel_owned_order(order) do
+      {:ok, Repo.preload(cancelled, [:items, :user, :passes], force: true)}
+    end
+  end
+
+  defp fetch_manageable_order(user, order_id) do
+    case Repo.one(from(o in Order, where: o.id == ^order_id, preload: :items)) do
+      nil -> {:error, :not_found}
+      order -> authorize_order_manager(user, order)
+    end
+  end
+
+  defp authorize_order_manager(%{role: "admin"}, order), do: {:ok, order}
+
+  defp authorize_order_manager(%{id: user_id}, order) do
+    case Repo.get(Event, order.event_id) do
+      %Event{organization_id: org_id} ->
+        if Organizations.can_manage?(user_id, org_id),
+          do: {:ok, order},
+          else: {:error, :not_found}
+
+      _ ->
+        {:error, :not_found}
     end
   end
 

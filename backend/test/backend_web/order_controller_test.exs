@@ -434,7 +434,7 @@ defmodule BackendWeb.OrderControllerTest do
       assert json_response(conn, 404)
     end
 
-    test "only admins and leaders can access orders", %{conn: conn} do
+    test "admins, leaders, and participants can access orders", %{conn: conn} do
       {owner_conn, owner, event, tt} = authed_org_creator(conn)
       {_, _, _} = setup_pending_and_paid(conn, event, tt)
       [%{id: org_id} | _] = Backend.Organizations.list_for_user(owner.id)
@@ -445,13 +445,14 @@ defmodule BackendWeb.OrderControllerTest do
              |> json_response(200)
              |> length() == 2
 
-      # 2. Plain participant of the same org -> 404 (denied; no existence leak).
+      # 2. Participant of the same org -> 200 (a manager; can view + cancel orders).
       {participant_conn, participant} = authed_conn(conn)
       {:ok, _} = Backend.Organizations.add_member(org_id, participant.id, "participant")
 
       assert participant_conn
              |> get("/api/v1/events/#{event.id}/orders")
-             |> json_response(404)
+             |> json_response(200)
+             |> length() == 2
 
       # 3. Scan-only staff member of the same org -> 404 (denied; no existence leak).
       {staff_conn, staff} = authed_conn(conn)
@@ -475,6 +476,86 @@ defmodule BackendWeb.OrderControllerTest do
              |> get("/api/v1/events/#{event.id}/orders")
              |> json_response(200)
              |> length() == 2
+    end
+  end
+
+  describe "POST /api/v1/events/:event_id/orders/:order_id/cancel" do
+    test "a leader cancels a buyer's pending order", %{conn: conn} do
+      {owner_conn, _owner, event, tt} = authed_org_creator(conn)
+      {_buyer_conn, buyer} = authed_conn(conn)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      conn = post(owner_conn, "/api/v1/events/#{event.id}/orders/#{order.id}/cancel")
+      resp = json_response(conn, 200)
+      assert resp["id"] == order.id
+      assert resp["status"] == "cancelled"
+      # Manager endpoint returns the event-orders shape (buyer PII included).
+      assert resp["buyer_email"] == buyer.email
+    end
+
+    test "a participant cancels a buyer's pending order", %{conn: conn} do
+      {_owner_conn, owner, event, tt} = authed_org_creator(conn)
+      [%{id: org_id} | _] = Backend.Organizations.list_for_user(owner.id)
+      {participant_conn, participant} = authed_conn(conn)
+      {:ok, _} = Backend.Organizations.add_member(org_id, participant.id, "participant")
+      {_buyer_conn, buyer} = authed_conn(conn)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      conn = post(participant_conn, "/api/v1/events/#{event.id}/orders/#{order.id}/cancel")
+      assert json_response(conn, 200)["status"] == "cancelled"
+    end
+
+    test "a scan-only staff member cannot cancel -> 404", %{conn: conn} do
+      {_owner_conn, owner, event, tt} = authed_org_creator(conn)
+      [%{id: org_id} | _] = Backend.Organizations.list_for_user(owner.id)
+      {staff_conn, staff} = authed_conn(conn)
+      {:ok, _} = Backend.Organizations.add_member(org_id, staff.id, "staff")
+      {_buyer_conn, buyer} = authed_conn(conn)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      conn = post(staff_conn, "/api/v1/events/#{event.id}/orders/#{order.id}/cancel")
+      assert json_response(conn, 404)
+    end
+
+    test "an outsider with no membership cannot cancel -> 404", %{conn: conn} do
+      {_owner_conn, _owner, event, tt} = authed_org_creator(conn)
+      {outsider_conn, _outsider} = authed_conn(conn)
+      {_buyer_conn, buyer} = authed_conn(conn)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      conn = post(outsider_conn, "/api/v1/events/#{event.id}/orders/#{order.id}/cancel")
+      assert json_response(conn, 404)
+    end
+
+    test "returns 422 for an already-paid order", %{conn: conn} do
+      {owner_conn, _owner, event, tt} = authed_org_creator(conn)
+      {_buyer_conn, buyer} = authed_conn(conn)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      {:ok, _} = Orders.mark_paid_by_checkout(order.abacate_checkout_id)
+
+      conn = post(owner_conn, "/api/v1/events/#{event.id}/orders/#{order.id}/cancel")
+      assert json_response(conn, 422)["error"] == "order cannot be cancelled"
     end
   end
 end

@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { api, ApiError, formatBRL } from '$lib/api';
+	import { api, ApiError, formatBRL, isCancellable } from '$lib/api';
+	import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';
 	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
@@ -12,6 +13,8 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let selected = $state<EventOrder | null>(null);
+	let cancelling = $state(false);
+	let cancelError = $state<string | null>(null);
 
 	// Statuses offered in the filter; paid is the only one selected by default.
 	const statusOptions: OrderStatus[] = ['paid', 'pending', 'expired'];
@@ -62,19 +65,50 @@
 		}
 	}
 
+	function openOrder(o: EventOrder) {
+		selected = o;
+		cancelError = null;
+	}
+
+	function closeModal() {
+		selected = null;
+		cancelError = null;
+	}
+
 	function onRowKey(e: KeyboardEvent, o: EventOrder) {
 		if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault();
-			selected = o;
+			openOrder(o);
 		}
 	}
 
 	function onKeydown(e: KeyboardEvent) {
-		if (selected && e.key === 'Escape') selected = null;
+		if (selected && e.key === 'Escape') closeModal();
 	}
 
 	function onBackdropClick(e: MouseEvent) {
-		if (e.target === e.currentTarget) selected = null;
+		if (e.target === e.currentTarget) closeModal();
+	}
+
+	async function cancelSelectedOrder() {
+		if (!selected || cancelling) return;
+		const ok = await confirmDialog({
+			message: t('order.cancelConfirm'),
+			confirmText: t('order.cancel'),
+			danger: true
+		});
+		if (!ok) return;
+		cancelling = true;
+		cancelError = null;
+		try {
+			const updated = await api.cancelEventOrder(page.params.id!, selected.id);
+			orders = (orders ?? []).map((o) => (o.id === updated.id ? updated : o));
+			selected = updated;
+		} catch (e) {
+			cancelError = e instanceof ApiError ? e.message : t('order.cancelError');
+		} finally {
+			cancelling = false;
+		}
 	}
 </script>
 
@@ -138,7 +172,7 @@
 							class="clickable"
 							role="button"
 							tabindex="0"
-							onclick={() => (selected = o)}
+							onclick={() => openOrder(o)}
 							onkeydown={(e) => onRowKey(e, o)}
 						>
 							<td class="name-cell">{o.buyer_name ?? o.buyer_email}</td>
@@ -162,7 +196,7 @@
 		<div class="dialog card" role="dialog" aria-modal="true" aria-labelledby="order-details-title">
 			<div class="dialog-head">
 				<h3 id="order-details-title">{t('eventOrders.detailsTitle')}</h3>
-				<button type="button" class="secondary small" onclick={() => (selected = null)}>
+				<button type="button" class="secondary small" onclick={closeModal}>
 					{t('dashboard.close')}
 				</button>
 			</div>
@@ -235,6 +269,17 @@
 					</table>
 				{/if}
 			</section>
+
+			{#if isCancellable(selected)}
+				<footer class="dialog-foot">
+					{#if cancelError}
+						<div class="error">{cancelError}</div>
+					{/if}
+					<button class="btn danger" onclick={cancelSelectedOrder} disabled={cancelling}>
+						{cancelling ? t('order.cancelling') : t('order.cancel')}
+					</button>
+				</footer>
+			{/if}
 		</div>
 	</div>
 {/if}
@@ -352,6 +397,18 @@
 	}
 	.summary dd {
 		margin: 0;
+	}
+	.dialog-foot {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.75rem;
+		margin-top: 1.5rem;
+		padding-top: 1rem;
+		border-top: 1px solid var(--border);
+	}
+	.dialog-foot .error {
+		align-self: stretch;
 	}
 	.items {
 		margin-top: 1rem;
