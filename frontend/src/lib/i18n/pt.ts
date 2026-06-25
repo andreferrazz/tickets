@@ -348,6 +348,10 @@ export const pt = {
 	'order.passCheckedIn': 'Já validado',
 	'order.errorFallback': 'Falha ao carregar pedido',
 	'order.notFound': 'Pedido não encontrado',
+	'order.cancel': 'Cancelar pedido',
+	'order.cancelConfirm': 'Tem certeza que deseja cancelar este pedido? Esta ação não pode ser desfeita.',
+	'order.cancelling': 'Cancelando…',
+	'order.cancelError': 'Falha ao cancelar o pedido',
 
 	// Invitations
 	'invitations.title': 'Convites',

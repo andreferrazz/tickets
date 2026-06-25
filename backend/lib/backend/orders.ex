@@ -7,6 +7,7 @@ defmodule Backend.Orders do
   """
 
   import Ecto.Query
+  require Logger
   alias Backend.Repo
   alias Backend.Events
   alias Backend.Events.{Event, ExtraItem, Seating, TicketBatch}
@@ -14,7 +15,7 @@ defmodule Backend.Orders do
   alias Backend.Organizations
   alias Backend.Tickets
 
-  @valid_statuses ~w(pending paid expired refunded)
+  @valid_statuses ~w(pending paid expired refunded cancelled)
 
   # ---------------------------------------------------------------------------
   # Create
@@ -251,6 +252,108 @@ defmodule Backend.Orders do
       nil -> {:error, :not_found}
       {order, title} -> {:ok, order |> Map.put(:event_title, title) |> Repo.preload(:items)}
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Cancel (buyer-initiated)
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Cancels `user`'s order `order_id`, releasing the reserved stock.
+
+  Only orders where no payment was actually collected may be cancelled:
+
+    * Free orders (`total_cents == 0`) — created already `paid` with passes
+      issued inline. Their passes are deleted so the QR tokens stop validating.
+    * Pending paid-orders — cancellable only after Abacate Pay confirms the
+      checkout is not paid, closing the window where the buyer paid but the
+      `checkout.completed` webhook hasn't landed yet. If Abacate reports it
+      paid, the order is recovered (marked paid + fulfilled) instead and
+      cancellation is refused.
+
+  Returns `{:ok, cancelled_order}` or `{:error, reason}` where reason is one of
+  `:not_found`, `:not_cancellable`, `:already_paid`, `:payment_check_failed`.
+  """
+  def cancel_order(user, order_id) do
+    with {:ok, order} <- get_order(user, order_id) do
+      cancel_owned_order(order)
+    end
+  end
+
+  defp cancel_owned_order(%Order{status: "paid", total_cents: 0} = order) do
+    cancel_and_release(order, delete_passes?: true)
+  end
+
+  defp cancel_owned_order(%Order{status: "pending"} = order) do
+    case confirm_unpaid(order) do
+      :unpaid -> cancel_and_release(order, delete_passes?: false)
+      {:paid, info} -> recover_and_refuse(order, info)
+      :error -> {:error, :payment_check_failed}
+    end
+  end
+
+  defp cancel_owned_order(%Order{}), do: {:error, :not_cancellable}
+
+  # Asks Abacate Pay whether the pending checkout is actually paid. Mirrors the
+  # method split used by ExpiryWorker (boleto -> transparent endpoint). A nil
+  # checkout id (never reached the provider) is treated as unpaid. Upstream
+  # failures surface as `:error` so we never cancel a possibly-paid order.
+  defp confirm_unpaid(%Order{abacate_checkout_id: nil}), do: :unpaid
+
+  defp confirm_unpaid(%Order{payment_method: "BOLETO"} = order) do
+    interpret_upstream(abacate_pay().get_transparent(order.abacate_checkout_id))
+  end
+
+  defp confirm_unpaid(order) do
+    interpret_upstream(abacate_pay().get_checkout(order.abacate_checkout_id))
+  end
+
+  defp interpret_upstream({:ok, %{status: "paid"} = info}), do: {:paid, info}
+  defp interpret_upstream({:ok, %{status: _}}), do: :unpaid
+  defp interpret_upstream({:error, _reason}), do: :error
+
+  # The buyer paid in the gap before the webhook arrived: recover the order
+  # (mark paid + fulfil) the same way ExpiryWorker does, then refuse the
+  # cancellation. Recovery failures are logged but still refuse — Abacate is
+  # authoritative that money was collected.
+  defp recover_and_refuse(order, info) do
+    case recover_paid(order, info) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning(
+          "cancel_order: recovery of paid order=#{order.id} failed: #{inspect(reason)}"
+        )
+    end
+
+    {:error, :already_paid}
+  end
+
+  defp recover_paid(order, info) do
+    with {:ok, paid} <- mark_paid_by_checkout(order.abacate_checkout_id, info),
+         {:ok, _order, _passes} <- fulfill_paid_order(paid) do
+      :ok
+    end
+  end
+
+  # Flips status to "cancelled" and releases the reserved stock (ticket batches,
+  # extras, seat assignments). Free orders additionally have their issued passes
+  # deleted. Wrapped in a transaction so partial state can't leak on failure.
+  defp cancel_and_release(order, opts) do
+    delete_passes? = Keyword.fetch!(opts, :delete_passes?)
+    order = Repo.preload(order, :items)
+
+    Repo.transaction(fn ->
+      updated =
+        order
+        |> Ecto.Changeset.change(status: "cancelled")
+        |> Repo.update!()
+
+      release_order_stock(order)
+      if delete_passes?, do: Tickets.delete_for_order(order)
+      updated
+    end)
   end
 
   # ---------------------------------------------------------------------------

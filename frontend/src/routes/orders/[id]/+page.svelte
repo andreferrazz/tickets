@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { api, ApiError, formatBRL } from '$lib/api';
+	import { api, ApiError, formatBRL, isCancellable } from '$lib/api';
+	import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';
 	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
@@ -12,6 +13,7 @@
 	let passes = $state<Pass[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+	let cancelling = $state(false);
 	const justPaid = $derived(page.url.searchParams.get('paid') === '1');
 	const ticketPasses = $derived(passes.filter((p) => p.kind === 'ticket'));
 	const extraPasses = $derived(passes.filter((p) => p.kind === 'extra'));
@@ -35,6 +37,26 @@
 
 	function passLabel(p: Pass): string {
 		return p.kind === 'extra' ? t('order.passExtras') : p.item_name;
+	}
+
+	async function cancelOrder() {
+		if (!order || cancelling) return;
+		const ok = await confirmDialog({
+			message: t('order.cancelConfirm'),
+			confirmText: t('order.cancel'),
+			danger: true
+		});
+		if (!ok) return;
+		cancelling = true;
+		error = null;
+		try {
+			order = await api.cancelOrder(order.id);
+			passes = [];
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : t('order.cancelError');
+		} finally {
+			cancelling = false;
+		}
 	}
 </script>
 
@@ -71,6 +93,14 @@
 		<div class="card" style="margin-top: 1rem;">
 			<p>{t('order.awaitingPayment')}</p>
 			<a href={order.abacate_payment_url} class="btn">{t('order.continueToPay')}</a>
+		</div>
+	{/if}
+
+	{#if isCancellable(order)}
+		<div style="margin-top: 1rem;">
+			<button class="btn danger" onclick={cancelOrder} disabled={cancelling}>
+				{cancelling ? t('order.cancelling') : t('order.cancel')}
+			</button>
 		</div>
 	{/if}
 

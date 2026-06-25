@@ -111,7 +111,7 @@ export interface EventDetail extends Event {
 	seating: Seating | null;
 }
 
-export type OrderStatus = 'pending' | 'paid' | 'expired' | 'refunded';
+export type OrderStatus = 'pending' | 'paid' | 'expired' | 'refunded' | 'cancelled';
 
 export interface OrderItem {
 	id: string;

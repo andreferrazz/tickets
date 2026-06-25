@@ -131,6 +131,32 @@ defmodule BackendWeb.OrderController do
   end
 
   @doc """
+  POST /api/v1/orders/:id/cancel
+
+  Cancels the buyer's own order. Only unpaid orders are cancellable: free
+  orders (nothing charged) and pending orders that Abacate Pay confirms are
+  not yet paid. See `Orders.cancel_order/2`.
+  """
+  def cancel(conn, %{"id" => id}) do
+    case Orders.cancel_order(conn.assigns.current_user, id) do
+      {:ok, order} ->
+        json(conn, order_json(order))
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "order not found"})
+
+      {:error, :not_cancellable} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: "order cannot be cancelled"})
+
+      {:error, :already_paid} ->
+        conn |> put_status(:conflict) |> json(%{error: "order already paid"})
+
+      {:error, :payment_check_failed} ->
+        conn |> put_status(:bad_gateway) |> json(%{error: "payment status check failed"})
+    end
+  end
+
+  @doc """
   GET /api/v1/orders/:id/passes
 
   Returns the QR passes for the buyer's order. The QR PNG is embedded as a

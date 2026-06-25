@@ -183,7 +183,8 @@ button.danger {
 	color: var(--tone-paid-fg);
 }
 .badge.expired,
-.badge.refunded {
+.badge.refunded,
+.badge.cancelled {
 	background: var(--tone-error-bg);
 	color: var(--tone-error-fg);
 }

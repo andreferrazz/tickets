@@ -1,8 +1,10 @@
 defmodule Backend.OrdersTest do
   use Backend.DataCase, async: true
 
-  alias Backend.{Accounts, Events, Orders}
+  alias Backend.{Accounts, AbacatePayMock, Events, Orders, Tickets}
   alias Backend.Events.TicketBatch
+  alias Backend.Orders.Order
+  alias Backend.Tickets.Pass
 
   # ---------------------------------------------------------------------------
   # Helpers
@@ -541,6 +543,135 @@ defmodule Backend.OrdersTest do
       refute is_nil(after_refund.closed_at)
       refute after_refund.auto_closed
       assert after_refund.quantity_sold == 0
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # cancel_order/2 (buyer-initiated)
+  # ---------------------------------------------------------------------------
+
+  describe "cancel_order/2" do
+    test "cancels a free order, releasing stock and deleting its passes" do
+      creator = make_creator()
+      buyer = make_buyer()
+      {event, tt, batch} = published_event_with_tickets(creator, price_cents: 0)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 2}
+        ])
+
+      # Free order was paid + fulfilled inline: passes exist up front.
+      [%Pass{token: token} | _] = Tickets.list_for_order(order)
+      assert reload_batch(batch.id).quantity_sold == 2
+
+      assert {:ok, cancelled} = Orders.cancel_order(buyer, order.id)
+      assert cancelled.status == "cancelled"
+      assert reload_batch(batch.id).quantity_sold == 0
+
+      # Passes are gone so the QR token no longer validates at the door.
+      assert Tickets.list_for_order(order) == []
+      assert {:error, :not_found} = Tickets.fetch_by_token(token)
+    end
+
+    test "cancels a pending order Abacate reports as not paid, releasing stock" do
+      creator = make_creator()
+      buyer = make_buyer()
+      {event, tt, batch} = published_event_with_tickets(creator)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 3}
+        ])
+
+      # Mock defaults get_checkout to "pending" — no override needed.
+      assert {:ok, cancelled} = Orders.cancel_order(buyer, order.id)
+      assert cancelled.status == "cancelled"
+      assert reload_batch(batch.id).quantity_sold == 0
+    end
+
+    test "refuses and recovers a pending order Abacate reports as paid" do
+      creator = make_creator()
+      buyer = make_buyer()
+      {event, tt, _batch} = published_event_with_tickets(creator)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      AbacatePayMock.put_checkout(order.abacate_checkout_id, %{status: "paid"})
+
+      assert {:error, :already_paid} = Orders.cancel_order(buyer, order.id)
+
+      # Order was recovered: marked paid and fulfilled with a pass.
+      recovered = Repo.get!(Order, order.id)
+      assert recovered.status == "paid"
+      refute is_nil(recovered.paid_at)
+      assert Repo.aggregate(from(p in Pass, where: p.order_id == ^order.id), :count) == 1
+    end
+
+    test "returns payment_check_failed and leaves the order untouched on upstream error" do
+      creator = make_creator()
+      buyer = make_buyer()
+      {event, tt, batch} = published_event_with_tickets(creator)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 2}
+        ])
+
+      AbacatePayMock.put_checkout(order.abacate_checkout_id, {:error, :timeout})
+
+      assert {:error, :payment_check_failed} = Orders.cancel_order(buyer, order.id)
+
+      # Nothing changed: still pending, stock still held.
+      assert Repo.get!(Order, order.id).status == "pending"
+      assert reload_batch(batch.id).quantity_sold == 2
+    end
+
+    test "returns not_cancellable for an already-paid non-free order" do
+      creator = make_creator()
+      buyer = make_buyer()
+      {event, tt, _batch} = published_event_with_tickets(creator)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      {:ok, _} = Orders.mark_paid_by_checkout(order.abacate_checkout_id)
+
+      assert {:error, :not_cancellable} = Orders.cancel_order(buyer, order.id)
+    end
+
+    test "returns not_cancellable for an already-expired order" do
+      creator = make_creator()
+      buyer = make_buyer()
+      {event, tt, _batch} = published_event_with_tickets(creator)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      {:ok, _} = Orders.mark_expired(order)
+
+      assert {:error, :not_cancellable} = Orders.cancel_order(buyer, order.id)
+    end
+
+    test "returns not_found for another user's order" do
+      creator = make_creator()
+      buyer = make_buyer()
+      other = make_buyer()
+      {event, tt, _batch} = published_event_with_tickets(creator)
+
+      {:ok, order} =
+        Orders.create_order(buyer, event.id, [
+          %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}
+        ])
+
+      assert {:error, :not_found} = Orders.cancel_order(other, order.id)
     end
   end
 end
