@@ -17,7 +17,7 @@
 	let cancelError = $state<string | null>(null);
 
 	// Statuses offered in the filter; paid is the only one selected by default.
-	const statusOptions: OrderStatus[] = ['paid', 'pending', 'expired'];
+	const statusOptions: OrderStatus[] = ['paid', 'pending', 'expired', 'cancelled'];
 	let query = $state('');
 	let statuses = $state<OrderStatus[]>(['paid']);
 
