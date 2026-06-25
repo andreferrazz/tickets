@@ -87,11 +87,12 @@
 				{t('dashboard.feesDeducted', { amount: formatBRL(stats.totals.fees_cents) })}
 			</div>
 			<div class="muted small">{t('dashboard.netRevenueHint')}</div>
-			{#if stats.can_withdraw}
+			<!-- Withdraw ("Sacar dinheiro") button hidden for now. -->
+			<!-- {#if stats.can_withdraw}
 				<button type="button" class="btn small withdraw-btn" onclick={() => (withdrawOpen = true)}>
 					{t('dashboard.withdraw')}
 				</button>
-			{/if}
+			{/if} -->
 		</div>
 		<div class="card kpi">
 			<div class="muted small">{t('dashboard.ticketsReserved')}</div>
