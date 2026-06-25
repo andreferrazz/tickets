@@ -429,6 +429,10 @@ defmodule Backend.Events do
        when is_integer(reported_fee) and reported_fee >= 0,
        do: reported_fee
 
+  # A free order (total 0) never touches the payment processor, so it has no
+  # fee, regardless of any stale payment_method on legacy rows.
+  defp order_fee_cents(_reported, 0, _method, _installments), do: 0
+
   defp order_fee_cents(_reported, total, method, installments),
     do: Backend.AbacatePay.fee_cents(total, method, installments)
 
