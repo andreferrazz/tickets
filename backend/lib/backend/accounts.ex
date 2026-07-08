@@ -127,7 +127,21 @@ defmodule Backend.Accounts do
     end
   end
 
-  defp find_or_create_user(email) do
+  @doc """
+  Finds the user with `email`, or creates a minimal `buyer` account for it.
+
+  The caller is responsible for normalizing (trim/downcase) the address — the
+  passwordless-login and invite-accept flows do so before calling. Used by
+  `verify_code/2`, `accept_invitation/1`, and the manager comp-ticket flow
+  (`Backend.Orders.create_comp_order/4`) to deliver a ticket to someone who has
+  never signed in; they later adopt the same row on first login.
+
+  ## Example
+
+      find_or_create_user("guest@example.com")
+      #=> {:ok, %User{email: "guest@example.com", role: "buyer"}}
+  """
+  def find_or_create_user(email) do
     case Repo.get_by(User, email: email) do
       %User{} = user ->
         {:ok, user}

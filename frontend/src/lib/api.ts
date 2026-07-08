@@ -3,6 +3,8 @@ import { auth } from '$lib/stores/auth.svelte';
 import type {
 	AuthResponse,
 	Batch,
+	CompRecipient,
+	CompTicketsResult,
 	Event,
 	EventDetail,
 	EventOrder,
@@ -185,6 +187,11 @@ export const api = {
 	},
 	cancelEventOrder: (eventId: string, orderId: string) =>
 		request<EventOrder>(`/events/${eventId}/orders/${orderId}/cancel`, { method: 'POST' }),
+	sendCompTickets: (eventId: string, itemId: string, recipients: CompRecipient[]) =>
+		request<CompTicketsResult>(`/events/${eventId}/comp-orders`, {
+			method: 'POST',
+			body: { item_id: itemId, recipients }
+		}),
 	getOrder: (id: string, fetcher?: typeof fetch) =>
 		request<Order>(`/orders/${id}`, { fetcher }),
 	cancelOrder: (id: string) => request<Order>(`/orders/${id}/cancel`, { method: 'POST' }),

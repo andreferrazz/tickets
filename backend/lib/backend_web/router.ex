@@ -88,6 +88,7 @@ defmodule BackendWeb.Router do
     get "/orders/:id/passes", OrderController, :passes
     get "/events/:event_id/orders", OrderController, :event_index
     post "/events/:event_id/orders/:order_id/cancel", OrderController, :cancel_event_order
+    post "/events/:event_id/comp-orders", OrderController, :create_comp_orders
 
     post "/events/:event_id/passes/validate", PassController, :validate
 
