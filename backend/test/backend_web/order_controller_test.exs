@@ -558,4 +558,58 @@ defmodule BackendWeb.OrderControllerTest do
       assert json_response(conn, 422)["error"] == "order cannot be cancelled"
     end
   end
+
+  describe "POST /api/v1/events/:event_id/comp-orders" do
+    test "sends per-recipient quantities of a single ticket type", %{conn: conn} do
+      {owner_conn, _owner, event, tt} = authed_org_creator(conn)
+      a = "a_#{:rand.uniform(999_999)}@guest.test"
+      b = "b_#{:rand.uniform(999_999)}@guest.test"
+
+      conn =
+        post(owner_conn, "/api/v1/events/#{event.id}/comp-orders", %{
+          item_id: tt.id,
+          recipients: [%{email: a, quantity: 2}, %{email: b, quantity: 1}]
+        })
+
+      resp = json_response(conn, 200)
+      assert Enum.sort(resp["sent"]) == Enum.sort([a, b])
+      assert resp["failed"] == []
+
+      # Each recipient got exactly their requested amount of passes.
+      recipient_a = Backend.Repo.get_by!(Accounts.User, email: a)
+
+      assert Backend.Repo.aggregate(
+               from(p in Backend.Tickets.Pass, where: p.user_id == ^recipient_a.id),
+               :count
+             ) == 2
+    end
+
+    test "reports per-recipient failures without aborting the batch", %{conn: conn} do
+      {owner_conn, _owner, event, tt} = authed_org_creator(conn)
+      good = "good_#{:rand.uniform(999_999)}@guest.test"
+
+      conn =
+        post(owner_conn, "/api/v1/events/#{event.id}/comp-orders", %{
+          item_id: tt.id,
+          recipients: [
+            %{email: good, quantity: 1},
+            %{email: "not-an-email", quantity: 1},
+            %{email: "zero@guest.test", quantity: 0}
+          ]
+        })
+
+      resp = json_response(conn, 200)
+      assert resp["sent"] == [good]
+
+      assert %{"email" => "not-an-email", "error" => "invalid_email"} in resp["failed"]
+      assert %{"email" => "zero@guest.test", "error" => "invalid_quantity"} in resp["failed"]
+    end
+
+    test "returns 400 when item_id or recipients are missing", %{conn: conn} do
+      {owner_conn, _owner, event, _tt} = authed_org_creator(conn)
+
+      conn = post(owner_conn, "/api/v1/events/#{event.id}/comp-orders", %{recipients: []})
+      assert json_response(conn, 400)["error"] =~ "item_id"
+    end
+  end
 end

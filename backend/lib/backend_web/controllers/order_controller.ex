@@ -81,6 +81,75 @@ defmodule BackendWeb.OrderController do
     end
   end
 
+  @doc """
+  POST /api/v1/events/:event_id/comp-orders
+
+  Issues free tickets of a single ticket type (`item_id`) to a list of
+  `recipients`, each `%{"email" => ..., "quantity" => n}` with its own amount.
+  Recipients are processed independently; the response reports the addresses
+  that were `sent` and those that `failed` (with a short reason), so a malformed
+  email, a bad quantity, or a sold-out batch skips only that recipient rather
+  than aborting the whole guest list. See `Orders.create_comp_order/4`.
+  """
+  def create_comp_orders(
+        conn,
+        %{"event_id" => event_id, "item_id" => item_id, "recipients" => recipients}
+      )
+      when is_binary(item_id) and is_list(recipients) do
+    results =
+      Enum.map(recipients, fn recipient ->
+        comp_recipient(conn.assigns.current_user, event_id, item_id, recipient)
+      end)
+
+    json(conn, comp_summary_json(results))
+  end
+
+  def create_comp_orders(conn, _),
+    do:
+      conn
+      |> put_status(:bad_request)
+      |> json(%{error: "item_id (string) and recipients (list) are required"})
+
+  # Issues the recipient's requested quantity of `item_id`. Validates the
+  # quantity here so a bad amount surfaces as a clean per-recipient failure
+  # rather than a generic resolve error.
+  defp comp_recipient(user, event_id, item_id, %{"email" => email, "quantity" => qty})
+       when is_integer(qty) and qty > 0 do
+    items = [%{"item_type" => "ticket", "item_id" => item_id, "quantity" => qty}]
+    {email, Orders.create_comp_order(user, event_id, email, items)}
+  end
+
+  defp comp_recipient(_user, _event_id, _item_id, %{"email" => email}),
+    do: {email, {:error, :invalid_quantity}}
+
+  defp comp_recipient(_user, _event_id, _item_id, _recipient),
+    do: {nil, {:error, :invalid_recipient}}
+
+  # Splits per-recipient results into successfully-sent addresses and failures
+  # carrying a short, client-facing reason string.
+  defp comp_summary_json(results) do
+    {sent, failed} = Enum.split_with(results, fn {_email, res} -> match?({:ok, _}, res) end)
+
+    %{
+      sent: Enum.map(sent, fn {email, _} -> email end),
+      failed:
+        Enum.map(failed, fn {email, {:error, reason}} ->
+          %{email: email, error: comp_error(reason)}
+        end)
+    }
+  end
+
+  defp comp_error(:invalid_email), do: "invalid_email"
+  defp comp_error(:invalid_quantity), do: "invalid_quantity"
+  defp comp_error(:invalid_recipient), do: "invalid_recipient"
+  defp comp_error(:extras_not_comped), do: "extras_not_comped"
+  defp comp_error(:not_found), do: "not_found"
+  defp comp_error(:event_not_available), do: "event_not_available"
+  defp comp_error(:no_items), do: "no_items"
+  defp comp_error({:out_of_stock, name}), do: "out_of_stock: #{name}"
+  defp comp_error({:invalid_item, id}), do: "invalid_item: #{id}"
+  defp comp_error(other), do: inspect(other)
+
   @doc "GET /api/v1/orders"
   def index(conn, _params) do
     orders = Orders.list_orders(conn.assigns.current_user)

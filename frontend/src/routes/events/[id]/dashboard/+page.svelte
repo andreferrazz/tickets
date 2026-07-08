@@ -133,6 +133,9 @@
 			<a href="/events/{stats.event_id}/orders" class="btn small view-orders-btn">
 				{t('dashboard.viewOrders')}
 			</a>
+			<a href="/events/{stats.event_id}/comp" class="btn small secondary view-orders-btn">
+				{t('dashboard.sendComp')}
+			</a>
 		</div>
 		<div class="card kpi">
 			<div class="muted small">{t('dashboard.ordersPending')}</div>

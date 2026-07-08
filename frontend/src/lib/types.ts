@@ -236,6 +236,18 @@ export interface CartLine {
 	quantity: number;
 }
 
+export interface CompRecipient {
+	email: string;
+	quantity: number;
+}
+
+export interface CompTicketsResult {
+	/** Recipient emails that received their free tickets. */
+	sent: string[];
+	/** Recipients that were skipped, each with a short reason string. */
+	failed: { email: string | null; error: string }[];
+}
+
 export interface EventStatsTotals {
 	orders_paid: number;
 	orders_pending: number;

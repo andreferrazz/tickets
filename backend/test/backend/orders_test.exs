@@ -1,6 +1,8 @@
 defmodule Backend.OrdersTest do
   use Backend.DataCase, async: true
 
+  import Swoosh.TestAssertions
+
   alias Backend.{Accounts, AbacatePayMock, Events, Orders, Tickets}
   alias Backend.Events.TicketBatch
   alias Backend.Orders.Order
@@ -712,6 +714,137 @@ defmodule Backend.OrdersTest do
         ])
 
       assert {:error, :not_found} = Orders.cancel_event_order(outsider, order.id)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # create_comp_order/4 (manager-initiated free tickets)
+  # ---------------------------------------------------------------------------
+
+  describe "create_comp_order/4" do
+    defp comp_email, do: "guest_#{:rand.uniform(999_999)}@comp.test"
+
+    defp ticket_items(tt, qty),
+      do: [%{"item_type" => "ticket", "item_id" => tt.id, "quantity" => qty}]
+
+    # Setup (make_creator) sends auth-code emails to the test process mailbox;
+    # `assert_email_sent/1` inspects the oldest message, so drain them first to
+    # isolate the ticket email produced by the action under test.
+    defp flush_emails do
+      receive do
+        {:email, _} -> flush_emails()
+      after
+        0 -> :ok
+      end
+    end
+
+    test "comps a paid ticket to a brand-new email: forced free, passes issued, email sent" do
+      creator = make_creator()
+      # Default price is 5000 — the comp must force it to zero regardless.
+      {event, tt, batch} = published_event_with_tickets(creator)
+      email = comp_email()
+      flush_emails()
+
+      assert {:ok, order} =
+               Orders.create_comp_order(creator, event.id, email, ticket_items(tt, 2))
+
+      assert order.status == "paid"
+      assert order.total_cents == 0
+      assert is_nil(order.abacate_checkout_id)
+
+      # Recipient was auto-created and owns the order + passes.
+      recipient = Repo.get_by!(Accounts.User, email: email)
+      assert recipient.role == "buyer"
+      assert order.user_id == recipient.id
+
+      passes = Repo.all(from p in Pass, where: p.order_id == ^order.id)
+      assert length(passes) == 2
+      assert Enum.all?(passes, &(&1.user_id == recipient.id))
+
+      # Order items snapshot the zeroed price; stock is still reserved.
+      assert Enum.all?(order.items, &(&1.unit_price_cents == 0))
+      assert reload_batch(batch.id).quantity_sold == 2
+
+      assert_email_sent(fn mail -> Enum.any?(mail.to, fn {_, addr} -> addr == email end) end)
+    end
+
+    test "recipient adopts the same account on later login (no duplicate row)" do
+      creator = make_creator()
+      {event, tt, _batch} = published_event_with_tickets(creator, price_cents: 0)
+      email = comp_email()
+
+      assert {:ok, order} =
+               Orders.create_comp_order(creator, event.id, email, ticket_items(tt, 1))
+
+      recipient = Repo.get_by!(Accounts.User, email: email)
+
+      # Passwordless login finds the pre-created row rather than making a new one.
+      {:ok, code} = Accounts.request_code(email)
+      {:ok, %{user: logged_in}} = Accounts.verify_code(email, code)
+
+      assert logged_in.id == recipient.id
+      assert Repo.aggregate(from(u in Accounts.User, where: u.email == ^email), :count) == 1
+      assert order.user_id == logged_in.id
+    end
+
+    test "rejects a malformed email without creating a user or sending mail" do
+      creator = make_creator()
+      {event, tt, _batch} = published_event_with_tickets(creator)
+
+      assert {:error, :invalid_email} =
+               Orders.create_comp_order(creator, event.id, "not-an-email", ticket_items(tt, 1))
+
+      # No account is created for an address that fails validation; the guard
+      # short-circuits before find-or-create and before any mail is sent.
+      assert is_nil(Repo.get_by(Accounts.User, email: "not-an-email"))
+    end
+
+    test "counts against capacity: a sold-out batch is refused" do
+      creator = make_creator()
+      {event, tt, _batch} = published_event_with_tickets(creator, quantity_total: 1)
+
+      assert {:error, {:out_of_stock, _}} =
+               Orders.create_comp_order(creator, event.id, comp_email(), ticket_items(tt, 2))
+    end
+
+    test "rejects extras — comps are tickets only in v1" do
+      creator = make_creator()
+      {event, tt, _batch} = published_event_with_tickets(creator, price_cents: 0)
+      {:ok, section} = Events.create_section(creator, event.id, %{"title" => "Add-ons"})
+
+      {:ok, extra} =
+        Events.create_extra(creator, event.id, %{
+          "name" => "Drink",
+          "price_cents" => 1500,
+          "section_id" => section.id
+        })
+
+      items =
+        ticket_items(tt, 1) ++ [%{"item_type" => "extra", "item_id" => extra.id, "quantity" => 1}]
+
+      assert {:error, :extras_not_comped} =
+               Orders.create_comp_order(creator, event.id, comp_email(), items)
+    end
+
+    test "returns not_found when the caller cannot manage the event's org" do
+      creator = make_creator()
+      outsider = make_buyer()
+      {event, tt, _batch} = published_event_with_tickets(creator)
+
+      assert {:error, :not_found} =
+               Orders.create_comp_order(outsider, event.id, comp_email(), ticket_items(tt, 1))
+    end
+
+    test "returns event_not_available for an unpublished event" do
+      creator = make_creator()
+      {event, tt, _batch} = published_event_with_tickets(creator)
+
+      Repo.update_all(from(e in Backend.Events.Event, where: e.id == ^event.id),
+        set: [status: "draft"]
+      )
+
+      assert {:error, :event_not_available} =
+               Orders.create_comp_order(creator, event.id, comp_email(), ticket_items(tt, 1))
     end
   end
 end

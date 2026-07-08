@@ -9,6 +9,7 @@ defmodule Backend.Orders do
   import Ecto.Query
   require Logger
   alias Backend.Repo
+  alias Backend.Accounts
   alias Backend.Events
   alias Backend.Events.{Event, ExtraItem, Seating, TicketBatch}
   alias Backend.Orders.{Order, OrderItem}
@@ -63,6 +64,74 @@ defmodule Backend.Orders do
     line_items
     |> Enum.filter(&(&1.type == "ticket"))
     |> Enum.reduce(0, fn line, acc -> acc + line.quantity end)
+  end
+
+  @doc """
+  Issues free ("comp") tickets to `recipient_email` on behalf of an event
+  manager, bypassing checkout entirely.
+
+  Authorization: `manager` must be an admin or a leader/participant of the
+  event's organization (see `Organizations.can_manage?/2`), and the event must
+  be published. The recipient is found-or-created by email — no prior account is
+  required — and owns the resulting passes, which are emailed to them with the QR
+  codes inline. Every resolved line is forced to `price_cents: 0` so the order
+  takes the free path in `finalize_order/6`: marked paid and fulfilled inline,
+  while still reserving batch stock like a normal purchase.
+
+  Tickets only in v1 — extras are rejected. Assigned-seat events are not
+  supported (no seat is picked), so a seat-required event surfaces a seating
+  error rather than an assigned seat.
+
+  ## Example
+
+      create_comp_order(manager, event.id, "guest@example.com",
+        [%{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 2}])
+      #=> {:ok, %Order{status: "paid", total_cents: 0}}
+
+  Returns `{:ok, order}` or `{:error, reason}` where reason is one of
+  `:not_found` (missing/unmanageable event), `:event_not_available`
+  (unpublished), `:invalid_email`, `:extras_not_comped`, `:no_items`,
+  `{:out_of_stock, name}`, or `{:invalid_item, id}`.
+  """
+  def create_comp_order(manager, event_id, recipient_email, cart_items) do
+    with {:ok, event} <- authorize_manageable_published_event(manager, event_id),
+         {:ok, recipient} <- resolve_comp_recipient(recipient_email),
+         {:ok, line_items} <- resolve_items(event, cart_items),
+         :ok <- ensure_tickets_only(line_items),
+         comp_lines = Enum.map(line_items, &%{&1 | price_cents: 0}),
+         {:ok, order} <- reserve_order(recipient, event, 0, comp_lines, []) do
+      finalize_order(recipient, event, 0, comp_lines, order, nil)
+    end
+  end
+
+  defp authorize_manageable_published_event(manager, event_id) do
+    with {:ok, event} <- authorize_event(manager, event_id) do
+      ensure_published(event)
+    end
+  end
+
+  defp ensure_published(%Event{status: "published"} = event), do: {:ok, event}
+  defp ensure_published(%Event{}), do: {:error, :event_not_available}
+
+  # Normalizes then validates the recipient address through the same changeset
+  # used at signup, so a malformed email is rejected before a stray user row or
+  # ticket email is created for it.
+  defp resolve_comp_recipient(email) when is_binary(email) do
+    normalized = email |> String.trim() |> String.downcase()
+
+    if Accounts.User.changeset(%{email: normalized, role: "buyer"}).valid? do
+      Accounts.find_or_create_user(normalized)
+    else
+      {:error, :invalid_email}
+    end
+  end
+
+  defp resolve_comp_recipient(_), do: {:error, :invalid_email}
+
+  defp ensure_tickets_only(line_items) do
+    if Enum.all?(line_items, &(&1.type == "ticket")),
+      do: :ok,
+      else: {:error, :extras_not_comped}
   end
 
   # Free orders (total == 0) skip Abacate Pay entirely — there's nothing to
