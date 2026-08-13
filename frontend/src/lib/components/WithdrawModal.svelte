@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { api, ApiError, formatBRL } from '$lib/api';
-	import { formatCentsInput, parseCentsInput } from '$lib/currency';
-	import { formatDateTime } from '$lib/datetime';
+	import { formatCentsInput, parseCentsInput } from '$lib/utils/currency';
+	import { formatDateTime } from '$lib/utils/datetime';
 	import { t } from '$lib/i18n';
 	import type { TranslationKey } from '$lib/i18n/pt';
 	import type { EventStats, Payout, PayoutStatus, PixKeyType } from '$lib/types';

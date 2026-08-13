@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { fromLocalInputValue, toLocalInputValue } from '$lib/datetime';
+	import { fromLocalInputValue, toLocalInputValue } from '$lib/utils/datetime';
 	import { t } from '$lib/i18n';
 	import type { Event } from '$lib/types';
 

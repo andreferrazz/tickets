@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api, ApiError } from '$lib/api';
-	import { formatDateTime } from '$lib/datetime';
+	import { formatDateTime } from '$lib/utils/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';

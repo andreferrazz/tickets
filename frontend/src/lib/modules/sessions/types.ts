@@ -9,12 +9,3 @@ export interface SessionUser {
 	id: string;
 	role: Role;
 }
-
-export interface SessionRepository {
-	findUserByToken(token: string): Promise<SessionUser | null>;
-}
-
-export interface SessionService {
-	/** The bearer of `token`, or null when the request is anonymous. */
-	resolveUser(token: string | undefined): Promise<SessionUser | null>;
-}

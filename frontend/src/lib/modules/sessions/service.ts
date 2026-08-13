@@ -1,20 +1,30 @@
-import type { SessionRepository, SessionService, SessionUser } from './types';
+import type { SessionRepository } from './repository';
+import type { SessionUser } from './types';
 
-/**
- * Resolves who is behind a request. An absent, unknown, revoked, or expired
- * token are all the same answer here: the request is anonymous.
- *
- * @example
- * const user = await sessionService({ repository }).resolveUser(cookies.get(SESSION_COOKIE));
- */
-export function sessionService(deps: { repository: SessionRepository }): SessionService {
-	const { repository } = deps;
+export interface SessionService {
+	
+	/** 
+	 * The bearer of `token`, or null when the request is anonymous.
+ 	 * 
+	 * Resolves who is behind a request. An absent, unknown, revoked, or expired
+ 	 * token are all the same answer here: the request is anonymous.
+	 */
+	resolveUser(token: string | undefined): Promise<SessionUser | null>;
+}
+
+export function getSessionService(repository: SessionRepository): SessionService {
 	return {
+	
 		async resolveUser(token: string | undefined): Promise<SessionUser | null> {
-			// Skipping the query for an anonymous request keeps the database out of
-			// the path of every logged-out page view.
 			if (!token) return null;
-			return repository.findUserByToken(token);
+			
+			try {
+				return repository.findUserByToken(token);
+			} catch (cause) {
+				console.error(JSON.stringify({ event: 'session_lookup_failed', error: String(cause) }));
+				return null;
+			}
 		}
+	
 	};
 }

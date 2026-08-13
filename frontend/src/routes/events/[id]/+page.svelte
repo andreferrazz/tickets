@@ -4,7 +4,7 @@
 	import { api, ApiError, formatBRL } from '$lib/api';
 	import SeatPicker from '$lib/components/SeatPicker.svelte';
 	import PaymentMethodModal from '$lib/components/PaymentMethodModal.svelte';
-	import { formatDateTime } from '$lib/datetime';
+	import { formatDateTime } from '$lib/utils/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { requestLogin } from '$lib/stores/loginModal.svelte';

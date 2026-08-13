@@ -1,7 +1,5 @@
-import { createContainer } from '$lib/container';
-import { deferredQueryable } from '$lib/db/pool';
+import { getContainer } from '$lib/container';
 import { SESSION_COOKIE } from '$lib/modules/sessions/cookie';
-import type { SessionService, SessionUser } from '$lib/modules/sessions/types';
 import type { Handle } from '@sveltejs/kit';
 
 /**
@@ -13,22 +11,10 @@ import type { Handle } from '@sveltejs/kit';
  * rather than failing it.
  */
 export const handle: Handle = async ({ event, resolve }) => {
-	event.locals.container = createContainer({ queryable: deferredQueryable() });
-	event.locals.user = await currentUser(
-		event.locals.container.sessions,
-		event.cookies.get(SESSION_COOKIE)
-	);
+	const container = getContainer();
+	const token = event.cookies.get(SESSION_COOKIE);
+	const user = await container.sessionService.resolveUser(token);
+	event.locals.user = user;
+	event.locals.container = container
 	return resolve(event);
 };
-
-async function currentUser(
-	sessions: SessionService,
-	token: string | undefined
-): Promise<SessionUser | null> {
-	try {
-		return await sessions.resolveUser(token);
-	} catch (cause) {
-		console.error(JSON.stringify({ event: 'session_lookup_failed', error: String(cause) }));
-		return null;
-	}
-}

@@ -1,10 +1,11 @@
-import type { Queryable } from '$lib/db/queryable';
-import { eventRepository } from '$lib/modules/events/repository';
-import { eventService } from '$lib/modules/events/service';
-import type { EventService } from '$lib/modules/events/types';
-import { sessionRepository } from '$lib/modules/sessions/repository';
-import { sessionService } from '$lib/modules/sessions/service';
-import type { SessionService } from '$lib/modules/sessions/types';
+import { getQueryableInstance } from '$lib/db/queryable';
+import { getEventRepository } from '$lib/modules/events/repository';
+import { getEventService } from '$lib/modules/events/service';
+import type { EventService } from '$lib/modules/events/service';
+import { getSessionRepository } from '$lib/modules/sessions/repository';
+import { getSessionService } from '$lib/modules/sessions/service';
+import type { SessionService } from '$lib/modules/sessions/service';
+import { getHomeBff, type HomeBff } from './bff/home';
 
 /**
  * Everything a request handler is allowed to reach for. One entry per domain
@@ -12,8 +13,9 @@ import type { SessionService } from '$lib/modules/sessions/types';
  * detail of the module that owns them.
  */
 export interface Container {
-	events: EventService;
-	sessions: SessionService;
+	eventService: EventService;
+	sessionService: SessionService;
+	homeBff: HomeBff;
 }
 
 /**
@@ -23,14 +25,31 @@ export interface Container {
  *
  * Pure functions stay ordinary imports. Only things with dependencies belong in
  * the graph, otherwise this becomes a registry of everything.
- *
- * @example
- * const container = createContainer({ queryable: deferredQueryable() });
- * const rows = await container.events.listVisible(user);
  */
-export function createContainer(deps: { queryable: Queryable }): Container {
+export function getContainer(): Container {
+	container ??= createContainer()
+	return container
+}
+
+function createContainer(): Container {
+	
+	// repositories
+	const queryable = getQueryableInstance()
+	const sessionRepository = getSessionRepository(queryable)
+	const eventRepository = getEventRepository(queryable)
+
+	// services
+	const sessionService = getSessionService(sessionRepository)
+	const eventService = getEventService(eventRepository)
+
+	// bff
+	const homeBff = getHomeBff(eventService);
+	
 	return {
-		events: eventService({ repository: eventRepository(deps) }),
-		sessions: sessionService({ repository: sessionRepository(deps) })
+		sessionService,
+		eventService,
+		homeBff,
 	};
 }
+
+let container: Container | null

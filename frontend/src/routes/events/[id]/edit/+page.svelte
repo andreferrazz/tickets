@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api, ApiError, formatBRL } from '$lib/api';
-	import { formatCentsInput, parseCentsInput } from '$lib/currency';
+	import { formatCentsInput, parseCentsInput } from '$lib/utils/currency';
 	import EventForm from '$lib/components/EventForm.svelte';
 	import FloatingField from '$lib/components/FloatingField.svelte';
 	import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';

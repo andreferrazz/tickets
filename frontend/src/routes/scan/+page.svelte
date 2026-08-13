@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { api, ApiError } from '$lib/api';
-	import { formatDateTime } from '$lib/datetime';
+	import { formatDateTime } from '$lib/utils/datetime';
 	import { t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import type { Event } from '$lib/types';

@@ -1,5 +1,4 @@
-import { toEventJson } from '$lib/modules/events/serializer';
-import type { Event } from '$lib/types';
+import type { HomeData } from '$lib/bff/home';
 import type { PageServerLoad } from './$types';
 
 /**
@@ -11,11 +10,5 @@ import type { PageServerLoad } from './$types';
  * the previous client-fetched behaviour.
  */
 export const load: PageServerLoad = async ({ locals }) => {
-	try {
-		const rows = await locals.container.events.listVisible(locals.user);
-		return { events: rows.map(toEventJson), loadFailed: false };
-	} catch (cause) {
-		console.error(JSON.stringify({ event: 'home_events_load_failed', error: String(cause) }));
-		return { events: [] as Event[], loadFailed: true };
-	}
+	return await locals.container.homeBff.index(locals.user);
 };

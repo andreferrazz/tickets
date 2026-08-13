@@ -3,7 +3,7 @@
 	import { api, ApiError } from '$lib/api';
 	import { t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { safeNext } from '$lib/next';
+	import { safeNext } from '$lib/utils/next';
 	import { onMount } from 'svelte';
 
 	let email = $state('');

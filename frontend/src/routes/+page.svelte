@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { formatDateTime } from '$lib/datetime';
+	import { formatDateTime } from '$lib/utils/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import type { PageData } from './$types';
 
@@ -41,8 +41,8 @@
 	<div class="grid">
 		{#each filtered as ev (ev.id)}
 			<a href="/events/{ev.id}" class="event-card">
-				{#if ev.cover_image_url}
-					<img src={ev.cover_image_url} alt="" loading="lazy" />
+				{#if ev.coverImageUrl}
+					<img src={ev.coverImageUrl} alt="" loading="lazy" />
 				{:else}
 					<div class="cover-placeholder">🎟</div>
 				{/if}
@@ -51,7 +51,7 @@
 						<span class="badge {ev.status}">{tStatus(ev.status)}</span>
 					{/if}
 					<h3>{ev.title}</h3>
-					<p class="muted small">{formatDateTime(ev.starts_at)}</p>
+					<p class="muted small">{formatDateTime(ev.startsAt)}</p>
 					<p class="muted small">{ev.location}</p>
 				</div>
 			</a>

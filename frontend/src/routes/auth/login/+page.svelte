@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { api, ApiError } from '$lib/api';
 	import { t } from '$lib/i18n';
-	import { safeNext } from '$lib/next';
+	import { safeNext } from '$lib/utils/next';
 
 	let email = $state('');
 	let hint = $state<string | null>(null);

@@ -4,7 +4,7 @@
 	import { api, ApiError, formatBRL } from '$lib/api';
 	import BuyerModal, { type BuyerTarget } from '$lib/components/BuyerModal.svelte';
 	import WithdrawModal from '$lib/components/WithdrawModal.svelte';
-	import { formatDateTime } from '$lib/datetime';
+	import { formatDateTime } from '$lib/utils/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import type { EventStats } from '$lib/types';

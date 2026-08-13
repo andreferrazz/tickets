@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { api, ApiError } from '$lib/api';
 	import QrScanner from '$lib/components/QrScanner.svelte';
-	import { formatDateTime } from '$lib/datetime';
+	import { formatDateTime } from '$lib/utils/datetime';
 	import { t } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import type { EventDetail, ValidateResult } from '$lib/types';

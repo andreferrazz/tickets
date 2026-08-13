@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { api, ApiError, formatBRL, isCancellable } from '$lib/api';
 	import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';
-	import { formatDateTime } from '$lib/datetime';
+	import { formatDateTime } from '$lib/utils/datetime';
 	import { t, tStatus } from '$lib/i18n';
 	import { auth } from '$lib/stores/auth.svelte';
 	import type { EventOrder, EventOrderLine, OrderStatus, PaymentMethod } from '$lib/types';
