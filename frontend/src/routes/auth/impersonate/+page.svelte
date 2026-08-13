@@ -20,10 +20,10 @@
 		auth.token = token;
 		try {
 			const user = await api.me();
-			auth.set(token, user);
+			await auth.set(token, user);
 			await goto('/');
 		} catch {
-			auth.clear();
+			await auth.clear();
 			error = t('impersonate.errorFallback');
 		}
 	});

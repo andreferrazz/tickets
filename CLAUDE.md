@@ -21,16 +21,24 @@
 
 ## Tests
 
-- Tests run with a single command: `<project-specific>`.
-- Every new function gets a test. Bug fixes get a regression test.
-- Mock external I/O (API, DB, filesystem) with named fake classes,
-  not inline stubs.
+- Tests run with a single command: `mix test` in `backend/`, `npm test` in `frontend/`.
+- `backend/`: ExUnit, unit and controller level. Every new function gets a
+  test. Bug fixes get a regression test. Mock external I/O (API, DB,
+  filesystem) with named fake classes, not inline stubs.
+- `frontend/`: Playwright e2e only — a few specs covering the main flow, no
+  unit tests. Specs live in `frontend/e2e/`. They run against the seeded
+  `tickets_e2e` database (built by `e2e/support/database.ts`), never
+  `backend_dev`.
 - Tests must be F.I.R.S.T: fast, independent, repeatable,
   self-validating, timely.
 
 ## Dependencies
 
 - Inject dependencies through constructor/parameter, not global/import.
+  Server modules: each factory takes one `deps` object and returns an
+  interface (`eventService(deps: { repository })`). The graph is assembled
+  only in `frontend/src/lib/container.ts` and reaches handlers via
+  `event.locals.container`.
 - Wrap third-party libs behind a thin interface owned by this project.
 
 ## Structure

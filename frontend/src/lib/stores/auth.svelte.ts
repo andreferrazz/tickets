@@ -2,6 +2,7 @@ import { browser } from '$app/environment';
 import type { OrganizationMembership, User } from '$lib/types';
 
 const STORAGE_KEY = 'tickets.auth';
+const SESSION_ENDPOINT = '/api/session';
 
 interface Persisted {
 	token: string;
@@ -19,6 +20,23 @@ function load(): Persisted | null {
 	}
 }
 
+/**
+ * Copies the token into an httpOnly cookie so server-rendered routes know who is
+ * asking. localStorage stays the source of truth for the `Authorization: Bearer`
+ * header, which every Phoenix-served endpoint still needs.
+ */
+async function storeSessionCookie(token: string): Promise<void> {
+	await fetch(SESSION_ENDPOINT, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ token })
+	});
+}
+
+async function dropSessionCookie(): Promise<void> {
+	await fetch(SESSION_ENDPOINT, { method: 'DELETE' });
+}
+
 class AuthStore {
 	token = $state<string | null>(null);
 	user = $state<User | null>(null);
@@ -34,12 +52,18 @@ class AuthStore {
 		}
 	}
 
-	set(token: string, user: User): void {
+	/**
+	 * Await this before navigating: the server reads the session cookie while
+	 * rendering, so a navigation that races the cookie write renders as anonymous.
+	 */
+	async set(token: string, user: User): Promise<void> {
 		this.token = token;
 		this.user = user;
 		this.memberships = null;
 		this.#inflight = null;
-		if (browser) localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user }));
+		if (!browser) return;
+		localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user }));
+		await storeSessionCookie(token);
 	}
 
 	setUser(user: User): void {
@@ -49,12 +73,25 @@ class AuthStore {
 		}
 	}
 
-	clear(): void {
+	/**
+	 * Re-issues the session cookie from the token held in localStorage. Covers
+	 * sessions that predate the cookie and cookies that expired before the token
+	 * did; without it those visitors would be server-rendered as anonymous.
+	 */
+	async restoreSessionCookie(): Promise<void> {
+		if (!browser || !this.token) return;
+		await storeSessionCookie(this.token);
+	}
+
+	/** Await this before navigating, for the same reason as {@link AuthStore.set}. */
+	async clear(): Promise<void> {
 		this.token = null;
 		this.user = null;
 		this.memberships = null;
 		this.#inflight = null;
-		if (browser) localStorage.removeItem(STORAGE_KEY);
+		if (!browser) return;
+		localStorage.removeItem(STORAGE_KEY);
+		await dropSessionCookie();
 	}
 
 	/**

@@ -1,34 +1,21 @@
 <script lang="ts">
-	import { api, ApiError } from '$lib/api';
 	import { formatDateTime } from '$lib/datetime';
 	import { t, tStatus } from '$lib/i18n';
-	import type { Event } from '$lib/types';
-	import { onMount } from 'svelte';
+	import type { PageData } from './$types';
 
-	let events = $state<Event[]>([]);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
+	let { data }: { data: PageData } = $props();
+
 	let query = $state('');
-	// Closed events are returned by the API but hidden until the user opts in.
+	// Closed events are served by the load function but hidden until the user opts in.
 	let showClosed = $state(false);
 
 	const filtered = $derived.by(() => {
 		const q = query.toLowerCase();
-		return events.filter((e) => {
+		return data.events.filter((e) => {
 			if (!showClosed && e.status === 'closed') return false;
 			if (!q) return true;
 			return e.title.toLowerCase().includes(q) || e.location.toLowerCase().includes(q);
 		});
-	});
-
-	onMount(async () => {
-		try {
-			events = await api.listEvents();
-		} catch (e) {
-			error = e instanceof ApiError ? e.message : t('home.errorFallback');
-		} finally {
-			loading = false;
-		}
 	});
 </script>
 
@@ -46,10 +33,8 @@
 	{t('home.showClosed')}
 </label>
 
-{#if loading}
-	<p class="muted">{t('common.loading')}</p>
-{:else if error}
-	<div class="error">{error}</div>
+{#if data.loadFailed}
+	<div class="error">{t('home.errorFallback')}</div>
 {:else if filtered.length === 0}
 	<p class="muted">{t('home.noResults')}</p>
 {:else}

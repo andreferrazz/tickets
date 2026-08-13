@@ -28,6 +28,9 @@
 		registerSW({ immediate: true });
 		// Needed so the nav can decide whether to show the staff "Scan" entry.
 		if (auth.isAuthed) auth.loadMemberships();
+		// Keeps the server's view of the session in step with localStorage, which
+		// is still the source of truth while Phoenix serves most endpoints.
+		auth.restoreSessionCookie();
 	});
 
 	// Force authed users to complete their profile before navigating anywhere
@@ -48,7 +51,7 @@
 		} catch {
 			/* ignore */
 		}
-		auth.clear();
+		await auth.clear();
 		await goto('/');
 	}
 </script>

@@ -22,7 +22,7 @@
 		busy = true;
 		try {
 			const res = await api.verifyCode(email, code);
-			auth.set(res.token, res.user);
+			await auth.set(res.token, res.user);
 			sessionStorage.removeItem('tickets.pending_email');
 
 			if (!res.user.profile_complete) {

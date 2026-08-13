@@ -31,7 +31,7 @@
 		} catch {
 			/* ignore */
 		}
-		auth.clear();
+		await auth.clear();
 		await goto('/');
 	}
 

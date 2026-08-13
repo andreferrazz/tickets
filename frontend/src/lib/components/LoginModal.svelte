@@ -67,7 +67,7 @@
 		busy = true;
 		try {
 			const res = await api.verifyCode(loginModalStore.email, code);
-			auth.set(res.token, res.user);
+			await auth.set(res.token, res.user);
 			if (!res.user.profile_complete) {
 				loginModalStore.toProfile();
 			} else {
