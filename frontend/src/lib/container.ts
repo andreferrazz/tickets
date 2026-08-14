@@ -1,4 +1,5 @@
 import { getQueryableInstance } from '$lib/db/queryable';
+import { getEventMapper } from '$lib/modules/events/mapper';
 import { getEventRepository } from '$lib/modules/events/repository';
 import { getEventService } from '$lib/modules/events/service';
 import type { EventService } from '$lib/modules/events/service';
@@ -42,8 +43,11 @@ function createContainer(): Container {
 	const sessionService = getSessionService(sessionRepository)
 	const eventService = getEventService(eventRepository)
 
+	// mappers
+	const eventMapper = getEventMapper()
+
 	// bff
-	const homeBff = getHomeBff(eventService);
+	const homeBff = getHomeBff(eventService, eventMapper);
 	
 	return {
 		sessionService,

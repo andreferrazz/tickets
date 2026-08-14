@@ -1,6 +1,6 @@
 /**
  * A row of the `events` table, as Postgres returns it. Column names stay
- * snake_case and timestamps stay `Date` — {@link toEventJson} is what turns this
+ * snake_case and timestamps stay `Date` — {@link EventMapper} is what turns this
  * into the wire shape.
  */
 export interface EventRow {
