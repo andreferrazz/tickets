@@ -12,7 +12,7 @@
 
 	const methods: { value: PaymentMethod; label: string }[] = [
 		{ value: 'PIX', label: t('payment.pix') },
-		{ value: 'CARD', label: t('payment.card') },
+		// { value: 'CARD', label: t('payment.card') },
 		{ value: 'BOLETO', label: t('payment.boleto') },
 	];
 
