@@ -82,6 +82,7 @@ export const pt = {
 	'home.subtitle': 'Encontre ingressos e complementos para eventos perto de você.',
 	'home.searchPlaceholder': 'Buscar eventos...',
 	'home.showClosed': 'Mostrar eventos encerrados',
+	'home.applyFilters': 'Filtrar',
 	'home.noResults': 'Nenhum evento encontrado.',
 	'home.errorFallback': 'Falha ao carregar eventos',
 	'home.guestTitle': 'Entre para ver os eventos',

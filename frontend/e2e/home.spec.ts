@@ -14,9 +14,7 @@ import {
 const SESSION_COOKIE = 'tickets_session';
 
 async function signIn(context: BrowserContext, token: string): Promise<void> {
-	await context.addCookies([
-		{ name: SESSION_COOKIE, value: token, url: 'http://localhost:5273' }
-	]);
+	await context.addCookies([{ name: SESSION_COOKIE, value: token, url: 'http://localhost:5273' }]);
 }
 
 test('an anonymous visitor sees published events and no drafts', async ({ page }) => {
@@ -61,20 +59,38 @@ test('an admin sees drafts from an organization they do not belong to', async ({
 	await expect(page.getByRole('heading', { name: OTHER_ORG_DRAFT.title })).toBeVisible();
 });
 
+// The form has no submit button, so ticking the box only submits once the page
+// has hydrated. Waiting for the network to settle asserts that path instead of
+// racing it.
 test('closed events stay hidden until the visitor asks for them', async ({ page }) => {
 	await page.goto('/');
+	await page.waitForLoadState('networkidle');
 	await expect(page.getByRole('heading', { name: CLOSED_EVENT.title })).toHaveCount(0);
 
 	await page.getByRole('checkbox').check();
 
+	await expect(page).toHaveURL(/closed=1/);
 	await expect(page.getByRole('heading', { name: CLOSED_EVENT.title })).toBeVisible();
+});
+
+// The filters used to be component state, which meant the served HTML ignored
+// them and the toggle only worked if hydration did. Assert at the HTML level so
+// a regression can't hide behind client-side rendering.
+test('the closed filter is applied server-side', async ({ request }) => {
+	const withClosed = await (await request.get('/?closed=1')).text();
+	const withoutClosed = await (await request.get('/')).text();
+
+	expect(withClosed).toContain(CLOSED_EVENT.title);
+	expect(withoutClosed).not.toContain(CLOSED_EVENT.title);
 });
 
 test('search narrows the rendered list', async ({ page }) => {
 	await page.goto('/');
 
 	await page.getByRole('textbox').fill('Published');
+	await page.getByRole('textbox').press('Enter');
 
+	await expect(page).toHaveURL(/search=Published/);
 	await expect(page.getByRole('heading', { name: PUBLISHED_EVENT.title })).toBeVisible();
 	await expect(page.getByRole('heading', { name: CLOSED_EVENT.title })).toHaveCount(0);
 });

@@ -24,6 +24,8 @@
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@types/pg": "^8.21.0",
 		"@vite-pwa/sveltekit": "^1.1.0",
+		"prettier": "^3.9.6",
+		"prettier-plugin-svelte": "^4.1.1",
 		"svelte": "^5.55.2",
 		"svelte-check": "^4.4.6",
 		"typescript": "^6.0.2",
