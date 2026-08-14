@@ -1,350 +1,317 @@
 export type Role = 'buyer' | 'creator' | 'admin';
 
 export interface User {
-	id: string;
-	email: string;
-	role: Role;
-	invited_by: string | null;
-	name: string | null;
-	cellphone: string | null;
-	tax_id: string | null;
-	abacate_customer_id: string | null;
-	profile_complete: boolean;
-	created_at: string;
+    id: string;
+    email: string;
+    role: Role;
+    invited_by: string | null;
+    name: string | null;
+    cellphone: string | null;
+    tax_id: string | null;
+    abacate_customer_id: string | null;
+    profile_complete: boolean;
+    created_at: string;
 }
 
 export interface ProfileUpdate {
-	name: string;
-	cellphone: string;
-	tax_id: string;
+    name: string;
+    cellphone: string;
+    tax_id: string;
 }
 
 export interface Event {
-	id: string;
-	organization_id: string;
-	created_by_id: string | null;
-	title: string;
-	description: string;
-	tickets_description: string | null;
-	location: string;
-	starts_at: string;
-	ends_at: string | null;
-	cover_image_url: string | null;
-	status: 'draft' | 'published' | 'cancelled' | 'closed';
-	seat_selection_enabled: boolean;
-	seats_per_table: number | null;
-	created_at: string;
-	updated_at: string;
-}
-
-export interface SeatTable {
-	id: string;
-	event_id: string;
-	name: string;
-	position: number;
-}
-
-export interface SeatingTableSnapshot {
-	id: string;
-	name: string;
-	position: number;
-	taken_seats: number[];
-}
-
-export interface Seating {
-	seats_per_table: number;
-	tables: SeatingTableSnapshot[];
-}
-
-export interface SeatPick {
-	seat_table_id: string;
-	seat_number: number;
+    id: string;
+    organization_id: string;
+    created_by_id: string | null;
+    title: string;
+    description: string;
+    tickets_description: string | null;
+    location: string;
+    starts_at: string;
+    ends_at: string | null;
+    cover_image_url: string | null;
+    status: 'draft' | 'published' | 'cancelled' | 'closed';
+    created_at: string;
+    updated_at: string;
 }
 
 export interface Batch {
-	id: string;
-	ticket_type_id: string;
-	sequence: number;
-	label: string;
-	price_cents: number;
-	quantity_total: number;
-	quantity_sold: number;
-	closed_at: string | null;
+    id: string;
+    ticket_type_id: string;
+    sequence: number;
+    label: string;
+    price_cents: number;
+    quantity_total: number;
+    quantity_sold: number;
+    closed_at: string | null;
 }
 
 export interface TicketType {
-	id: string;
-	event_id: string;
-	name: string;
-	description: string;
-	sales_start: string | null;
-	sales_end: string | null;
-	active_batch: Batch | null;
-	batches: Batch[];
+    id: string;
+    event_id: string;
+    name: string;
+    description: string;
+    sales_start: string | null;
+    sales_end: string | null;
+    active_batch: Batch | null;
+    batches: Batch[];
 }
 
 export interface ExtraItem {
-	id: string;
-	event_id: string;
-	section_id: string;
-	name: string;
-	description: string;
-	price_cents: number;
-	quantity_total: number | null;
-	quantity_sold: number;
-	show_remaining: boolean;
-	limit_to_ticket_count: boolean;
+    id: string;
+    event_id: string;
+    section_id: string;
+    name: string;
+    description: string;
+    price_cents: number;
+    quantity_total: number | null;
+    quantity_sold: number;
+    show_remaining: boolean;
+    limit_to_ticket_count: boolean;
 }
 
 export interface ExtraSection {
-	id: string;
-	event_id: string;
-	title: string;
-	description: string | null;
-	position: number;
-	extras: ExtraItem[];
+    id: string;
+    event_id: string;
+    title: string;
+    description: string | null;
+    position: number;
+    extras: ExtraItem[];
 }
 
 export interface EventDetail extends Event {
-	ticket_types: TicketType[];
-	extra_sections: ExtraSection[];
-	seating: Seating | null;
+    ticket_types: TicketType[];
+    extra_sections: ExtraSection[];
 }
 
 export type OrderStatus = 'pending' | 'paid' | 'expired' | 'refunded' | 'cancelled';
 
 export interface OrderItem {
-	id: string;
-	order_id: string;
-	item_type: 'ticket' | 'extra';
-	item_id: string;
-	item_name: string;
-	quantity: number;
-	unit_price_cents: number;
+    id: string;
+    order_id: string;
+    item_type: 'ticket' | 'extra';
+    item_id: string;
+    item_name: string;
+    quantity: number;
+    unit_price_cents: number;
 }
 
 export interface Pass {
-	id: string;
-	kind: 'ticket' | 'extra';
-	item_name: string;
-	seat_label: string | null;
-	token: string;
-	checked_in_at: string | null;
-	qr_png_base64: string;
+    id: string;
+    kind: 'ticket' | 'extra';
+    item_name: string;
+    seat_label: string | null;
+    token: string;
+    checked_in_at: string | null;
+    qr_png_base64: string;
 }
 
 export interface ValidateResult {
-	status: 'checked_in' | 'already_checked_in';
-	pass: {
-		id: string;
-		kind: 'ticket' | 'extra';
-		item_name: string;
-		seat_label: string | null;
-		event_id: string;
-		order_id: string;
-		checked_in_at: string | null;
-		extras: { name: string; quantity: number }[];
-	};
+    status: 'checked_in' | 'already_checked_in';
+    pass: {
+        id: string;
+        kind: 'ticket' | 'extra';
+        item_name: string;
+        seat_label: string | null;
+        event_id: string;
+        order_id: string;
+        checked_in_at: string | null;
+        extras: { name: string; quantity: number }[];
+    };
 }
 
 export interface Order {
-	id: string;
-	user_id: string;
-	event_id: string;
-	event_title: string;
-	status: OrderStatus;
-	total_cents: number;
-	abacate_payment_url: string | null;
-	paid_at: string | null;
-	created_at: string;
-	items: OrderItem[];
+    id: string;
+    user_id: string;
+    event_id: string;
+    event_title: string;
+    status: OrderStatus;
+    total_cents: number;
+    abacate_payment_url: string | null;
+    paid_at: string | null;
+    created_at: string;
+    items: OrderItem[];
 }
 
 export type PaymentMethod = 'PIX' | 'CARD' | 'BOLETO';
 
 export interface EventOrderLine {
-	name: string;
-	quantity: number;
-	unit_price_cents: number;
+    name: string;
+    quantity: number;
+    unit_price_cents: number;
 }
 
 export interface EventOrder {
-	id: string;
-	buyer_name: string | null;
-	buyer_email: string;
-	buyer_phone: string | null;
-	status: OrderStatus;
-	total_cents: number;
-	payment_method: PaymentMethod | null;
-	paid_at: string | null;
-	created_at: string;
-	tickets: EventOrderLine[];
-	extras: EventOrderLine[];
-	/** Checked-in ticket passes; paired with the ticket total as validated/total. */
-	validated_count: number;
+    id: string;
+    buyer_name: string | null;
+    buyer_email: string;
+    buyer_phone: string | null;
+    status: OrderStatus;
+    total_cents: number;
+    payment_method: PaymentMethod | null;
+    paid_at: string | null;
+    created_at: string;
+    tickets: EventOrderLine[];
+    extras: EventOrderLine[];
+    /** Checked-in ticket passes; paired with the ticket total as validated/total. */
+    validated_count: number;
 }
 
 export interface Invitation {
-	id: string;
-	inviter_id: string;
-	organization_id: string;
-	role: OrgRole;
-	email: string;
-	status: 'pending' | 'accepted';
-	created_at: string;
+    id: string;
+    inviter_id: string;
+    organization_id: string;
+    role: OrgRole;
+    email: string;
+    status: 'pending' | 'accepted';
+    created_at: string;
 }
 
 export interface Organization {
-	id: string;
-	name: string;
-	pix_key?: string | null;
-	pix_key_type?: PixKeyType | null;
-	created_at?: string;
-	updated_at?: string;
+    id: string;
+    name: string;
+    pix_key?: string | null;
+    pix_key_type?: PixKeyType | null;
+    created_at?: string;
+    updated_at?: string;
 }
 
 export type OrgRole = 'leader' | 'participant' | 'staff';
 
 export interface OrgMember {
-	user_id: string;
-	email: string;
-	role: OrgRole;
+    user_id: string;
+    email: string;
+    role: OrgRole;
 }
 
 export interface InvitedOrganization {
-	id: string;
-	name: string;
-	role: OrgRole;
+    id: string;
+    name: string;
+    role: OrgRole;
 }
 
 export interface OrganizationMembership {
-	id: string;
-	name: string;
-	role: OrgRole;
+    id: string;
+    name: string;
+    role: OrgRole;
 }
 
 export interface AuthResponse {
-	token: string;
-	user: User;
-	/** Present only when this auth response came from accepting an invitation. */
-	organization?: InvitedOrganization;
+    token: string;
+    user: User;
+    /** Present only when this auth response came from accepting an invitation. */
+    organization?: InvitedOrganization;
 }
 
 export interface CartLine {
-	item_type: 'ticket' | 'extra';
-	item_id: string;
-	quantity: number;
+    item_type: 'ticket' | 'extra';
+    item_id: string;
+    quantity: number;
 }
 
 export interface CompRecipient {
-	email: string;
-	quantity: number;
+    email: string;
+    quantity: number;
 }
 
 export interface CompTicketsResult {
-	/** Recipient emails that received their free tickets. */
-	sent: string[];
-	/** Recipients that were skipped, each with a short reason string. */
-	failed: { email: string | null; error: string }[];
+    /** Recipient emails that received their free tickets. */
+    sent: string[];
+    /** Recipients that were skipped, each with a short reason string. */
+    failed: { email: string | null; error: string }[];
 }
 
 export interface EventStatsTotals {
-	orders_paid: number;
-	orders_pending: number;
-	revenue_cents: number;
-	gross_revenue_cents: number;
-	fees_cents: number;
-	net_revenue_cents: number;
-	available_to_withdraw_cents: number;
-	last_payout_at: string | null;
-	tickets_sold: number;
-	tickets_capacity: number;
-	extras_sold: number;
-	passes_issued: number;
-	passes_checked_in: number;
+    orders_paid: number;
+    orders_pending: number;
+    revenue_cents: number;
+    gross_revenue_cents: number;
+    fees_cents: number;
+    net_revenue_cents: number;
+    available_to_withdraw_cents: number;
+    last_payout_at: string | null;
+    tickets_sold: number;
+    tickets_capacity: number;
+    extras_sold: number;
+    passes_issued: number;
+    passes_checked_in: number;
 }
 
 export type PixKeyType = 'cpf' | 'cnpj' | 'email' | 'phone' | 'evp';
 
 export interface PayoutSettings {
-	pix_key: string | null;
-	pix_key_type: PixKeyType | null;
+    pix_key: string | null;
+    pix_key_type: PixKeyType | null;
 }
 
-export type PayoutStatus =
-	| 'pending'
-	| 'complete'
-	| 'failed'
-	| 'cancelled'
-	| 'refunded'
-	| 'expired';
+export type PayoutStatus = 'pending' | 'complete' | 'failed' | 'cancelled' | 'refunded' | 'expired';
 
 export interface Payout {
-	id: string;
-	amount_cents: number;
-	status: PayoutStatus;
-	pix_key: string;
-	pix_key_type: PixKeyType;
-	receipt_url: string | null;
-	error_message: string | null;
-	created_at: string;
+    id: string;
+    amount_cents: number;
+    status: PayoutStatus;
+    pix_key: string;
+    pix_key_type: PixKeyType;
+    receipt_url: string | null;
+    error_message: string | null;
+    created_at: string;
 }
 
 export interface BatchStats {
-	id: string;
-	sequence: number;
-	label: string;
-	sold: number;
-	capacity: number;
-	price_cents: number;
-	closed_at: string | null;
+    id: string;
+    sequence: number;
+    label: string;
+    sold: number;
+    capacity: number;
+    price_cents: number;
+    closed_at: string | null;
 }
 
 export interface TicketTypeStats {
-	id: string;
-	name: string;
-	sold: number;
-	capacity: number;
-	revenue_cents: number;
-	batches: BatchStats[];
+    id: string;
+    name: string;
+    sold: number;
+    capacity: number;
+    revenue_cents: number;
+    batches: BatchStats[];
 }
 
 export interface ExtraStats {
-	id: string;
-	name: string;
-	section_title: string;
-	sold: number;
-	capacity: number | null;
-	revenue_cents: number;
+    id: string;
+    name: string;
+    section_title: string;
+    sold: number;
+    capacity: number | null;
+    revenue_cents: number;
 }
 
 export interface RecentOrderRow {
-	id: string;
-	buyer_email: string;
-	status: OrderStatus;
-	total_cents: number;
-	paid_at: string | null;
-	created_at: string;
-	item_count: number;
+    id: string;
+    buyer_email: string;
+    status: OrderStatus;
+    total_cents: number;
+    paid_at: string | null;
+    created_at: string;
+    item_count: number;
 }
 
 export interface EventStats {
-	event_id: string;
-	totals: EventStatsTotals;
-	ticket_types: TicketTypeStats[];
-	extras: ExtraStats[];
-	recent_orders: RecentOrderRow[];
-	can_withdraw: boolean;
-	organization: {
-		id: string;
-		pix_key: string | null;
-		pix_key_type: PixKeyType | null;
-	};
+    event_id: string;
+    totals: EventStatsTotals;
+    ticket_types: TicketTypeStats[];
+    extras: ExtraStats[];
+    recent_orders: RecentOrderRow[];
+    can_withdraw: boolean;
+    organization: {
+        id: string;
+        pix_key: string | null;
+        pix_key_type: PixKeyType | null;
+    };
 }
 
 export interface ExtraBuyer {
-	name: string | null;
-	tax_id: string | null;
-	email: string;
-	quantity: number;
+    name: string | null;
+    tax_id: string | null;
+    email: string;
+    quantity: number;
 }

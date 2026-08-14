@@ -29,8 +29,6 @@ export function getEventMapper(): EventMapper {
                 endsAt: toIso8601UtcOrNull(row.ends_at),
                 coverImageUrl: row.cover_image_url,
                 status: row.status,
-                seatSelectionEnabled: row.seat_selection_enabled,
-                seatsPerTable: row.seats_per_table,
                 createdAt: toIso8601Utc(row.inserted_at),
                 updatedAt: toIso8601Utc(row.updated_at)
             };

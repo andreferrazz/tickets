@@ -1,435 +1,402 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { page } from '$app/state';
-	import { api, ApiError, formatBRL } from '$lib/api';
-	import SeatPicker from '$lib/components/SeatPicker.svelte';
-	import PaymentMethodModal from '$lib/components/PaymentMethodModal.svelte';
-	import { formatDateTime } from '$lib/utils/datetime';
-	import { t, tStatus } from '$lib/i18n';
-	import { auth } from '$lib/stores/auth.svelte';
-	import { requestLogin } from '$lib/stores/loginModal.svelte';
-	import type { CartLine, EventDetail, PaymentMethod, SeatPick } from '$lib/types';
-	import { onMount } from 'svelte';
+    import { goto } from '$app/navigation';
+    import { api, ApiError, formatBRL } from '$lib/api';
+    import PaymentMethodModal from '$lib/components/PaymentMethodModal.svelte';
+    import { formatDateTime } from '$lib/utils/datetime';
+    import { t, tStatus } from '$lib/i18n';
+    import { auth } from '$lib/stores/auth.svelte';
+    import { requestLogin } from '$lib/stores/loginModal.svelte';
+    import type { CartLine, PaymentMethod } from '$lib/types';
+    import { onMount } from 'svelte';
+    import type { PageData } from './$types';
 
-	let event = $state<EventDetail | null>(null);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
-	let buyError = $state<string | null>(null);
-	let busy = $state(false);
-	let paymentModalOpen = $state(false);
+    let { data }: { data: PageData } = $props();
 
-	let qty = $state<Record<string, number>>({});
-	let seatPicks = $state<SeatPick[]>([]);
+    // Server-rendered: an event that does not exist, or that this visitor may not
+    // see, never reaches this component — the load function answers 404 instead.
+    const event = $derived(data.event);
 
-	const allExtras = $derived(event ? event.extra_sections.flatMap((s) => s.extras) : []);
+    let buyError = $state<string | null>(null);
+    let busy = $state(false);
+    let paymentModalOpen = $state(false);
 
-	const lines = $derived.by(() => {
-		if (!event) return [] as CartLine[];
-		const out: CartLine[] = [];
-		for (const t of event.ticket_types) {
-			const q = qty[`t:${t.id}`] ?? 0;
-			if (q > 0) out.push({ item_type: 'ticket', item_id: t.id, quantity: q });
-		}
-		for (const x of allExtras) {
-			const q = qty[`x:${x.id}`] ?? 0;
-			if (q > 0) out.push({ item_type: 'extra', item_id: x.id, quantity: q });
-		}
-		return out;
-	});
+    let qty = $state<Record<string, number>>({});
 
-	const ticketCount = $derived(
-		lines.filter((l) => l.item_type === 'ticket').reduce((acc, l) => acc + l.quantity, 0)
-	);
-	const seatsRequired = $derived(!!event?.seat_selection_enabled && ticketCount > 0);
-	const seatsReady = $derived(!seatsRequired || seatPicks.length === ticketCount);
+    const allExtras = $derived(event ? event.extraSections.flatMap((s) => s.extras) : []);
 
-	$effect(() => {
-		if (seatPicks.length > ticketCount) {
-			seatPicks = seatPicks.slice(0, ticketCount);
-		}
-	});
+    const lines = $derived.by(() => {
+        if (!event) return [] as CartLine[];
+        const out: CartLine[] = [];
+        for (const t of event.ticketTypes) {
+            const q = qty[`t:${t.id}`] ?? 0;
+            if (q > 0) out.push({ item_type: 'ticket', item_id: t.id, quantity: q });
+        }
+        for (const x of allExtras) {
+            const q = qty[`x:${x.id}`] ?? 0;
+            if (q > 0) out.push({ item_type: 'extra', item_id: x.id, quantity: q });
+        }
+        return out;
+    });
 
-	// Capped extras must never exceed the live ticket count. When the buyer
-	// reduces tickets, trim their existing extra qty silently.
-	$effect(() => {
-		for (const x of allExtras) {
-			if (!x.limit_to_ticket_count) continue;
-			const key = `x:${x.id}`;
-			const cur = qty[key] ?? 0;
-			if (cur > ticketCount) {
-				qty = { ...qty, [key]: ticketCount };
-			}
-		}
-	});
+    const ticketCount = $derived(
+        lines.filter((l) => l.item_type === 'ticket').reduce((acc, l) => acc + l.quantity, 0)
+    );
+    // Capped extras must never exceed the live ticket count. When the buyer
+    // reduces tickets, trim their existing extra qty silently.
+    $effect(() => {
+        for (const x of allExtras) {
+            if (!x.limitToTicketCount) continue;
+            const key = `x:${x.id}`;
+            const cur = qty[key] ?? 0;
+            if (cur > ticketCount) {
+                qty = { ...qty, [key]: ticketCount };
+            }
+        }
+    });
 
-	const total = $derived.by(() => {
-		if (!event) return 0;
-		let sum = 0;
-		for (const tk of event.ticket_types) {
-			const price = tk.active_batch?.price_cents ?? 0;
-			sum += (qty[`t:${tk.id}`] ?? 0) * price;
-		}
-		for (const x of allExtras) sum += (qty[`x:${x.id}`] ?? 0) * x.price_cents;
-		return sum;
-	});
+    const total = $derived.by(() => {
+        if (!event) return 0;
+        let sum = 0;
+        for (const tk of event.ticketTypes) {
+            const price = tk.activeBatch?.priceCents ?? 0;
+            sum += (qty[`t:${tk.id}`] ?? 0) * price;
+        }
+        for (const x of allExtras) sum += (qty[`x:${x.id}`] ?? 0) * x.priceCents;
+        return sum;
+    });
 
-	const canEdit = $derived(
-		!!auth.isCreator && !!event && auth.canManageOrg(event.organization_id)
-	);
+    // Always false in the server HTML: the auth store is browser-only, so the
+    // creator actions appear on hydration.
+    const canEdit = $derived(
+        !!auth.isCreator && !!event && auth.canManageOrg(event.organizationId)
+    );
 
-	// Closed events stay viewable but no longer sell: block cart edits and checkout.
-	const isClosed = $derived(event?.status === 'closed');
+    // Closed events stay viewable but no longer sell: block cart edits and checkout.
+    const isClosed = $derived(event?.status === 'closed');
 
-	onMount(async () => {
-		try {
-			event = await api.getEvent(page.params.id!);
-		} catch (e) {
-			error = e instanceof ApiError ? e.message : t('event.errorFallback');
-		} finally {
-			loading = false;
-		}
-		// Best-effort: memberships only gate the edit affordance (canEdit) and must never
-		// block viewing a public event. A stale token is cleared globally in request().
-		if (auth.isAuthed) void auth.loadMemberships().catch(() => {});
-	});
+    onMount(() => {
+        // Best-effort: memberships only gate the edit affordance (canEdit) and must never
+        // block viewing a public event. A stale token is cleared globally in request().
+        if (auth.isAuthed) void auth.loadMemberships().catch(() => {});
+    });
 
-	function bump(key: string, delta: number, max: number) {
-		if (isClosed) return;
-		const cur = qty[key] ?? 0;
-		const next = Math.max(0, Math.min(max, cur + delta));
-		qty = { ...qty, [key]: next };
-	}
+    function bump(key: string, delta: number, max: number) {
+        if (isClosed) return;
+        const cur = qty[key] ?? 0;
+        const next = Math.max(0, Math.min(max, cur + delta));
+        qty = { ...qty, [key]: next };
+    }
 
-	async function refreshSeating() {
-		if (!event) return;
-		const fresh = await api.getEventSeating(event.id);
-		event = { ...event, seating: fresh };
-		// Drop any picks that became taken in the meantime.
-		const taken = new Map(fresh.tables.map((t) => [t.id, new Set(t.taken_seats)]));
-		seatPicks = seatPicks.filter((p) => !taken.get(p.seat_table_id)?.has(p.seat_number));
-	}
+    async function buy() {
+        if (!event || isClosed || lines.length === 0) return;
+        if (!auth.isAuthed || !auth.user?.profile_complete) {
+            const ok = await requestLogin();
+            if (!ok) return;
+        }
+        // Free orders skip Abacate entirely, so there's no method to choose.
+        if (total === 0) {
+            await submitOrder();
+        } else {
+            paymentModalOpen = true;
+        }
+    }
 
-	async function buy() {
-		if (!event || isClosed || lines.length === 0) return;
-		if (!seatsReady) return;
-		if (!auth.isAuthed || !auth.user?.profile_complete) {
-			const ok = await requestLogin();
-			if (!ok) return;
-		}
-		// Free orders skip Abacate entirely, so there's no method to choose.
-		if (total === 0) {
-			await submitOrder();
-		} else {
-			paymentModalOpen = true;
-		}
-	}
+    async function onPaymentMethod(method: PaymentMethod) {
+        paymentModalOpen = false;
+        await submitOrder(method);
+    }
 
-	async function onPaymentMethod(method: PaymentMethod) {
-		paymentModalOpen = false;
-		await submitOrder(method);
-	}
-
-	async function submitOrder(method?: PaymentMethod) {
-		if (!event) return;
-		buyError = null;
-		busy = true;
-		try {
-			const order = await api.createOrder(event.id, lines, seatPicks, method);
-			if (order.abacate_payment_url) {
-				window.location.href = order.abacate_payment_url;
-			} else {
-				await goto(`/orders/${order.id}`);
-			}
-		} catch (e) {
-			if (e instanceof ApiError && e.message === 'seat_taken') {
-				buyError = t('event.seatTakenConflict');
-				await refreshSeating();
-			} else if (e instanceof ApiError && e.message === 'extra_exceeds_tickets') {
-				buyError = t('event.errorExtraExceedsTickets');
-			} else {
-				buyError = e instanceof ApiError ? e.message : t('event.errorFallback');
-			}
-		} finally {
-			busy = false;
-		}
-	}
+    async function submitOrder(method?: PaymentMethod) {
+        if (!event) return;
+        buyError = null;
+        busy = true;
+        try {
+            const order = await api.createOrder(event.id, lines, method);
+            if (order.abacate_payment_url) {
+                window.location.href = order.abacate_payment_url;
+            } else {
+                await goto(`/orders/${order.id}`);
+            }
+        } catch (e) {
+            if (e instanceof ApiError && e.message === 'extra_exceeds_tickets') {
+                buyError = t('event.errorExtraExceedsTickets');
+            } else {
+                buyError = e instanceof ApiError ? e.message : t('event.errorFallback');
+            }
+        } finally {
+            busy = false;
+        }
+    }
 </script>
 
-{#if loading}
-	<p class="muted">{t('common.loading')}</p>
-{:else if error || !event}
-	<div class="error">{error ?? t('event.notFound')}</div>
+{#if !event}
+    <div class="error">{t('event.errorFallback')}</div>
 {:else}
-	<article class="event">
-		{#if event.cover_image_url}
-			<img class="cover" src={event.cover_image_url} alt="" />
-		{/if}
+    <article class="event">
+        {#if event.coverImageUrl}
+            <img class="cover" src={event.coverImageUrl} alt="" />
+        {/if}
 
-		<div class="event-head">
-			<div>
-				<span class="badge {event.status}">{tStatus(event.status)}</span>
-				<h1>{event.title}</h1>
-				<p class="muted">{formatDateTime(event.starts_at)} · {event.location}</p>
-			</div>
-			{#if canEdit}
-				<div class="row creator-actions">
-					<a href="/events/{event.id}/dashboard" class="btn secondary small"
-						>{t('event.dashboard')}</a
-					>
-					<a href="/events/{event.id}/edit" class="btn secondary small">{t('common.edit')}</a>
-				</div>
-			{/if}
-		</div>
+        <div class="event-head">
+            <div>
+                <span class="badge {event.status}">{tStatus(event.status)}</span>
+                <h1>{event.title}</h1>
+                <p class="muted">{formatDateTime(event.startsAt)} · {event.location}</p>
+            </div>
+            {#if canEdit}
+                <div class="row creator-actions">
+                    <a href="/events/{event.id}/dashboard" class="btn secondary small"
+                        >{t('event.dashboard')}</a
+                    >
+                    <a href="/events/{event.id}/edit" class="btn secondary small"
+                        >{t('common.edit')}</a
+                    >
+                </div>
+            {/if}
+        </div>
 
-		<p class="description">{event.description}</p>
+        <p class="description">{event.description}</p>
 
-		<div class="two-col">
-			<section class="stack">
-				<h2>{t('event.tickets')}</h2>
-				{#if event.tickets_description}
-					<p class="muted">{event.tickets_description}</p>
-				{/if}
-				{#each event.ticket_types as tk (tk.id)}
-					{@const active = tk.active_batch}
-					{@const visibleBatches = tk.batches.filter(
-						(b) => b.closed_at !== null || b.id === active?.id
-					)}
-					{@const remaining = active ? active.quantity_total - active.quantity_sold : 0}
-					<div class="ticket-group">
-						<div class="ticket-head">
-							<strong>{tk.name}</strong>
-							{#if tk.description}
-								<div class="muted small">{tk.description}</div>
-							{/if}
-						</div>
-						{#each visibleBatches as b (b.id)}
-							{@const isActive = b.id === active?.id}
-							<div class="line batch-line">
-								<div>
-									<span class="badge">{b.label}</span>
-									<span class="muted small">{formatBRL(b.price_cents)}</span>
-								</div>
-								{#if !isActive || remaining <= 0}
-									<span class="badge sold-out">{t('event.soldOut')}</span>
-								{:else}
-									<div class="qty">
-										<button
-											class="secondary small"
-											disabled={isClosed}
-											onclick={() => bump(`t:${tk.id}`, -1, remaining)}>−</button
-										>
-										<span>{qty[`t:${tk.id}`] ?? 0}</span>
-										<button
-											class="secondary small"
-											disabled={isClosed}
-											onclick={() => bump(`t:${tk.id}`, 1, remaining)}>+</button
-										>
-									</div>
-								{/if}
-							</div>
-						{:else}
-							<div class="line"><span class="badge sold-out">{t('event.soldOut')}</span></div>
-						{/each}
-					</div>
-				{:else}
-					<p class="muted">{t('event.noTickets')}</p>
-				{/each}
+        <div class="two-col">
+            <section class="stack">
+                <h2>{t('event.tickets')}</h2>
+                {#if event.ticketsDescription}
+                    <p class="muted">{event.ticketsDescription}</p>
+                {/if}
+                {#each event.ticketTypes as tk (tk.id)}
+                    {@const active = tk.activeBatch}
+                    {@const visibleBatches = tk.batches.filter(
+                        (b) => b.closedAt !== null || b.id === active?.id
+                    )}
+                    {@const remaining = active ? active.quantityTotal - active.quantitySold : 0}
+                    <div class="ticket-group">
+                        <div class="ticket-head">
+                            <strong>{tk.name}</strong>
+                            {#if tk.description}
+                                <div class="muted small">{tk.description}</div>
+                            {/if}
+                        </div>
+                        {#each visibleBatches as b (b.id)}
+                            {@const isActive = b.id === active?.id}
+                            <div class="line batch-line">
+                                <div>
+                                    <span class="badge">{b.label}</span>
+                                    <span class="muted small">{formatBRL(b.priceCents)}</span>
+                                </div>
+                                {#if !isActive || remaining <= 0}
+                                    <span class="badge sold-out">{t('event.soldOut')}</span>
+                                {:else}
+                                    <div class="qty">
+                                        <button
+                                            class="secondary small"
+                                            disabled={isClosed}
+                                            onclick={() => bump(`t:${tk.id}`, -1, remaining)}
+                                            >−</button
+                                        >
+                                        <span>{qty[`t:${tk.id}`] ?? 0}</span>
+                                        <button
+                                            class="secondary small"
+                                            disabled={isClosed}
+                                            onclick={() => bump(`t:${tk.id}`, 1, remaining)}
+                                            >+</button
+                                        >
+                                    </div>
+                                {/if}
+                            </div>
+                        {:else}
+                            <div class="line">
+                                <span class="badge sold-out">{t('event.soldOut')}</span>
+                            </div>
+                        {/each}
+                    </div>
+                {:else}
+                    <p class="muted">{t('event.noTickets')}</p>
+                {/each}
 
-				{#each event.extra_sections as s (s.id)}
-					{#if s.extras.length}
-						<h2 style="margin-top: 1rem;">{s.title}</h2>
-						{#if s.description}
-							<p class="muted">{s.description}</p>
-						{/if}
-						{#each s.extras as x (x.id)}
-							{@const stockMax = x.quantity_total === null
-								? 999
-								: x.quantity_total - x.quantity_sold}
-							{@const remaining = x.limit_to_ticket_count
-								? Math.min(stockMax, ticketCount)
-								: stockMax}
-							{@const needsTickets = x.limit_to_ticket_count && ticketCount === 0}
-							<div class="line">
-								<div>
-									<strong>{x.name}</strong>
-									<div class="muted small">{x.description}</div>
-									<div class="muted small">{formatBRL(x.price_cents)}</div>
-									{#if x.show_remaining && x.quantity_total !== null && stockMax > 0}
-										<div class="muted small">
-											{t('event.remainingCount', { count: stockMax })}
-										</div>
-									{/if}
-									{#if needsTickets}
-										<div class="muted small">{t('event.extraNeedsTicket')}</div>
-									{/if}
-								</div>
-								{#if stockMax <= 0}
-									<span class="badge sold-out">{t('event.soldOut')}</span>
-								{:else}
-									<div class="qty">
-										<button
-											class="secondary small"
-											disabled={isClosed || remaining === 0}
-											onclick={() => bump(`x:${x.id}`, -1, remaining)}>−</button
-										>
-										<span>{qty[`x:${x.id}`] ?? 0}</span>
-										<button
-											class="secondary small"
-											disabled={isClosed || remaining === 0}
-											onclick={() => bump(`x:${x.id}`, 1, remaining)}>+</button
-										>
-									</div>
-								{/if}
-							</div>
-						{/each}
-					{/if}
-				{/each}
+                {#each event.extraSections as s (s.id)}
+                    {#if s.extras.length}
+                        <h2 style="margin-top: 1rem;">{s.title}</h2>
+                        {#if s.description}
+                            <p class="muted">{s.description}</p>
+                        {/if}
+                        {#each s.extras as x (x.id)}
+                            {@const stockMax =
+                                x.quantityTotal === null ? 999 : x.quantityTotal - x.quantitySold}
+                            {@const remaining = x.limitToTicketCount
+                                ? Math.min(stockMax, ticketCount)
+                                : stockMax}
+                            {@const needsTickets = x.limitToTicketCount && ticketCount === 0}
+                            <div class="line">
+                                <div>
+                                    <strong>{x.name}</strong>
+                                    <div class="muted small">{x.description}</div>
+                                    <div class="muted small">{formatBRL(x.priceCents)}</div>
+                                    {#if x.showRemaining && x.quantityTotal !== null && stockMax > 0}
+                                        <div class="muted small">
+                                            {t('event.remainingCount', { count: stockMax })}
+                                        </div>
+                                    {/if}
+                                    {#if needsTickets}
+                                        <div class="muted small">{t('event.extraNeedsTicket')}</div>
+                                    {/if}
+                                </div>
+                                {#if stockMax <= 0}
+                                    <span class="badge sold-out">{t('event.soldOut')}</span>
+                                {:else}
+                                    <div class="qty">
+                                        <button
+                                            class="secondary small"
+                                            disabled={isClosed || remaining === 0}
+                                            onclick={() => bump(`x:${x.id}`, -1, remaining)}
+                                            >−</button
+                                        >
+                                        <span>{qty[`x:${x.id}`] ?? 0}</span>
+                                        <button
+                                            class="secondary small"
+                                            disabled={isClosed || remaining === 0}
+                                            onclick={() => bump(`x:${x.id}`, 1, remaining)}
+                                            >+</button
+                                        >
+                                    </div>
+                                {/if}
+                            </div>
+                        {/each}
+                    {/if}
+                {/each}
+            </section>
 
-				{#if seatsRequired && event.seating}
-					<div class="card" style="margin-top: 1rem;">
-						<SeatPicker
-							seating={event.seating}
-							{ticketCount}
-							picks={seatPicks}
-							onChange={(p) => (seatPicks = p)}
-							onRefresh={refreshSeating}
-						/>
-					</div>
-				{/if}
-			</section>
-
-			<aside class="summary card">
-				<h3>{t('event.orderSummary')}</h3>
-				{#if lines.length === 0}
-					<p class="muted">{t('event.noItems')}</p>
-				{:else}
-					<ul class="lines">
-						{#each event.ticket_types as tk (tk.id)}
-							{@const q = qty[`t:${tk.id}`] ?? 0}
-							{#if q > 0 && tk.active_batch}
-								<li>
-									<span>{tk.name} ({tk.active_batch.label}) × {q}</span>
-									<span>{formatBRL(tk.active_batch.price_cents * q)}</span>
-								</li>
-							{/if}
-						{/each}
-						{#each allExtras as x (x.id)}
-							{@const q = qty[`x:${x.id}`] ?? 0}
-							{#if q > 0}
-								<li>
-									<span>{x.name} × {q}</span>
-									<span>{formatBRL(x.price_cents * q)}</span>
-								</li>
-							{/if}
-						{/each}
-					</ul>
-				{/if}
-				<div class="total">
-					<span>{t('common.total')}</span>
-					<strong>{formatBRL(total)}</strong>
-				</div>
-				{#if isClosed}
-					<div class="notice">{t('event.salesClosed')}</div>
-				{/if}
-				{#if buyError}
-					<div class="error">{buyError}</div>
-				{/if}
-				<button disabled={isClosed || lines.length === 0 || !seatsReady || busy} onclick={buy}>
-					{busy ? t('event.buying') : t('event.buy')}
-				</button>
-			</aside>
-		</div>
-	</article>
-	<PaymentMethodModal
-		open={paymentModalOpen}
-		onSelect={onPaymentMethod}
-		onClose={() => (paymentModalOpen = false)}
-	/>
+            <aside class="summary card">
+                <h3>{t('event.orderSummary')}</h3>
+                {#if lines.length === 0}
+                    <p class="muted">{t('event.noItems')}</p>
+                {:else}
+                    <ul class="lines">
+                        {#each event.ticketTypes as tk (tk.id)}
+                            {@const q = qty[`t:${tk.id}`] ?? 0}
+                            {#if q > 0 && tk.activeBatch}
+                                <li>
+                                    <span>{tk.name} ({tk.activeBatch.label}) × {q}</span>
+                                    <span>{formatBRL(tk.activeBatch.priceCents * q)}</span>
+                                </li>
+                            {/if}
+                        {/each}
+                        {#each allExtras as x (x.id)}
+                            {@const q = qty[`x:${x.id}`] ?? 0}
+                            {#if q > 0}
+                                <li>
+                                    <span>{x.name} × {q}</span>
+                                    <span>{formatBRL(x.priceCents * q)}</span>
+                                </li>
+                            {/if}
+                        {/each}
+                    </ul>
+                {/if}
+                <div class="total">
+                    <span>{t('common.total')}</span>
+                    <strong>{formatBRL(total)}</strong>
+                </div>
+                {#if isClosed}
+                    <div class="notice">{t('event.salesClosed')}</div>
+                {/if}
+                {#if buyError}
+                    <div class="error">{buyError}</div>
+                {/if}
+                <button disabled={isClosed || lines.length === 0 || busy} onclick={buy}>
+                    {busy ? t('event.buying') : t('event.buy')}
+                </button>
+            </aside>
+        </div>
+    </article>
+    <PaymentMethodModal
+        open={paymentModalOpen}
+        onSelect={onPaymentMethod}
+        onClose={() => (paymentModalOpen = false)}
+    />
 {/if}
 
 <style>
-	.description {
-		white-space: pre-wrap;
-	}
-	.cover {
-		width: 100%;
-		max-height: 360px;
-		object-fit: cover;
-		border-radius: var(--radius);
-		margin: 1rem 0;
-	}
-	.event-head {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		gap: 1rem;
-		margin: 1rem 0;
-	}
-	.two-col {
-		display: grid;
-		grid-template-columns: 1fr 320px;
-		gap: 1.5rem;
-		margin-top: 1.5rem;
-	}
-	@media (max-width: 720px) {
-		.two-col {
-			grid-template-columns: 1fr;
-		}
-	}
-	.line {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 1rem;
-		padding: 0.75rem;
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-	}
-	.ticket-group {
-		display: grid;
-		gap: 0.4rem;
-	}
-	.ticket-head {
-		padding: 0 0.25rem;
-	}
-	.batch-line {
-		padding: 0.5rem 0.75rem;
-	}
-	.small {
-		font-size: 0.85rem;
-	}
-	.qty {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-	.qty span {
-		min-width: 1.5rem;
-		text-align: center;
-	}
-	.summary {
-		position: sticky;
-		top: 80px;
-		align-self: flex-start;
-	}
-	.lines {
-		list-style: none;
-		padding: 0;
-		margin: 0.5rem 0;
-	}
-	.lines li {
-		display: flex;
-		justify-content: space-between;
-		padding: 0.25rem 0;
-		font-size: 0.9rem;
-	}
-	.total {
-		display: flex;
-		justify-content: space-between;
-		padding: 0.75rem 0;
-		border-top: 1px solid var(--border);
-		margin-top: 0.5rem;
-		margin-bottom: 0.75rem;
-	}
+    .description {
+        white-space: pre-wrap;
+    }
+    .cover {
+        width: 100%;
+        max-height: 360px;
+        object-fit: cover;
+        border-radius: var(--radius);
+        margin: 1rem 0;
+    }
+    .event-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+    .two-col {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+    }
+    @media (max-width: 720px) {
+        .two-col {
+            grid-template-columns: 1fr;
+        }
+    }
+    .line {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.75rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+    }
+    .ticket-group {
+        display: grid;
+        gap: 0.4rem;
+    }
+    .ticket-head {
+        padding: 0 0.25rem;
+    }
+    .batch-line {
+        padding: 0.5rem 0.75rem;
+    }
+    .small {
+        font-size: 0.85rem;
+    }
+    .qty {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .qty span {
+        min-width: 1.5rem;
+        text-align: center;
+    }
+    .summary {
+        position: sticky;
+        top: 80px;
+        align-self: flex-start;
+    }
+    .lines {
+        list-style: none;
+        padding: 0;
+        margin: 0.5rem 0;
+    }
+    .lines li {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.25rem 0;
+        font-size: 0.9rem;
+    }
+    .total {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-top: 1px solid var(--border);
+        margin-top: 0.5rem;
+        margin-bottom: 0.75rem;
+    }
 </style>
