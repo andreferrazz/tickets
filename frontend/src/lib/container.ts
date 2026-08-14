@@ -9,7 +9,7 @@ import type { EventService } from '$lib/modules/events/service';
 import { getSessionRepository } from '$lib/modules/sessions/repository';
 import { getSessionService } from '$lib/modules/sessions/service';
 import type { SessionService } from '$lib/modules/sessions/service';
-import { getEventDetailBff, type EventDetailBff } from './bff/eventDetail';
+import { getEventDetailBff, type EventsBff } from './bff/events';
 import { getHomeBff, type HomeBff } from './bff/home';
 
 /**
@@ -21,7 +21,7 @@ export interface Container {
     eventService: EventService;
     sessionService: SessionService;
     homeBff: HomeBff;
-    eventDetailBff: EventDetailBff;
+    eventsBff: EventsBff;
 }
 
 /**
@@ -55,13 +55,13 @@ function createContainer(): Container {
 
     // bff
     const homeBff = getHomeBff(eventService, eventMapper);
-    const eventDetailBff = getEventDetailBff(eventService, eventDetailService, eventDetailMapper);
+    const eventsBff = getEventDetailBff(eventService, eventDetailService, eventDetailMapper);
 
     return {
         sessionService,
         eventService,
         homeBff,
-        eventDetailBff
+        eventsBff
     };
 }
 

@@ -4,23 +4,23 @@ import type { EventService } from '$lib/modules/events/service';
 import type { EventDetailDto } from '$lib/modules/events/types';
 import type { SessionUser } from '$lib/modules/sessions/types';
 
-export interface EventDetailData {
+export interface EventsData {
     /** Null when the event does not exist or `user` may not see it. */
     event: EventDetailDto | null;
     loadFailed: boolean;
 }
 
-export interface EventDetailBff {
-    show(user: SessionUser | null, id: string): Promise<EventDetailData>;
+export interface EventsBff {
+    show(user: SessionUser | null, id: string): Promise<EventsData>;
 }
 
 export function getEventDetailBff(
     service: EventService,
     detailService: EventDetailService,
     mapper: EventDetailMapper
-): EventDetailBff {
+): EventsBff {
     eventDetailBff ??= {
-        async show(user, id): Promise<EventDetailData> {
+        async show(user, id): Promise<EventsData> {
             try {
                 const event = await service.getVisible(user, id);
                 if (!event) {
@@ -41,4 +41,4 @@ export function getEventDetailBff(
     return eventDetailBff;
 }
 
-let eventDetailBff: EventDetailBff | null = null;
+let eventDetailBff: EventsBff | null = null;

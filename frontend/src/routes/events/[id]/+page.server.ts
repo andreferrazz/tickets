@@ -12,7 +12,7 @@ import type { PageServerLoad } from './$types';
  * error state, the same way the home page does.
  */
 export const load: PageServerLoad = async ({ locals, params }) => {
-    const data = await locals.container.eventDetailBff.show(locals.user, params.id);
+    const data = await locals.container.eventsBff.show(locals.user, params.id);
 
     if (!data.event && !data.loadFailed) {
         error(404, 'event not found');
