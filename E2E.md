@@ -39,10 +39,11 @@ the same files `npm run db:migrate` applies everywhere else.
 | --- | --- | --- |
 | `home.spec.ts` | Event list by role: anonymous sees published only, a member sees own-org drafts, an admin sees every draft. Closed filter and search applied server-side | Served HTML never leaks drafts |
 | `event-detail.spec.ts` | Event page server-rendered with ticket type and batch; draft visibility by role | Missing, malformed and other-org draft ids are 404, never 403 |
+| `orders.spec.ts` | Buyer's order list and order detail server-rendered: items, total, one QR per pass, payment link while pending; anonymous sent to login with `next` | Another buyer's order, missing and malformed ids are 404, never 403 |
 
 ## Planned
 
 One spec per migration step, added by the PR that ports the flow:
-`orders` (5), `dashboard` (6), `auth` (7), `event-management` (8),
+`dashboard` (6), `auth` (7), `event-management` (8),
 `organization` (9), `checkin` (10), `checkout` (11), `webhook` and
 `order-expiry` (12), `payout` (13).

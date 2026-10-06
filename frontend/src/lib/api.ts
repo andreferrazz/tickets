@@ -1,4 +1,5 @@
 import { PUBLIC_API_URL } from '$env/static/public';
+import { canBuyerCancel } from '$lib/modules/orders/policy';
 import { auth } from '$lib/stores/auth.svelte';
 import type {
     AuthResponse,
@@ -30,13 +31,9 @@ import type {
     ValidateResult
 } from '$lib/types';
 
-/**
- * Whether the buyer may cancel this order. Only orders with no payment
- * collected qualify: free orders (paid inline, total 0) and still-pending
- * orders. The backend re-confirms pending orders with Abacate before acting.
- */
+/** The buyer cancellation rule for the snake_case API shape; see `canBuyerCancel`. */
 export function isCancellable(order: Pick<Order, 'status' | 'total_cents'>): boolean {
-    return order.status === 'pending' || (order.status === 'paid' && order.total_cents === 0);
+    return canBuyerCancel({ status: order.status, totalCents: order.total_cents });
 }
 
 const BASE = PUBLIC_API_URL;
@@ -161,7 +158,6 @@ export const api = {
             method: 'POST',
             body: { event_id, items, payment_method }
         }),
-    listOrders: (fetcher?: typeof fetch) => request<Order[]>('/orders', { fetcher }),
     listEventOrders: (eventId: string, statuses: OrderStatus[] = [], fetcher?: typeof fetch) => {
         const qs = statuses.map((s) => `status[]=${encodeURIComponent(s)}`).join('&');
         const path = qs ? `/events/${eventId}/orders?${qs}` : `/events/${eventId}/orders`;
@@ -174,10 +170,7 @@ export const api = {
             method: 'POST',
             body: { item_id: itemId, recipients }
         }),
-    getOrder: (id: string, fetcher?: typeof fetch) => request<Order>(`/orders/${id}`, { fetcher }),
     cancelOrder: (id: string) => request<Order>(`/orders/${id}/cancel`, { method: 'POST' }),
-    getOrderPasses: (id: string, fetcher?: typeof fetch) =>
-        request<Pass[]>(`/orders/${id}/passes`, { fetcher }),
     validatePass: (eventId: string, token: string) =>
         request<ValidateResult>(`/events/${eventId}/passes/validate`, {
             method: 'POST',

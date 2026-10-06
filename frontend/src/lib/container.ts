@@ -14,12 +14,16 @@ import { getEventDetailService } from '$lib/modules/events/detail-service';
 import { getEventMapper } from '$lib/modules/events/mapper';
 import { getEventRepository } from '$lib/modules/events/repository';
 import { getEventService } from '$lib/modules/events/service';
+import { getOrderMapper } from '$lib/modules/orders/mapper';
+import { getOrderRepository } from '$lib/modules/orders/repository';
+import { getOrderService } from '$lib/modules/orders/service';
 import type { EventService } from '$lib/modules/events/service';
 import { getSessionRepository } from '$lib/modules/sessions/repository';
 import { getSessionService } from '$lib/modules/sessions/service';
 import type { SessionService } from '$lib/modules/sessions/service';
 import { getEventDetailBff, type EventsBff } from './bff/events';
 import { getHomeBff, type HomeBff } from './bff/home';
+import { getOrdersBff, type OrdersBff } from './bff/orders';
 
 /**
  * Everything a request handler is allowed to reach for. One entry per domain
@@ -35,6 +39,7 @@ export interface Container {
     sessionService: SessionService;
     homeBff: HomeBff;
     eventsBff: EventsBff;
+    ordersBff: OrdersBff;
 }
 
 /**
@@ -66,19 +71,23 @@ function createContainer(): Container {
     const sessionRepository = getSessionRepository(queryable);
     const eventRepository = getEventRepository(queryable);
     const eventDetailRepository = getEventDetailRepository(queryable);
+    const orderRepository = getOrderRepository(queryable);
 
     // services
     const sessionService = getSessionService(sessionRepository);
     const eventService = getEventService(eventRepository);
     const eventDetailService = getEventDetailService(eventDetailRepository);
+    const orderService = getOrderService(orderRepository);
 
     // mappers
     const eventMapper = getEventMapper();
     const eventDetailMapper = getEventDetailMapper(eventMapper);
+    const orderMapper = getOrderMapper();
 
     // bff
     const homeBff = getHomeBff(eventService, eventMapper);
     const eventsBff = getEventDetailBff(eventService, eventDetailService, eventDetailMapper);
+    const ordersBff = getOrdersBff(orderService, orderMapper);
 
     return {
         integrationMode,
@@ -87,7 +96,8 @@ function createContainer(): Container {
         sessionService,
         eventService,
         homeBff,
-        eventsBff
+        eventsBff,
+        ordersBff
     };
 }
 

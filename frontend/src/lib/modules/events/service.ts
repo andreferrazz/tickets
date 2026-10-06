@@ -1,4 +1,5 @@
 import type { SessionUser } from '$lib/modules/sessions/types';
+import { isUuid } from '$lib/utils/uuid';
 import type { EventRepository } from './repository';
 import type { EventRow } from './types';
 
@@ -37,7 +38,7 @@ export function getEventService(repository: EventRepository): EventService {
         getVisible(user: SessionUser | null, id: string): Promise<EventRow | null> {
             // Postgres raises on a malformed uuid, and a mistyped URL is a miss,
             // not a failure.
-            if (!UUID.test(id)) {
+            if (!isUuid(id)) {
                 return Promise.resolve(null);
             }
 
@@ -53,5 +54,3 @@ export function getEventService(repository: EventRepository): EventService {
         }
     };
 }
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
