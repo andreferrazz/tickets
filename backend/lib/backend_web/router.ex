@@ -42,7 +42,6 @@ defmodule BackendWeb.Router do
 
     get "/events", EventController, :index
     get "/events/:id", EventController, :show
-    get "/events/:id/seating", EventController, :seating
   end
 
   # ---------------------------------------------------------------------------
@@ -78,9 +77,6 @@ defmodule BackendWeb.Router do
     put "/extra-sections/:id", ExtraItemSectionController, :update
     delete "/extra-sections/:id", ExtraItemSectionController, :delete
 
-    put "/seat-tables/:id", SeatTableController, :update
-    delete "/seat-tables/:id", SeatTableController, :delete
-
     post "/orders", OrderController, :create
     get "/orders", OrderController, :index
     get "/orders/:id", OrderController, :show
@@ -112,7 +108,6 @@ defmodule BackendWeb.Router do
     post "/ticket-types/:ticket_type_id/batches", TicketBatchController, :create
     post "/events/:event_id/extras", ExtraItemController, :create
     post "/events/:event_id/extra-sections", ExtraItemSectionController, :create
-    post "/events/:event_id/seat-tables", SeatTableController, :create
 
     # Invitations: admins create new orgs with leader invites; leaders invite
     # participants to their existing org. Buyer-only and participant-only users

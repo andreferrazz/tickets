@@ -271,7 +271,6 @@ defmodule BackendWeb.WebhookControllerTest do
           %{"item_type" => "ticket", "item_id" => tt.id, "quantity" => ticket_qty},
           %{"item_type" => "extra", "item_id" => extra.id, "quantity" => 1}
         ],
-        [],
         Keyword.get(opts, :payment_method)
       )
 

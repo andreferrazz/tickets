@@ -9,6 +9,9 @@ config :backend, Backend.Repo,
   username: "postgres",
   password: "postgres",
   hostname: "localhost",
+  # Honours the standard libpq variable so a machine whose 5432 is taken by
+  # another project can still run the suite against a Postgres on another port.
+  port: String.to_integer(System.get_env("PGPORT", "5432")),
   database: "backend_test#{System.get_env("MIX_TEST_PARTITION")}",
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: System.schedulers_online() * 2

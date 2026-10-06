@@ -86,8 +86,7 @@
 	}
 
 	function passDetail(res: ValidateResult): string {
-		const p = res.pass;
-		return p.seat_label ? `${p.item_name} · ${p.seat_label}` : p.item_name;
+		return res.pass.item_name;
 	}
 
 	function alreadyDetail(res: ValidateResult): string {

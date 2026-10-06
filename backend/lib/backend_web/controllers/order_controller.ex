@@ -8,11 +8,10 @@ defmodule BackendWeb.OrderController do
 
   @doc "POST /api/v1/orders"
   def create(conn, %{"event_id" => event_id, "items" => items} = params) do
-    seat_picks = Map.get(params, "seat_picks", [])
     payment_method = Map.get(params, "payment_method")
 
     with :ok <- validate_payment_method(payment_method) do
-      create_with_method(conn, event_id, items, seat_picks, payment_method)
+      create_with_method(conn, event_id, items, payment_method)
     else
       {:error, :invalid_payment_method} ->
         conn
@@ -30,12 +29,11 @@ defmodule BackendWeb.OrderController do
   defp validate_payment_method(m) when m in @valid_payment_methods, do: :ok
   defp validate_payment_method(_), do: {:error, :invalid_payment_method}
 
-  defp create_with_method(conn, event_id, items, seat_picks, payment_method) do
+  defp create_with_method(conn, event_id, items, payment_method) do
     case Orders.create_order(
            conn.assigns.current_user,
            event_id,
            items,
-           seat_picks,
            payment_method
          ) do
       {:ok, order} ->
@@ -62,19 +60,6 @@ defmodule BackendWeb.OrderController do
 
       {:error, {:invalid_item, id}} ->
         conn |> put_status(:bad_request) |> json(%{error: "invalid item: #{id}"})
-
-      {:error, {:seat_taken, _}} ->
-        conn |> put_status(:conflict) |> json(%{error: "seat_taken"})
-
-      {:error, {:seat_count_mismatch, got, expected}} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "seat_count_mismatch", got: got, expected: expected})
-
-      {:error, {:invalid_seat_pick, detail}} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "invalid_seat_pick", detail: detail})
 
       {:error, reason} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
@@ -278,7 +263,6 @@ defmodule BackendWeb.OrderController do
       id: pass.id,
       kind: pass.kind,
       item_name: pass.item_name,
-      seat_label: pass.seat_label,
       token: pass.token,
       checked_in_at: pass.checked_in_at,
       qr_png_base64: pass |> Tickets.qr_png() |> Base.encode64()
