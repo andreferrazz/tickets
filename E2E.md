@@ -40,10 +40,12 @@ the same files `npm run db:migrate` applies everywhere else.
 | `home.spec.ts` | Event list by role: anonymous sees published only, a member sees own-org drafts, an admin sees every draft. Closed filter and search applied server-side | Served HTML never leaks drafts |
 | `event-detail.spec.ts` | Event page server-rendered with ticket type and batch; draft visibility by role | Missing, malformed and other-org draft ids are 404, never 403 |
 | `orders.spec.ts` | Buyer's order list and order detail server-rendered: items, total, one QR per pass, payment link while pending; anonymous sent to login with `next` | Another buyer's order, missing and malformed ids are 404, never 403 |
+| `dashboard.spec.ts` | Creator dashboard and event orders server-rendered: revenue, stock, recent orders, buyers of an item from the `buyers` query parameter, validated counts | Another organization's event is 404 for a manager, 200 for an admin; anonymous sent to login with `next` |
+| `management.spec.ts` | Organization team page (members, invitations), admin users, admin invitations, scan landing | Non-managers and non-admins sent home with a 303; another inviter's invitation never shows on the admin page |
 
 ## Planned
 
 One spec per migration step, added by the PR that ports the flow:
-`dashboard` (6), `auth` (7), `event-management` (8),
+`auth` (7), `event-management` (8),
 `organization` (9), `checkin` (10), `checkout` (11), `webhook` and
 `order-expiry` (12), `payout` (13).

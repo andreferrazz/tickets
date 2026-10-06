@@ -19,6 +19,9 @@ export interface EventRepository {
 
     /** `id` if it is public, or if `userId` manages the owning organization. */
     findEventByIdForMember(id: string, userId: string): Promise<EventRow | null>;
+
+    /** Every live event of the given organizations, drafts included, by start time. */
+    listEventsForOrganizations(organizationIds: readonly string[]): Promise<EventRow[]>;
 }
 
 export function getEventRepository(queryable: Queryable): EventRepository {
@@ -54,6 +57,16 @@ export function getEventRepository(queryable: Queryable): EventRepository {
 					)
 				order by starts_at asc`;
             return queryable.query<EventRow>(sql, [userId]);
+        },
+
+        listEventsForOrganizations(organizationIds) {
+            if (organizationIds.length === 0) return Promise.resolve([]);
+            const sql = `
+				select ${COLUMNS}
+                from events
+				where deleted_at is null and organization_id = any($1::uuid[])
+				order by starts_at asc`;
+            return queryable.query<EventRow>(sql, [organizationIds]);
         },
 
         async findPublicEventById(id: string) {

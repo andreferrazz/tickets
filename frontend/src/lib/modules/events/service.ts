@@ -19,6 +19,9 @@ export interface EventService {
      * telling them apart would leak the existence of an organization's drafts.
      */
     getVisible(user: SessionUser | null, id: string): Promise<EventRow | null>;
+
+    /** Every live event of `organizationIds`, for pages scoped to the caller's memberships. */
+    listForOrganizations(organizationIds: readonly string[]): Promise<EventRow[]>;
 }
 
 export function getEventService(repository: EventRepository): EventService {
@@ -51,6 +54,10 @@ export function getEventService(repository: EventRepository): EventService {
             }
 
             return repository.findEventByIdForMember(id, user.id);
+        },
+
+        listForOrganizations(organizationIds) {
+            return repository.listEventsForOrganizations(organizationIds);
         }
     };
 }

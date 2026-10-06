@@ -108,11 +108,8 @@ export const api = {
     myOrganizations: (fetcher?: typeof fetch) =>
         request<OrganizationMembership[]>('/me/organizations', { fetcher }),
     updateProfile: (body: ProfileUpdate) => request<User>('/me/profile', { method: 'PATCH', body }),
-    listEvents: (fetcher?: typeof fetch) => request<Event[]>('/events', { fetcher }),
     getEvent: (id: string, fetcher?: typeof fetch) =>
         request<EventDetail>(`/events/${id}`, { fetcher }),
-    getEventStats: (id: string, fetcher?: typeof fetch) =>
-        request<EventStats>(`/events/${id}/stats`, { fetcher }),
     createEvent: (body: Partial<Event>) => request<Event>('/events', { method: 'POST', body }),
     updateEvent: (id: string, body: Partial<Event>) =>
         request<Event>(`/events/${id}`, { method: 'PUT', body }),
@@ -135,10 +132,6 @@ export const api = {
     updateExtra: (id: string, body: Partial<ExtraItem>) =>
         request<ExtraItem>(`/extras/${id}`, { method: 'PUT', body }),
     deleteExtra: (id: string) => request<{ deleted: true }>(`/extras/${id}`, { method: 'DELETE' }),
-    listExtraBuyers: (id: string, fetcher?: typeof fetch) =>
-        request<ExtraBuyer[]>(`/extras/${id}/buyers`, { fetcher }),
-    listTicketTypeBuyers: (id: string, fetcher?: typeof fetch) =>
-        request<ExtraBuyer[]>(`/ticket-types/${id}/buyers`, { fetcher }),
     updatePayoutSettings: (orgId: string, body: PayoutSettings) =>
         request<Organization>(`/organizations/${orgId}/payout-settings`, {
             method: 'PATCH',
@@ -158,11 +151,6 @@ export const api = {
             method: 'POST',
             body: { event_id, items, payment_method }
         }),
-    listEventOrders: (eventId: string, statuses: OrderStatus[] = [], fetcher?: typeof fetch) => {
-        const qs = statuses.map((s) => `status[]=${encodeURIComponent(s)}`).join('&');
-        const path = qs ? `/events/${eventId}/orders?${qs}` : `/events/${eventId}/orders`;
-        return request<EventOrder[]>(path, { fetcher });
-    },
     cancelEventOrder: (eventId: string, orderId: string) =>
         request<EventOrder>(`/events/${eventId}/orders/${orderId}/cancel`, { method: 'POST' }),
     sendCompTickets: (eventId: string, itemId: string, recipients: CompRecipient[]) =>
@@ -176,7 +164,6 @@ export const api = {
             method: 'POST',
             body: { token }
         }),
-    listInvitations: (fetcher?: typeof fetch) => request<Invitation[]>('/invitations', { fetcher }),
     createInvitation: (email: string, organization_id?: string, role?: OrgRole) =>
         request<Invitation>('/invitations', {
             method: 'POST',
@@ -186,7 +173,6 @@ export const api = {
                 ...(role ? { role } : {})
             }
         }),
-    listMembers: (orgId: string) => request<OrgMember[]>(`/organizations/${orgId}/members`),
     setMemberRole: (orgId: string, userId: string, role: OrgRole) =>
         request<{ user_id: string; role: OrgRole }>(`/organizations/${orgId}/members/${userId}`, {
             method: 'PATCH',
@@ -196,11 +182,8 @@ export const api = {
         request<void>(`/organizations/${orgId}/members/${userId}`, { method: 'DELETE' }),
     acceptInvitation: (token: string) =>
         request<AuthResponse>('/invitations/accept', { method: 'POST', body: { token } }),
-    listUsers: (fetcher?: typeof fetch) => request<User[]>('/admin/users', { fetcher }),
     impersonateUser: (id: string) =>
         request<{ token: string }>(`/admin/users/${id}/impersonate`, { method: 'POST', body: {} }),
-    getOrganization: (id: string, fetcher?: typeof fetch) =>
-        request<Organization>(`/organizations/${id}`, { fetcher }),
     updateOrganization: (id: string, body: { name: string }) =>
         request<Organization>(`/organizations/${id}`, { method: 'PATCH', body }),
     deleteOrganization: (id: string) =>

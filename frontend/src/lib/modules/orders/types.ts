@@ -1,4 +1,4 @@
-import type { OrderStatus } from '$lib/types';
+import type { OrderStatus, PaymentMethod } from '$lib/types';
 
 export type PassKind = 'ticket' | 'extra';
 
@@ -65,6 +65,53 @@ export interface OrderDto {
     paidAt: string | null;
     createdAt: string;
     items: OrderItemDto[];
+}
+
+/** A row of `orders` joined to its buyer, for the people who manage the event. */
+export interface EventOrderRow {
+    id: string;
+    buyer_name: string | null;
+    buyer_email: string;
+    buyer_phone: string | null;
+    status: OrderStatus;
+    total_cents: number;
+    payment_method: PaymentMethod | null;
+    paid_at: Date | null;
+    inserted_at: Date;
+}
+
+export interface ValidatedCountRow {
+    order_id: string;
+    validated: number;
+}
+
+export interface EventOrderView {
+    order: EventOrderRow;
+    items: OrderItemRow[];
+    /** Ticket passes already scanned, shown against the ticket count. */
+    validatedCount: number;
+}
+
+export interface EventOrderLineDto {
+    name: string;
+    quantity: number;
+    unitPriceCents: number;
+}
+
+/** The wire shape of Phoenix's `event_order_json/1`, in camelCase. */
+export interface EventOrderDto {
+    id: string;
+    buyerName: string | null;
+    buyerEmail: string;
+    buyerPhone: string | null;
+    status: OrderStatus;
+    totalCents: number;
+    paymentMethod: PaymentMethod | null;
+    paidAt: string | null;
+    createdAt: string;
+    tickets: EventOrderLineDto[];
+    extras: EventOrderLineDto[];
+    validatedCount: number;
 }
 
 /** The wire shape of Phoenix's `pass_json/1` on the order endpoint, QR included. */

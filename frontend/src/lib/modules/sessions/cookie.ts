@@ -15,9 +15,9 @@ export const SESSION_COOKIE = 'tickets_session';
 const SESSION_TTL_DAYS = 30;
 
 export const SESSION_COOKIE_OPTIONS: CookieSerializeOptions & { path: string } = {
-	httpOnly: true,
-	sameSite: 'lax',
-	path: '/',
-	secure: !dev,
-	maxAge: SESSION_TTL_DAYS * 86_400
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    secure: !dev,
+    maxAge: SESSION_TTL_DAYS * 86_400
 };

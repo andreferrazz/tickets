@@ -3,6 +3,7 @@ import { migrate } from '../../db/migrate.ts';
 import {
     ADMIN,
     MEMBER_PAID_ORDER,
+    PENDING_INVITATION,
     PUBLISHED_BATCH,
     PUBLISHED_TICKET_TYPE,
     DRAFT_ORG,
@@ -36,6 +37,7 @@ const ADMIN_URL = `postgres://${PG_AUTH}@${PG_HOST}:${PG_PORT}/postgres`;
 // Only the tables these specs read. Truncating the whole schema would also wipe
 // the migration bookkeeping and make the database look unmigrated.
 const SEEDED_TABLES = [
+    'invitations',
     'passes',
     'order_items',
     'orders',
@@ -82,6 +84,7 @@ async function seed(): Promise<void> {
         await insertEvents(client);
         await insertTickets(client);
         await insertOrders(client);
+        await insertInvitations(client);
         await insertSessions(client);
     } finally {
         await client.end();
@@ -145,8 +148,15 @@ async function insertTickets(client: pg.Client): Promise<void> {
         await client.query(
             `insert into ticket_batches
 			   (id, ticket_type_id, sequence, price_cents, quantity_total, quantity_sold, inserted_at)
-			 values ($1, $2, $3, $4, $5, 0, now() at time zone 'utc')`,
-            [batch.id, batch.ticketTypeId, batch.sequence, batch.priceCents, batch.quantityTotal]
+			 values ($1, $2, $3, $4, $5, $6, now() at time zone 'utc')`,
+            [
+                batch.id,
+                batch.ticketTypeId,
+                batch.sequence,
+                batch.priceCents,
+                batch.quantityTotal,
+                batch.quantitySold
+            ]
         );
     }
 }
@@ -179,8 +189,8 @@ async function insertOrders(client: pg.Client): Promise<void> {
             [
                 item.id,
                 item.orderId,
-                PUBLISHED_TICKET_TYPE.id,
-                PUBLISHED_BATCH.id,
+                item.itemId,
+                item.batchId,
                 item.itemName,
                 item.quantity,
                 item.unitPriceCents
@@ -205,6 +215,23 @@ async function insertOrders(client: pg.Client): Promise<void> {
             ]
         );
     }
+}
+
+async function insertInvitations(client: pg.Client): Promise<void> {
+    await client.query(
+        `insert into invitations
+           (id, inviter_id, organization_id, email, role, status, token, expires_at, inserted_at)
+         values ($1, $2, $3, $4, $5, 'pending', $6, (now() at time zone 'utc') + interval '7 days',
+                 now() at time zone 'utc')`,
+        [
+            PENDING_INVITATION.id,
+            PENDING_INVITATION.inviterId,
+            PENDING_INVITATION.organizationId,
+            PENDING_INVITATION.email,
+            PENDING_INVITATION.role,
+            PENDING_INVITATION.token
+        ]
+    );
 }
 
 async function insertSessions(client: pg.Client): Promise<void> {

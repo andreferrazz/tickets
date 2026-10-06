@@ -87,7 +87,9 @@ export const PUBLISHED_BATCH = {
     sequence: 1,
     label: 'Lote 1',
     priceCents: 12_345,
-    quantityTotal: 10
+    quantityTotal: 10,
+    /** MEMBER's paid (2) and pending (1) tickets, so the dashboard has stock to show. */
+    quantitySold: 3
 };
 
 export const SEEDED_TICKET_TYPES = [PUBLISHED_TICKET_TYPE];
@@ -128,10 +130,22 @@ export const ADMIN_ORDER = {
 
 export const SEEDED_ORDERS = [MEMBER_PAID_ORDER, MEMBER_PENDING_ORDER, ADMIN_ORDER];
 
+/** A pending invitation MEMBER sent into their organization. */
+export const PENDING_INVITATION = {
+    id: '00000000-0000-4000-8000-000000000700',
+    inviterId: MEMBER.id,
+    organizationId: DRAFT_ORG.id,
+    email: 'invited@e2e.test',
+    role: 'participant',
+    token: 'e2e-invite-token'
+};
+
 export const SEEDED_ORDER_ITEMS = [
     {
         id: '00000000-0000-4000-8000-000000000500',
         orderId: MEMBER_PAID_ORDER.id,
+        itemId: PUBLISHED_TICKET_TYPE.id,
+        batchId: PUBLISHED_BATCH.id as string | null,
         itemName: PUBLISHED_TICKET_TYPE.name,
         quantity: 2,
         unitPriceCents: PUBLISHED_BATCH.priceCents
@@ -139,6 +153,8 @@ export const SEEDED_ORDER_ITEMS = [
     {
         id: '00000000-0000-4000-8000-000000000501',
         orderId: MEMBER_PENDING_ORDER.id,
+        itemId: PUBLISHED_TICKET_TYPE.id,
+        batchId: PUBLISHED_BATCH.id as string | null,
         itemName: PUBLISHED_TICKET_TYPE.name,
         quantity: 1,
         unitPriceCents: PUBLISHED_BATCH.priceCents
@@ -146,6 +162,9 @@ export const SEEDED_ORDER_ITEMS = [
     {
         id: '00000000-0000-4000-8000-000000000502',
         orderId: ADMIN_ORDER.id,
+        // A ticket type that was never seeded: order_items carries no FK on item_id.
+        itemId: '00000000-0000-4000-8000-000000000201',
+        batchId: null as string | null,
         itemName: 'E2E Admin Ticket',
         quantity: 1,
         unitPriceCents: 1_000

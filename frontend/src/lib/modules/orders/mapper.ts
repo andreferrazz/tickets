@@ -1,6 +1,16 @@
 import { renderQrPng } from '$lib/integrations/qr-code';
 import { toIso8601Utc, toIso8601UtcOrNull } from '$lib/utils/datetime';
-import type { OrderDto, OrderItemDto, OrderItemRow, OrderRow, PassDto, PassRow } from './types';
+import type {
+    EventOrderDto,
+    EventOrderLineDto,
+    EventOrderView,
+    OrderDto,
+    OrderItemDto,
+    OrderItemRow,
+    OrderRow,
+    PassDto,
+    PassRow
+} from './types';
 
 /**
  * Turns order, item and pass rows into the wire shapes the buyer pages render:
@@ -16,6 +26,8 @@ export interface OrderMapper {
     toOrderDto(order: OrderRow, items: OrderItemRow[]): OrderDto;
     /** Async because the QR code is rendered here, as the Phoenix endpoint did. */
     toPassDto(pass: PassRow): Promise<PassDto>;
+    /** Phoenix's `event_order_json/1`: lines split into tickets and extras. */
+    toEventOrderDto(view: EventOrderView): EventOrderDto;
 }
 
 export function getOrderMapper(): OrderMapper {
@@ -32,6 +44,23 @@ export function getOrderMapper(): OrderMapper {
                 paidAt: toIso8601UtcOrNull(order.paid_at),
                 createdAt: toIso8601Utc(order.inserted_at),
                 items: items.map(toItemDto)
+            };
+        },
+
+        toEventOrderDto({ order, items, validatedCount }) {
+            return {
+                id: order.id,
+                buyerName: order.buyer_name,
+                buyerEmail: order.buyer_email,
+                buyerPhone: order.buyer_phone,
+                status: order.status,
+                totalCents: order.total_cents,
+                paymentMethod: order.payment_method,
+                paidAt: toIso8601UtcOrNull(order.paid_at),
+                createdAt: toIso8601Utc(order.inserted_at),
+                tickets: items.filter((item) => item.item_type === 'ticket').map(toLineDto),
+                extras: items.filter((item) => item.item_type === 'extra').map(toLineDto),
+                validatedCount
             };
         },
 
@@ -59,6 +88,10 @@ function toItemDto(item: OrderItemRow): OrderItemDto {
         quantity: item.quantity,
         unitPriceCents: item.unit_price_cents
     };
+}
+
+function toLineDto(item: OrderItemRow): EventOrderLineDto {
+    return { name: item.item_name, quantity: item.quantity, unitPriceCents: item.unit_price_cents };
 }
 
 let orderMapper: OrderMapper | null = null;
