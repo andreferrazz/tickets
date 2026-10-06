@@ -1,5 +1,13 @@
+import { readAbacatePayConfig } from '$lib/config/abacate-pay';
 import { resolveIntegrationMode, type IntegrationMode } from '$lib/config/integrations';
-import { getQueryableInstance } from '$lib/db/queryable';
+import { readSmtpConfig } from '$lib/config/smtp';
+import { getQueryableInstance } from '$lib/db/pool';
+import { getFakeAbacatePay } from '$lib/integrations/abacate-pay/fake';
+import type { AbacatePayGateway } from '$lib/integrations/abacate-pay/gateway';
+import { getLiveAbacatePay } from '$lib/integrations/abacate-pay/live';
+import { getFakeMailer } from '$lib/integrations/mail/fake-mailer';
+import type { Mailer } from '$lib/integrations/mail/mailer';
+import { getSmtpMailer } from '$lib/integrations/mail/smtp-mailer';
 import { getEventDetailMapper } from '$lib/modules/events/detail-mapper';
 import { getEventDetailRepository } from '$lib/modules/events/detail-repository';
 import { getEventDetailService } from '$lib/modules/events/detail-service';
@@ -19,13 +27,10 @@ import { getHomeBff, type HomeBff } from './bff/home';
  * detail of the module that owns them.
  */
 export interface Container {
-    /**
-     * Which Abacate Pay and mail implementations this graph was built with. The
-     * first consumer arrives with the payment steps of the migration; until then
-     * it is resolved here so a bad INTEGRATIONS value fails at boot, not at the
-     * first checkout.
-     */
+    /** Which Abacate Pay and mail implementations this graph was built with. */
     integrationMode: IntegrationMode;
+    abacatePay: AbacatePayGateway;
+    mailer: Mailer;
     eventService: EventService;
     sessionService: SessionService;
     homeBff: HomeBff;
@@ -48,6 +53,14 @@ export function getContainer(): Container {
 function createContainer(): Container {
     const integrationMode = resolveIntegrationMode();
 
+    // integrations: the one place the fake/live choice is made. Live config is
+    // only read on the live branch, so a fake run needs no secrets at all.
+    const abacatePay =
+        integrationMode === 'fake'
+            ? getFakeAbacatePay()
+            : getLiveAbacatePay(readAbacatePayConfig());
+    const mailer = integrationMode === 'fake' ? getFakeMailer() : getSmtpMailer(readSmtpConfig());
+
     // repositories
     const queryable = getQueryableInstance();
     const sessionRepository = getSessionRepository(queryable);
@@ -69,6 +82,8 @@ function createContainer(): Container {
 
     return {
         integrationMode,
+        abacatePay,
+        mailer,
         sessionService,
         eventService,
         homeBff,
