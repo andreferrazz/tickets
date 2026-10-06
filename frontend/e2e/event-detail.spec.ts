@@ -1,4 +1,4 @@
-import { expect, test, type BrowserContext } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
     ADMIN,
     MEMBER,
@@ -10,16 +10,7 @@ import {
     PUBLISHED_TICKET_TYPE
 } from './support/fixtures';
 
-// Mirrors SESSION_COOKIE in src/lib/modules/sessions/cookie.ts. Duplicated rather
-// than imported because that module pulls in $app/environment, which only
-// resolves inside Vite.
-const SESSION_COOKIE = 'tickets_session';
-
-async function signIn(context: BrowserContext, token: string): Promise<void> {
-    await context.addCookies([
-        { name: SESSION_COOKIE, value: token, url: 'http://localhost:5273' }
-    ]);
-}
+import { signIn } from './support/session';
 
 test('an anonymous visitor sees a published event', async ({ page }) => {
     await page.goto(`/events/${PUBLISHED_EVENT.id}`);

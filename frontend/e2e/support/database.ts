@@ -2,11 +2,17 @@ import pg from 'pg';
 import { migrate } from '../../db/migrate.ts';
 import {
     ADMIN,
+    MEMBER_PAID_ORDER,
+    PUBLISHED_BATCH,
+    PUBLISHED_TICKET_TYPE,
     DRAFT_ORG,
     MEMBER,
     OTHER_ORG,
     SEEDED_BATCHES,
     SEEDED_EVENTS,
+    SEEDED_ORDER_ITEMS,
+    SEEDED_ORDERS,
+    SEEDED_PASSES,
     SEEDED_TICKET_TYPES,
     SESSIONS
 } from './fixtures';
@@ -30,6 +36,9 @@ const ADMIN_URL = `postgres://${PG_AUTH}@${PG_HOST}:${PG_PORT}/postgres`;
 // Only the tables these specs read. Truncating the whole schema would also wipe
 // the migration bookkeeping and make the database look unmigrated.
 const SEEDED_TABLES = [
+    'passes',
+    'order_items',
+    'orders',
     'sessions',
     'ticket_batches',
     'ticket_types',
@@ -72,6 +81,7 @@ async function seed(): Promise<void> {
         await insertUsers(client);
         await insertEvents(client);
         await insertTickets(client);
+        await insertOrders(client);
         await insertSessions(client);
     } finally {
         await client.end();
@@ -137,6 +147,62 @@ async function insertTickets(client: pg.Client): Promise<void> {
 			   (id, ticket_type_id, sequence, price_cents, quantity_total, quantity_sold, inserted_at)
 			 values ($1, $2, $3, $4, $5, 0, now() at time zone 'utc')`,
             [batch.id, batch.ticketTypeId, batch.sequence, batch.priceCents, batch.quantityTotal]
+        );
+    }
+}
+
+// Orders with their items and passes, so the buyer pages have something to
+// render: a paid order with two passes, a pending one, and another buyer's.
+async function insertOrders(client: pg.Client): Promise<void> {
+    for (const order of SEEDED_ORDERS) {
+        await client.query(
+            `insert into orders
+               (id, user_id, event_id, status, total_cents, abacate_payment_url, paid_at,
+                inserted_at, updated_at)
+             values ($1, $2, $3, $4, $5, $6, $7, now() at time zone 'utc', now() at time zone 'utc')`,
+            [
+                order.id,
+                order.userId,
+                order.eventId,
+                order.status,
+                order.totalCents,
+                order.paymentUrl,
+                order.paidAt
+            ]
+        );
+    }
+    for (const item of SEEDED_ORDER_ITEMS) {
+        await client.query(
+            `insert into order_items
+               (id, order_id, item_type, item_id, batch_id, item_name, quantity, unit_price_cents, inserted_at)
+             values ($1, $2, 'ticket', $3, $4, $5, $6, $7, now() at time zone 'utc')`,
+            [
+                item.id,
+                item.orderId,
+                PUBLISHED_TICKET_TYPE.id,
+                PUBLISHED_BATCH.id,
+                item.itemName,
+                item.quantity,
+                item.unitPriceCents
+            ]
+        );
+    }
+    for (const pass of SEEDED_PASSES) {
+        await client.query(
+            `insert into passes
+               (id, token, kind, order_id, order_item_id, event_id, user_id, item_name, checked_in_at,
+                inserted_at, updated_at)
+             values ($1, $2, 'ticket', $3, $4, $5, $6, $7, $8, now() at time zone 'utc', now() at time zone 'utc')`,
+            [
+                pass.id,
+                pass.token,
+                pass.orderId,
+                pass.orderItemId,
+                MEMBER_PAID_ORDER.eventId,
+                MEMBER_PAID_ORDER.userId,
+                PUBLISHED_TICKET_TYPE.name,
+                pass.checkedInAt
+            ]
         );
     }
 }
