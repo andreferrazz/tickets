@@ -1,6 +1,5 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import pg from 'pg';
+import { migrate } from '../../db/migrate.ts';
 import {
     ADMIN,
     DRAFT_ORG,
@@ -11,8 +10,6 @@ import {
     SEEDED_TICKET_TYPES,
     SESSIONS
 } from './fixtures';
-
-const run = promisify(execFile);
 
 /**
  * The database the e2e run owns outright. Kept separate from `backend_dev` so a
@@ -29,10 +26,9 @@ const PG_AUTH = 'postgres:postgres';
 export const E2E_DATABASE_URL = `postgres://${PG_AUTH}@${PG_HOST}:${PG_PORT}/${E2E_DATABASE}`;
 
 const ADMIN_URL = `postgres://${PG_AUTH}@${PG_HOST}:${PG_PORT}/postgres`;
-const SCHEMA_SOURCE = 'backend_dev';
 
 // Only the tables these specs read. Truncating the whole schema would also wipe
-// schema_migrations and make the copied schema look unmigrated.
+// the migration bookkeeping and make the database look unmigrated.
 const SEEDED_TABLES = [
     'sessions',
     'ticket_batches',
@@ -44,21 +40,13 @@ const SEEDED_TABLES = [
 ];
 
 /**
- * Creates the e2e database if it is missing and copies the schema across from
- * the migrated dev database.
- *
- * The schema is copied rather than hand-written on purpose: the column types
- * carry real weight here. `starts_at` is `timestamp(0) WITHOUT time zone`, which
- * is exactly the case the UTC type parser in `$lib/db/pool` exists to handle, so
- * a hand-rolled DDL that got it wrong would let a real bug pass.
+ * Creates the e2e database if it is missing and brings it to the current schema
+ * with the same SQL files production runs (`db/migrations`), so a spec can only
+ * pass against the schema that will actually be deployed.
  */
 async function ensureDatabase(): Promise<void> {
     await createDatabaseIfMissing();
-    // Checks for the schema rather than just the database: a run that died
-    // between `create database` and the schema copy would otherwise leave an
-    // empty database behind that every later run would accept as ready.
-    if (await hasSchema()) return;
-    await copySchema();
+    await migrate({ connectionString: E2E_DATABASE_URL });
 }
 
 async function createDatabaseIfMissing(): Promise<void> {
@@ -72,31 +60,6 @@ async function createDatabaseIfMissing(): Promise<void> {
     } finally {
         await admin.end();
     }
-}
-
-async function hasSchema(): Promise<boolean> {
-    const client = new pg.Client({ connectionString: E2E_DATABASE_URL });
-    await client.connect();
-    try {
-        const { rows } = await client.query<{ present: string | null }>(
-            `select to_regclass('public.events')::text as present`
-        );
-        return rows[0]?.present !== null;
-    } finally {
-        await client.end();
-    }
-}
-
-// Piped through psql rather than executed over the `pg` driver: pg_dump emits
-// psql meta-commands (\restrict and friends on PG 18) that the driver rejects.
-async function copySchema(): Promise<void> {
-    const server = `-h ${PG_HOST} -p ${PG_PORT} -U postgres`;
-    const dump = `pg_dump --schema-only --no-owner --no-privileges ${server} ${SCHEMA_SOURCE}`;
-    const load = `psql --quiet -v ON_ERROR_STOP=1 ${server} -d ${E2E_DATABASE}`;
-    await run('bash', ['-o', 'pipefail', '-c', `${dump} | ${load}`], {
-        env: { ...process.env, PGPASSWORD: 'postgres' },
-        maxBuffer: 32 * 1024 * 1024
-    });
 }
 
 /** Empties the seeded tables and inserts the fixture rows the specs assert on. */

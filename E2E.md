@@ -14,7 +14,8 @@ in-process fakes.
    bitten or are likely to. A new edge case is appended to the owning spec and
    gets a mention in that spec's row here.
 3. Specs run against `tickets_e2e`, never `backend_dev`. The harness in
-   `frontend/e2e/support/database.ts` builds and seeds it; the fixtures in
+   `frontend/e2e/support/database.ts` builds it from the SQL migrations in
+   `frontend/db/migrations` and seeds it; the fixtures in
    `frontend/e2e/support/fixtures.ts` are the only world the specs know.
 4. External services never run in e2e. The app boots with `INTEGRATIONS=fake`
    (set in `frontend/playwright.config.ts`), which selects the fake
@@ -29,7 +30,8 @@ cd frontend && npm test          # Postgres on localhost:5432
 PGPORT=55432 npm test            # a Postgres on another port (PGHOST works too)
 ```
 
-Needs `pg_dump` and `psql` on the PATH: the schema is copied from `backend_dev`.
+Needs only a reachable Postgres: the schema comes from `frontend/db/migrations`,
+the same files `npm run db:migrate` applies everywhere else.
 
 ## Catalog
 

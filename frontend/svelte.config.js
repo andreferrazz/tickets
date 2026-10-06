@@ -7,7 +7,15 @@ const config = {
 		runes: ({ filename }) => (filename.split(/[/\\]/).includes('node_modules') ? undefined : true)
 	},
 	kit: {
-		adapter: adapter()
+		adapter: adapter(),
+		typescript: {
+			// db/ and e2e/ run under plain Node and Playwright, outside Vite, but they
+			// are still this project's TypeScript: `npm run check` must cover them.
+			config: (tsconfig) => {
+				tsconfig.include.push('../db/**/*.ts', '../e2e/**/*.ts');
+				return tsconfig;
+			}
+		}
 	}
 };
 

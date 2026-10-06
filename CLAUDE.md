@@ -44,6 +44,9 @@
 
 ## Structure
 
+- Schema changes are SQL files in `frontend/db/migrations` (`NNNN_name.sql`),
+  applied with `npm run db:migrate`. The Ecto migrations under
+  `backend/priv/repo/migrations` are frozen; never add one.
 - Follow the framework's convention (Elixir, Phoenix, and SvelteKit).
 - Prefer small focused modules over god files.
 - Predictable paths.
