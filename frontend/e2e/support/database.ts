@@ -19,9 +19,16 @@ const run = promisify(execFile);
  * run can truncate freely without touching whatever you were working on.
  */
 export const E2E_DATABASE = 'tickets_e2e';
-export const E2E_DATABASE_URL = `postgres://postgres:postgres@localhost:5432/${E2E_DATABASE}`;
 
-const ADMIN_URL = 'postgres://postgres:postgres@localhost:5432/postgres';
+// Honours the libpq variables so a machine whose 5432 belongs to another project
+// can point the run at a different Postgres without editing this file.
+const PG_HOST = process.env.PGHOST ?? 'localhost';
+const PG_PORT = process.env.PGPORT ?? '5432';
+const PG_AUTH = 'postgres:postgres';
+
+export const E2E_DATABASE_URL = `postgres://${PG_AUTH}@${PG_HOST}:${PG_PORT}/${E2E_DATABASE}`;
+
+const ADMIN_URL = `postgres://${PG_AUTH}@${PG_HOST}:${PG_PORT}/postgres`;
 const SCHEMA_SOURCE = 'backend_dev';
 
 // Only the tables these specs read. Truncating the whole schema would also wipe
@@ -83,8 +90,9 @@ async function hasSchema(): Promise<boolean> {
 // Piped through psql rather than executed over the `pg` driver: pg_dump emits
 // psql meta-commands (\restrict and friends on PG 18) that the driver rejects.
 async function copySchema(): Promise<void> {
-    const dump = `pg_dump --schema-only --no-owner --no-privileges -h localhost -U postgres ${SCHEMA_SOURCE}`;
-    const load = `psql --quiet -v ON_ERROR_STOP=1 -h localhost -U postgres -d ${E2E_DATABASE}`;
+    const server = `-h ${PG_HOST} -p ${PG_PORT} -U postgres`;
+    const dump = `pg_dump --schema-only --no-owner --no-privileges ${server} ${SCHEMA_SOURCE}`;
+    const load = `psql --quiet -v ON_ERROR_STOP=1 ${server} -d ${E2E_DATABASE}`;
     await run('bash', ['-o', 'pipefail', '-c', `${dump} | ${load}`], {
         env: { ...process.env, PGPASSWORD: 'postgres' },
         maxBuffer: 32 * 1024 * 1024

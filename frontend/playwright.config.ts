@@ -20,7 +20,14 @@ export default defineConfig({
 		port: PORT,
 		reuseExistingServer: !process.env.CI,
 		// Points the app at the seeded database instead of the one in .env, so a
-		// run never reads or writes backend_dev.
-		env: { DATABASE_URL: E2E_DATABASE_URL }
+		// run never reads or writes backend_dev, and at the fake integrations so a
+		// spec never reaches Abacate Pay or an SMTP server. PUBLIC_API_URL is only
+		// here because lib/api.ts refuses to load without it; nothing in e2e calls
+		// Phoenix, and the variable goes with it in the last migration step.
+		env: {
+			DATABASE_URL: E2E_DATABASE_URL,
+			INTEGRATIONS: 'fake',
+			PUBLIC_API_URL: process.env.PUBLIC_API_URL ?? 'http://localhost:4000/api/v1'
+		}
 	}
 });
