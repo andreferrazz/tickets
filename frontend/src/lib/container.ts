@@ -1,3 +1,4 @@
+import { resolveIntegrationMode, type IntegrationMode } from '$lib/config/integrations';
 import { getQueryableInstance } from '$lib/db/queryable';
 import { getEventDetailMapper } from '$lib/modules/events/detail-mapper';
 import { getEventDetailRepository } from '$lib/modules/events/detail-repository';
@@ -18,6 +19,13 @@ import { getHomeBff, type HomeBff } from './bff/home';
  * detail of the module that owns them.
  */
 export interface Container {
+    /**
+     * Which Abacate Pay and mail implementations this graph was built with. The
+     * first consumer arrives with the payment steps of the migration; until then
+     * it is resolved here so a bad INTEGRATIONS value fails at boot, not at the
+     * first checkout.
+     */
+    integrationMode: IntegrationMode;
     eventService: EventService;
     sessionService: SessionService;
     homeBff: HomeBff;
@@ -38,6 +46,8 @@ export function getContainer(): Container {
 }
 
 function createContainer(): Container {
+    const integrationMode = resolveIntegrationMode();
+
     // repositories
     const queryable = getQueryableInstance();
     const sessionRepository = getSessionRepository(queryable);
@@ -58,6 +68,7 @@ function createContainer(): Container {
     const eventsBff = getEventDetailBff(eventService, eventDetailService, eventDetailMapper);
 
     return {
+        integrationMode,
         sessionService,
         eventService,
         homeBff,

@@ -28,7 +28,8 @@
 - `frontend/`: Playwright e2e only — a few specs covering the main flow, no
   unit tests. Specs live in `frontend/e2e/`. They run against the seeded
   `tickets_e2e` database (built by `e2e/support/database.ts`), never
-  `backend_dev`.
+  `backend_dev`. Every spec is cataloged in `E2E.md`; a PR that adds or
+  changes a flow updates the spec and the catalog together.
 - Tests must be F.I.R.S.T: fast, independent, repeatable,
   self-validating, timely.
 
