@@ -73,7 +73,6 @@ defmodule BackendWeb.PassController do
       id: pass.id,
       kind: pass.kind,
       item_name: pass.item_name,
-      seat_label: pass.seat_label,
       event_id: pass.event_id,
       order_id: pass.order_id,
       checked_in_at: pass.checked_in_at,

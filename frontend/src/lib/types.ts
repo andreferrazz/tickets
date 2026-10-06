@@ -100,7 +100,6 @@ export interface Pass {
     id: string;
     kind: 'ticket' | 'extra';
     item_name: string;
-    seat_label: string | null;
     token: string;
     checked_in_at: string | null;
     qr_png_base64: string;
@@ -112,7 +111,6 @@ export interface ValidateResult {
         id: string;
         kind: 'ticket' | 'extra';
         item_name: string;
-        seat_label: string | null;
         event_id: string;
         order_id: string;
         checked_in_at: string | null;

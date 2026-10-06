@@ -14,7 +14,6 @@ defmodule Backend.Tickets.Pass do
     field :token, :string
     field :kind, :string
     field :item_name, :string
-    field :seat_label, :string
     field :checked_in_at, :utc_datetime
 
     belongs_to :order, Backend.Orders.Order
@@ -34,7 +33,6 @@ defmodule Backend.Tickets.Pass do
       :token,
       :kind,
       :item_name,
-      :seat_label,
       :order_id,
       :order_item_id,
       :event_id,

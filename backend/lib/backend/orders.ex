@@ -11,7 +11,7 @@ defmodule Backend.Orders do
   alias Backend.Repo
   alias Backend.Accounts
   alias Backend.Events
-  alias Backend.Events.{Event, ExtraItem, Seating, TicketBatch}
+  alias Backend.Events.{Event, ExtraItem, TicketBatch}
   alias Backend.Orders.{Order, OrderItem}
   alias Backend.Organizations
   alias Backend.Tickets
@@ -33,13 +33,12 @@ defmodule Backend.Orders do
 
   Returns `{:ok, order}` or `{:error, reason}`.
   """
-  def create_order(user, event_id, cart_items, seat_picks \\ [], payment_method \\ nil) do
+  def create_order(user, event_id, cart_items, payment_method \\ nil) do
     with {:ok, event} <- fetch_published_event(event_id),
          {:ok, line_items} <- resolve_items(event, cart_items),
          :ok <- ensure_extras_within_ticket_count(line_items),
-         {:ok, picks} <- Seating.validate_picks(event, seat_picks, ticket_quantity(line_items)),
          total = compute_total(line_items),
-         {:ok, order} <- reserve_order(user, event, total, line_items, picks) do
+         {:ok, order} <- reserve_order(user, event, total, line_items) do
       finalize_order(user, event, total, line_items, order, payment_method)
     end
   end
@@ -78,9 +77,7 @@ defmodule Backend.Orders do
   takes the free path in `finalize_order/6`: marked paid and fulfilled inline,
   while still reserving batch stock like a normal purchase.
 
-  Tickets only in v1 — extras are rejected. Assigned-seat events are not
-  supported (no seat is picked), so a seat-required event surfaces a seating
-  error rather than an assigned seat.
+  Tickets only in v1 — extras are rejected.
 
   ## Example
 
@@ -99,7 +96,7 @@ defmodule Backend.Orders do
          {:ok, line_items} <- resolve_items(event, cart_items),
          :ok <- ensure_tickets_only(line_items),
          comp_lines = Enum.map(line_items, &%{&1 | price_cents: 0}),
-         {:ok, order} <- reserve_order(recipient, event, 0, comp_lines, []) do
+         {:ok, order} <- reserve_order(recipient, event, 0, comp_lines) do
       finalize_order(recipient, event, 0, comp_lines, order, nil)
     end
   end
@@ -442,8 +439,8 @@ defmodule Backend.Orders do
     end
   end
 
-  # Flips status to "cancelled" and releases the reserved stock (ticket batches,
-  # extras, seat assignments). Free orders additionally have their issued passes
+  # Flips status to "cancelled" and releases the reserved stock (ticket batches
+  # and extras). Free orders additionally have their issued passes
   # deleted. Wrapped in a transaction so partial state can't leak on failure.
   defp cancel_and_release(order, opts) do
     delete_passes? = Keyword.fetch!(opts, :delete_passes?)
@@ -674,47 +671,28 @@ defmodule Backend.Orders do
     Enum.reduce(line_items, 0, fn %{price_cents: p, quantity: q}, acc -> acc + p * q end)
   end
 
-  defp reserve_order(user, event, total, line_items, seat_picks) do
+  defp reserve_order(user, event, total, line_items) do
     Repo.transaction(fn ->
       order =
         %{user_id: user.id, event_id: event.id, total_cents: total}
         |> Order.changeset()
         |> Repo.insert!()
 
-      ticket_items =
-        Enum.map(line_items, fn line ->
-          item =
-            %{
-              "order_id" => order.id,
-              "item_type" => line.type,
-              "item_id" => line.item_id,
-              "batch_id" => line.batch_id,
-              "item_name" => line.name,
-              "quantity" => line.quantity,
-              "unit_price_cents" => line.price_cents
-            }
-            |> OrderItem.changeset()
-            |> Repo.insert!()
+      Enum.each(line_items, fn line ->
+        %{
+          "order_id" => order.id,
+          "item_type" => line.type,
+          "item_id" => line.item_id,
+          "batch_id" => line.batch_id,
+          "item_name" => line.name,
+          "quantity" => line.quantity,
+          "unit_price_cents" => line.price_cents
+        }
+        |> OrderItem.changeset()
+        |> Repo.insert!()
 
-          increment_sold(line)
-
-          {line, item}
-        end)
-        |> Enum.filter(fn {line, _} -> line.type == "ticket" end)
-        |> Enum.map(fn {_, item} -> item end)
-
-      try do
-        Seating.reserve!(event, seat_picks, order, ticket_items)
-      rescue
-        e in Postgrex.Error ->
-          case e do
-            %Postgrex.Error{postgres: %{constraint: "seat_assignments_active_uniq"}} ->
-              Repo.rollback({:seat_taken, seat_picks})
-
-            other ->
-              reraise other, __STACKTRACE__
-          end
-      end
+        increment_sold(line)
+      end)
 
       order
     end)
@@ -849,8 +827,6 @@ defmodule Backend.Orders do
           :ok
       end
     end)
-
-    Seating.release_for_order(order.id)
   end
 
   # Decrement the batch's sold count; if it was auto-closed (sellout), reopen

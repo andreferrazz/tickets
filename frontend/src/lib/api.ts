@@ -156,8 +156,6 @@ export const api = {
         request<ExtraSection>(`/extra-sections/${id}`, { method: 'PUT', body }),
     deleteExtraSection: (id: string) =>
         request<{ deleted: true }>(`/extra-sections/${id}`, { method: 'DELETE' }),
-    // No seat_picks: Phoenix defaults the param to [] for the seatless orders this
-    // app now creates.
     createOrder: (event_id: string, items: CartLine[], payment_method?: PaymentMethod) =>
         request<Order>('/orders', {
             method: 'POST',

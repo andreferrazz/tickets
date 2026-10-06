@@ -96,7 +96,6 @@ defmodule Backend.OrdersTest do
                  buyer,
                  event.id,
                  [%{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}],
-                 [],
                  "BOLETO"
                )
 
@@ -119,7 +118,6 @@ defmodule Backend.OrdersTest do
                  buyer,
                  event.id,
                  [%{"item_type" => "ticket", "item_id" => tt.id, "quantity" => 1}],
-                 [],
                  "PIX"
                )
 
@@ -538,7 +536,7 @@ defmodule Backend.OrdersTest do
       # Creator manually closes the batch despite remaining capacity.
       {:ok, _} = Events.close_batch(creator, batch.id)
 
-      # Refund frees the 2 reserved seats — but creator's close is sticky.
+      # Refund frees the 2 reserved tickets — but creator's close is sticky.
       {:ok, _} = Orders.mark_refunded_by_checkout(order.abacate_checkout_id)
 
       after_refund = reload_batch(batch.id)

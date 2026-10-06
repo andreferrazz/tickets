@@ -60,7 +60,6 @@ defmodule Backend.Orders.ExpiryWorkerTest do
         buyer,
         event.id,
         [%{"item_type" => "ticket", "item_id" => tt.id, "quantity" => qty}],
-        [],
         "BOLETO"
       )
 

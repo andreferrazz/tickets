@@ -11,7 +11,6 @@ defmodule Backend.Tickets do
 
   import Ecto.Query
   alias Backend.Repo
-  alias Backend.Events.Seating
   alias Backend.Orders.{Order, OrderItem}
   alias Backend.Tickets.Pass
 
@@ -43,8 +42,7 @@ defmodule Backend.Tickets do
 
   Used when a free order is cancelled: its passes were issued at creation, and
   since `check_in/2` resolves a pass purely by token (no order-status check),
-  the QR codes would otherwise keep validating. The `seat_assignments.pass_id`
-  FK is `on_delete: :nilify_all`, so this is safe for seated orders.
+  the QR codes would otherwise keep validating.
   """
   @spec delete_for_order(Order.t()) :: non_neg_integer()
   def delete_for_order(%Order{id: id}) do
@@ -115,14 +113,13 @@ defmodule Backend.Tickets do
 
   defp insert_passes(%Order{} = order) do
     order = Repo.preload(order, :items)
-    seat_index = build_seat_index(order.id)
 
     Repo.transaction(fn ->
-      ticket_rows = Enum.flat_map(order.items, &expand_ticket_item(&1, order, seat_index))
+      ticket_rows = Enum.flat_map(order.items, &expand_ticket_item(&1, order))
       extra_row = build_extra_row(order)
 
       (ticket_rows ++ List.wrap(extra_row))
-      |> Enum.map(&insert_pass_with_seat!/1)
+      |> Enum.map(&insert_pass!/1)
     end)
     |> case do
       {:ok, passes} -> {:ok, passes, :created}
@@ -130,41 +127,21 @@ defmodule Backend.Tickets do
     end
   end
 
-  # Pre-fetches all active seat assignments for this order, grouped by
-  # `order_item_id`. For seated orders the list length per item equals
-  # `item.quantity`; for unseated orders the index is empty.
-  defp build_seat_index(order_id) do
-    Seating.list_for_pass_issuance(order_id)
-    |> Enum.group_by(& &1.order_item_id)
-  end
-
-  defp expand_ticket_item(%OrderItem{item_type: "ticket"} = item, order, seat_index) do
-    assignments = Map.get(seat_index, item.id, [])
-
-    for n <- 1..item.quantity do
-      assignment = Enum.at(assignments, n - 1)
-
+  defp expand_ticket_item(%OrderItem{item_type: "ticket"} = item, order) do
+    for _ <- 1..item.quantity do
       %{
         token: generate_token(),
         kind: "ticket",
         item_name: item.item_name,
-        seat_label: seat_label(assignment),
         order_id: order.id,
         order_item_id: item.id,
         event_id: order.event_id,
-        user_id: order.user_id,
-        _assignment: assignment
+        user_id: order.user_id
       }
     end
   end
 
-  defp expand_ticket_item(_, _, _), do: []
-
-  defp seat_label(nil), do: nil
-
-  defp seat_label(assignment) do
-    "#{assignment.seat_table.name} · Lugar #{assignment.seat_number}"
-  end
+  defp expand_ticket_item(_, _), do: []
 
   defp build_extra_row(%Order{} = order) do
     if Enum.any?(order.items, &(&1.item_type == "extra")) do
@@ -172,26 +149,18 @@ defmodule Backend.Tickets do
         token: generate_token(),
         kind: "extra",
         item_name: "Extras",
-        seat_label: nil,
         order_id: order.id,
         order_item_id: nil,
         event_id: order.event_id,
-        user_id: order.user_id,
-        _assignment: nil
+        user_id: order.user_id
       }
     end
   end
 
-  defp insert_pass_with_seat!(attrs) do
-    {assignment, pass_attrs} = Map.pop(attrs, :_assignment)
-
-    pass =
-      pass_attrs
-      |> Pass.changeset()
-      |> Repo.insert!()
-
-    if assignment, do: Seating.set_pass_id(assignment, pass.id)
-    pass
+  defp insert_pass!(attrs) do
+    attrs
+    |> Pass.changeset()
+    |> Repo.insert!()
   end
 
   defp generate_token do
