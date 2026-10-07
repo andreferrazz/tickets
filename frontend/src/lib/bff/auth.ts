@@ -27,9 +27,7 @@ export interface ProfilePageData {
     memberships: MembershipSummaryRow[];
 }
 
-// Five code requests per minute per address, as the Phoenix controller allowed.
 const REQUEST_CODE_WINDOW_SECONDS = 60;
-const REQUEST_CODE_MAX = 5;
 
 /** The auth and profile flows, mapped for the pages that drive them. */
 export interface AuthBff {
@@ -52,6 +50,8 @@ export interface AuthBffDeps {
     organizations: OrganizationRepository;
     userMapper: UserMapper;
     rateLimiter: RateLimiter;
+    /** Code requests allowed per address per minute; five is what Phoenix allowed. */
+    requestCodeLimit: number;
 }
 
 export function getAuthBff(deps: AuthBffDeps): AuthBff {
@@ -61,7 +61,7 @@ export function getAuthBff(deps: AuthBffDeps): AuthBff {
             const verdict = deps.rateLimiter.check(
                 key,
                 REQUEST_CODE_WINDOW_SECONDS,
-                REQUEST_CODE_MAX
+                deps.requestCodeLimit
             );
             if (!verdict.allowed) return 'rate_limited';
             await deps.auth.requestCode(email);

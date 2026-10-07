@@ -49,7 +49,7 @@ test('a creator builds an event: ticket type, priced and free batches, close, pu
     await batchForm.getByLabel('Preço').fill('50,00');
     await batchForm.getByLabel('Qtde').fill('20');
     await batchForm.getByRole('button', { name: 'Adicionar lote' }).click();
-    await expect(page.getByText('Lote 1')).toBeVisible();
+    await expect(page.locator('form[action="?/updateBatch"]').getByText('Lote 1')).toBeVisible();
 
     // A priced batch gets its Abacate product inside the same transaction.
     const productId = await queryValue<string>(
@@ -62,7 +62,7 @@ test('a creator builds an event: ticket type, priced and free batches, close, pu
     await batchForm.getByLabel('Preço').fill('0,00');
     await batchForm.getByLabel('Qtde').fill('5');
     await batchForm.getByRole('button', { name: 'Adicionar lote' }).click();
-    await expect(page.getByText('Lote 2')).toBeVisible();
+    await expect(page.locator('form[action="?/updateBatch"]').getByText('Lote 2')).toBeVisible();
     // A free batch has nothing to sell through Abacate, so no product.
     const freeProduct = await queryValue<string>(
         `select b.abacate_product_id from ticket_batches b join ticket_types t on t.id = b.ticket_type_id

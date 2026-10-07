@@ -125,29 +125,7 @@ export const api = {
         request<ValidateResult>(`/events/${eventId}/passes/validate`, {
             method: 'POST',
             body: { token }
-        }),
-    createInvitation: (email: string, organization_id?: string, role?: OrgRole) =>
-        request<Invitation>('/invitations', {
-            method: 'POST',
-            body: {
-                email,
-                ...(organization_id ? { organization_id } : {}),
-                ...(role ? { role } : {})
-            }
-        }),
-    setMemberRole: (orgId: string, userId: string, role: OrgRole) =>
-        request<{ user_id: string; role: OrgRole }>(`/organizations/${orgId}/members/${userId}`, {
-            method: 'PATCH',
-            body: { role }
-        }),
-    removeMember: (orgId: string, userId: string) =>
-        request<void>(`/organizations/${orgId}/members/${userId}`, { method: 'DELETE' }),
-    acceptInvitation: (token: string) =>
-        request<AuthResponse>('/invitations/accept', { method: 'POST', body: { token } }),
-    updateOrganization: (id: string, body: { name: string }) =>
-        request<Organization>(`/organizations/${id}`, { method: 'PATCH', body }),
-    deleteOrganization: (id: string) =>
-        request<{ deleted: true }>(`/organizations/${id}`, { method: 'DELETE' })
+        })
 };
 
 export function formatBRL(cents: number): string {

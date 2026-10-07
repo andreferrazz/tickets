@@ -277,7 +277,8 @@ export const pt = {
     'eventNew.title': 'Novo evento',
     'eventNew.subtitle': 'Crie o evento e depois adicione tipos de ingresso e complementos.',
     'eventNew.cta': 'Criar evento',
-    'eventNew.noOrganization': 'Você precisa fazer parte de exatamente uma organização para criar eventos.',
+    'eventNew.noOrganization':
+        'Você precisa fazer parte de exatamente uma organização para criar eventos.',
 
     // Event edit
     'eventEdit.title': 'Editar evento',
@@ -365,6 +366,8 @@ export const pt = {
     'invitations.empty': 'Nenhum convite enviado ainda.',
     'invitations.errorFallback': 'Falha ao carregar',
     'invitations.sendErrorFallback': 'Falha ao enviar',
+    'invitations.alreadyInvited': 'Já existe um convite pendente para este e-mail.',
+    'invitations.alreadyMember': 'Esta pessoa já faz parte da organização.',
 
     // Admin: user list + impersonation ("log in as user") links
     'adminUsers.title': 'Usuários',

@@ -1,4 +1,5 @@
 import { readAbacatePayConfig } from '$lib/config/abacate-pay';
+import { readRateLimitConfig } from '$lib/config/rate-limit';
 import { resolveIntegrationMode, type IntegrationMode } from '$lib/config/integrations';
 import { readSmtpConfig } from '$lib/config/smtp';
 import { getQueryableInstance } from '$lib/db/pool';
@@ -10,7 +11,7 @@ import type { Mailer } from '$lib/integrations/mail/mailer';
 import { getSmtpMailer } from '$lib/integrations/mail/smtp-mailer';
 import { getAuthCodeRepository } from '$lib/modules/accounts/auth-code-repository';
 import { getAuthService } from '$lib/modules/accounts/auth-service';
-import { getUserMapper } from '$lib/modules/accounts/mapper';
+import { getUserMapper, type UserMapper } from '$lib/modules/accounts/mapper';
 import { getProfileService } from '$lib/modules/accounts/profile-service';
 import { getFixedWindowRateLimiter } from '$lib/modules/accounts/rate-limit';
 import { getUserRepository } from '$lib/modules/accounts/repository';
@@ -32,6 +33,10 @@ import { getEventStatsService } from '$lib/modules/events/stats-service';
 import { getInvitationMapper } from '$lib/modules/invitations/mapper';
 import { getInvitationRepository } from '$lib/modules/invitations/repository';
 import { getInvitationService } from '$lib/modules/invitations/service';
+import {
+    getInvitationWriteService,
+    type InvitationWriteService
+} from '$lib/modules/invitations/write-service';
 import { getEventOrderService } from '$lib/modules/orders/manager-service';
 import { getOrderMapper } from '$lib/modules/orders/mapper';
 import { getOrderRepository } from '$lib/modules/orders/repository';
@@ -39,7 +44,10 @@ import { getOrderService } from '$lib/modules/orders/service';
 import type { EventService } from '$lib/modules/events/service';
 import { getOrganizationMapper } from '$lib/modules/organizations/mapper';
 import { getOrganizationRepository } from '$lib/modules/organizations/repository';
-import { getOrganizationService } from '$lib/modules/organizations/service';
+import {
+    getOrganizationService,
+    type OrganizationService
+} from '$lib/modules/organizations/service';
 import { getSessionRepository } from '$lib/modules/sessions/repository';
 import { getSessionService } from '$lib/modules/sessions/service';
 import type { SessionService } from '$lib/modules/sessions/service';
@@ -78,6 +86,11 @@ export interface Container {
     eventManagementBff: EventManagementBff;
     /** Writes behind the event edit page; the actions call it directly. */
     eventManagement: EventManagementService;
+    /** Membership and rename writes; the team and onboarding actions call it directly. */
+    organizations: OrganizationService;
+    invitationWrites: InvitationWriteService;
+    /** For the one load that signs a user in outside the auth BFF: the invite link. */
+    userMapper: UserMapper;
 }
 
 /**
@@ -148,6 +161,15 @@ function createContainer(): Container {
         mailer
     });
     const profileService = getProfileService({ users: userRepository, abacatePay });
+    const invitationWrites = getInvitationWriteService({
+        queryable,
+        invitations: invitationRepository,
+        organizations: organizationRepository,
+        organizationService,
+        users: userRepository,
+        auth: authService,
+        mailer
+    });
     const eventManagement = getEventManagementService({
         queryable,
         repository: eventManagementRepository,
@@ -201,7 +223,8 @@ function createContainer(): Container {
         users: userRepository,
         organizations: organizationRepository,
         userMapper,
-        rateLimiter
+        rateLimiter,
+        requestCodeLimit: readRateLimitConfig().requestCodePerMinute
     });
 
     return {
@@ -220,7 +243,10 @@ function createContainer(): Container {
         scanBff,
         authBff,
         eventManagementBff,
-        eventManagement
+        eventManagement,
+        organizations: organizationService,
+        invitationWrites,
+        userMapper
     };
 }
 

@@ -39,6 +39,9 @@ export interface MembershipSummaryRow {
 
 export type AddMemberOutcome = 'added' | 'already_member' | 'leader_exists';
 
+/** Why a role change or removal did not happen: no such member, or the member is the leader. */
+export type MemberChangeOutcome = 'changed' | 'not_found' | 'leader';
+
 export interface OrgMemberDto {
     userId: string;
     email: string;

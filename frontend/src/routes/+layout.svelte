@@ -24,6 +24,9 @@
     });
 
     onMount(async () => {
+        // Lets a test know the page is interactive: forms that submit on change
+        // only do so once the client has taken over the markup.
+        document.documentElement.dataset.hydrated = 'true';
         const { registerSW } = await import('virtual:pwa-register');
         registerSW({ immediate: true });
         // Needed so the nav can decide whether to show the staff "Scan" entry.

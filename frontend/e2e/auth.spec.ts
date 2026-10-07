@@ -3,6 +3,7 @@ import { parse } from 'devalue';
 import { latestAuthCode, userColumn } from './support/auth-codes';
 import { ADMIN, DRAFT_ORG, MEMBER, PENDING_INVITATION } from './support/fixtures';
 import { signIn } from './support/session';
+import { execute } from './support/sql';
 
 const VALID_CPF = '390.533.447-05';
 const VALID_PHONE = '(11) 99999-9999';
@@ -87,8 +88,17 @@ test('the next parameter survives the whole flow', async ({ page }) => {
     await expect(page).toHaveURL('/orders');
 });
 
+// Logging out revokes the session it was done with. Minting one just for this
+// test keeps the shared member token alive for every other spec in the run.
 test('logging out revokes the session', async ({ context, page }) => {
-    await signIn(context, MEMBER.token);
+    const token = 'e2e-session-member-logout';
+    await execute(
+        `insert into sessions (user_id, token, expires_at, inserted_at)
+         values ($1, $2, (now() at time zone 'utc') + interval '1 day', now() at time zone 'utc')
+         on conflict (token) do nothing`,
+        [MEMBER.id, token]
+    );
+    await signIn(context, token);
     await page.goto('/profile');
     await expect(page.getByText(MEMBER.email)).toBeVisible();
 

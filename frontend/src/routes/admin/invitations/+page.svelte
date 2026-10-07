@@ -1,48 +1,44 @@
 <script lang="ts">
-    import { invalidateAll } from '$app/navigation';
-    import { api, ApiError } from '$lib/api';
-    import { formatDateTime } from '$lib/utils/datetime';
+    import { enhance } from '$app/forms';
     import { t, tStatus } from '$lib/i18n';
-    import type { PageData } from './$types';
+    import { formatDateTime } from '$lib/utils/datetime';
+    import type { ActionData, PageData } from './$types';
 
-    let { data }: { data: PageData } = $props();
+    let { data, form }: { data: PageData; form: ActionData } = $props();
 
-    let email = $state('');
-    let sendError = $state<string | null>(null);
     let busy = $state(false);
 
-    // Sending still goes through Phoenix until the organizations step of the
-    // migration; the list is then re-read from the server.
-    async function send(e: SubmitEvent) {
-        e.preventDefault();
-        sendError = null;
-        busy = true;
-        try {
-            await api.createInvitation(email);
-            email = '';
-            await invalidateAll();
-        } catch (e) {
-            sendError = e instanceof ApiError ? e.message : t('invitations.sendErrorFallback');
-        } finally {
-            busy = false;
-        }
-    }
+    const sendError = $derived(
+        form?.error === 'already_invited'
+            ? t('invitations.alreadyInvited')
+            : form?.error === 'already_member'
+              ? t('invitations.alreadyMember')
+              : form?.error
+                ? t('invitations.sendErrorFallback')
+                : null
+    );
 </script>
 
 <h1>{t('invitations.title')}</h1>
 <p class="muted">{t('invitations.subtitle')}</p>
 
-<form onsubmit={send} class="card stack" style="margin: 1rem 0;">
+<form
+    method="POST"
+    action="?/invite"
+    class="card stack"
+    style="margin: 1rem 0;"
+    use:enhance={() => {
+        busy = true;
+        return async ({ update }) => {
+            busy = false;
+            await update();
+        };
+    }}
+>
     <label for="email">{t('common.email')}</label>
     <div class="row">
-        <input
-            id="email"
-            type="email"
-            bind:value={email}
-            placeholder="amigo@exemplo.com"
-            required
-        />
-        <button type="submit" disabled={busy || !email}>
+        <input id="email" name="email" type="email" placeholder="amigo@exemplo.com" required />
+        <button type="submit" disabled={busy}>
             {busy ? t('invitations.sending') : t('invitations.send')}
         </button>
     </div>

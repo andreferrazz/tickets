@@ -1,5 +1,5 @@
 import type { Queryable } from '$lib/db/queryable';
-import type { InvitationRow } from './types';
+import type { InvitationRow, InvitationSecretRow, NewInvitationRow } from './types';
 
 export interface InvitationRepository {
     /** Invitations `userId` sent, newest first. */
@@ -13,6 +13,11 @@ export interface InvitationRepository {
 
     /** Runs inside the caller's transaction, next to the promotion it belongs to. */
     markAccepted(db: Queryable, id: string): Promise<void>;
+
+    insert(row: NewInvitationRow): Promise<InvitationSecretRow>;
+
+    /** Whatever its status; the service decides what a dead token means. */
+    findByToken(token: string): Promise<InvitationSecretRow | null>;
 }
 
 export function getInvitationRepository(queryable: Queryable): InvitationRepository {
@@ -41,6 +46,30 @@ export function getInvitationRepository(queryable: Queryable): InvitationReposit
 
         async markAccepted(db, id) {
             await db.query(`update invitations set status = 'accepted' where id = $1`, [id]);
+        },
+
+        async insert(row) {
+            const sql = `
+                insert into invitations (inviter_id, organization_id, role, email, status, token, expires_at, inserted_at)
+                values ($1, $2, $3, $4, 'pending', $5, (now() at time zone 'utc') + make_interval(hours => $6),
+                        now() at time zone 'utc')
+                returning ${COLUMNS}, token, expires_at`;
+            const params = [
+                row.inviterId,
+                row.organizationId,
+                row.role,
+                row.email,
+                row.token,
+                row.ttlHours
+            ];
+            const rows = await queryable.query<InvitationSecretRow>(sql, params);
+            if (!rows[0]) throw new Error('insert invitation returned no row');
+            return rows[0];
+        },
+
+        async findByToken(token) {
+            const sql = `select ${COLUMNS}, token, expires_at from invitations where token = $1`;
+            return (await queryable.query<InvitationSecretRow>(sql, [token]))[0] ?? null;
         }
     };
 }
