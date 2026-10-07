@@ -51,6 +51,14 @@
 - Prefer small focused modules over god files.
 - Predictable paths.
 
+## Svelte tooling
+
+- The Svelte MCP server (`.mcp.json`) and the official skills and subagent
+  under `.claude/` are the source of truth for Svelte 5 and SvelteKit
+  behaviour: look docs up with `get-documentation` before guessing, and run
+  `svelte-autofixer` on every `.svelte` or `.svelte.ts` file touched before
+  finishing. Without MCP, `npx @sveltejs/mcp <tool>` gives the same tools.
+
 ## Formatting
 
 - Use the language default formatter (`mix format`, `prettier`). Don't discuss style beyond that.
