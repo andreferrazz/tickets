@@ -73,7 +73,7 @@ export interface AuthBffDeps {
 }
 
 export function getAuthBff(deps: AuthBffDeps): AuthBff {
-    authBff ??= {
+    return {
         async requestCode(email, clientAddress) {
             const key = `request_code:${clientAddress}`;
             const verdict = deps.rateLimiter.check(
@@ -144,7 +144,6 @@ export function getAuthBff(deps: AuthBffDeps): AuthBff {
             return token;
         }
     };
-    return authBff;
 }
 
 // Both buckets are charged on every attempt, so a refused attempt still counts.
@@ -161,5 +160,3 @@ function mayVerify(deps: AuthBffDeps, email: string, clientAddress: string): boo
     );
     return byEmail.allowed && byAddress.allowed;
 }
-
-let authBff: AuthBff | null = null;

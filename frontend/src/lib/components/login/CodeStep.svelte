@@ -4,7 +4,8 @@
     import type { UserDto } from '$lib/modules/accounts/types';
     import { auth } from '$lib/stores/auth.svelte';
     import { loginModalStore } from '$lib/stores/loginModal.svelte';
-    import { failureText, type LoginActionResult } from './failure-text';
+    import { verifyFailureMessage } from '$lib/modules/accounts/auth-messages';
+    import { failureCode, type LoginActionResult } from './failure-text';
 
     type VerifyPayload = { token?: string; user?: UserDto } | undefined;
 
@@ -24,7 +25,7 @@
                 else loginModalStore.toProfile();
                 return;
             }
-            error = failureText(result.data, t('auth.verify.errorFallback'));
+            error = verifyFailureMessage(failureCode(result.data));
         };
     };
 

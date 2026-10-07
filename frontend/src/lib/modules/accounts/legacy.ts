@@ -3,8 +3,9 @@ import type { UserDto } from './types';
 
 /**
  * The Phoenix `user_json/1` shape to the one this app uses. Transitional: it
- * serves sessions stored before the login flow moved here and the invitation
- * link flow, which still signs in through Phoenix until the organizations step.
+ * only serves browsers that stored a session before the login flow moved here.
+ * Delete it, and `migrateUser` in the auth store, once those 30-day sessions
+ * have expired.
  */
 export function fromApiUser(user: User): UserDto {
     return {

@@ -1,3 +1,4 @@
+import { text } from '$lib/utils/form-fields';
 import { fail } from '@sveltejs/kit';
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from '$lib/modules/sessions/cookie';
 import type { Actions, PageServerLoad } from './$types';
@@ -15,7 +16,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 export const actions: Actions = {
     confirm: async ({ request, locals, cookies }) => {
-        const token = String((await request.formData()).get('token') ?? '');
+        const token = text(await request.formData(), 'token');
         const signedIn = await locals.container.authBff.impersonate(token);
         if (!signedIn) return fail(410, { error: 'invalid_link' });
         cookies.set(SESSION_COOKIE, signedIn.token, SESSION_COOKIE_OPTIONS);

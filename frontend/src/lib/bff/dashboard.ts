@@ -1,3 +1,4 @@
+import { logLoadFailure } from './load-failure';
 import type { EventStatsMapper } from '$lib/modules/events/stats-mapper';
 import type { EventStatsService } from '$lib/modules/events/stats-service';
 import type { BuyersTarget, EventStatsDto, ItemBuyerDto } from '$lib/modules/events/stats-types';
@@ -24,7 +25,7 @@ export function getDashboardBff(
     service: EventStatsService,
     mapper: EventStatsMapper
 ): DashboardBff {
-    dashboardBff ??= {
+    return {
         async show(user, eventId, target) {
             try {
                 const view = await service.getStats(user, eventId);
@@ -35,18 +36,11 @@ export function getDashboardBff(
                     : null;
                 return { stats, buyers, loadFailed: false };
             } catch (cause) {
-                console.error(
-                    JSON.stringify({
-                        event: 'dashboard_load_failed',
-                        eventId,
-                        error: String(cause)
-                    })
-                );
+                logLoadFailure('dashboard_load_failed', { eventId }, cause);
                 return { stats: null, buyers: null, loadFailed: true };
             }
         }
     };
-    return dashboardBff;
 }
 
 async function loadBuyers(
@@ -65,5 +59,3 @@ async function loadBuyers(
         rows: rows.map((row) => mapper.toBuyerDto(row))
     };
 }
-
-let dashboardBff: DashboardBff | null = null;

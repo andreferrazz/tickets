@@ -1,5 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { text } from '$lib/modules/events/management-forms';
+import { statusForFailure } from '$lib/forms/action-status';
+import { text } from '$lib/utils/form-fields';
 import { requireSessionUser } from '$lib/modules/sessions/require-user';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -24,8 +25,7 @@ export const actions: Actions = {
             params.id,
             text(await request.formData(), 'name')
         );
-        if (!result.ok)
-            return fail(result.failure === 'forbidden' ? 403 : 422, { error: result.failure });
+        if (!result.ok) return fail(statusForFailure(result.failure), { error: result.failure });
         redirect(303, '/');
     }
 };

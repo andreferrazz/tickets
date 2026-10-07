@@ -1,6 +1,9 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { parse } from 'devalue';
-import { DRAFT_ORG, MEMBER } from './support/fixtures';
+import { DRAFT_ORG, MEMBER, OTHER_ORG_DRAFT } from './support/fixtures';
+import { waitForHydration } from './support/hydration';
+import { seedPerson } from './support/people';
+import { withoutScripts } from './support/html';
 import { signIn } from './support/session';
 import { execute, queryValue } from './support/sql';
 
@@ -12,6 +15,8 @@ async function createEvent(page: Page, title: string): Promise<string> {
     await page.getByLabel('Início').fill('2027-08-01T20:00');
     await page.getByRole('button', { name: 'Criar evento' }).click();
     await expect(page).toHaveURL(/\/events\/[0-9a-f-]+\/edit$/);
+    // The edit page's buttons intercept their own clicks, which needs the client.
+    await waitForHydration(page);
     return page.url().split('/').at(-2) as string;
 }
 
@@ -43,7 +48,7 @@ test('a creator builds an event: ticket type, priced and free batches, close, pu
     const ticketTypeForm = page.locator('form[action="?/addTicketType"]');
     await ticketTypeForm.getByLabel('Nome').fill('Pista VIP');
     await ticketTypeForm.getByRole('button', { name: 'Adicionar' }).click();
-    await expect(page.getByText('Lotes')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Lotes' })).toBeVisible();
 
     const batchForm = page.locator('form[action="?/addBatch"]');
     await batchForm.getByLabel('Preço').fill('50,00');
@@ -90,7 +95,8 @@ test('a creator builds an event: ticket type, priced and free batches, close, pu
         .poll(() => queryValue<string>('select status from events where id = $1', [eventId]))
         .toBe('published');
     const home = await (await page.request.get('/')).text();
-    expect(home).toContain('E2E Built Show');
+    const homeMarkup = withoutScripts(home);
+    expect(homeMarkup).toContain('E2E Built Show');
 });
 
 test('extras get products, and a section only goes once it is empty', async ({ page, context }) => {
@@ -163,35 +169,19 @@ test('a batch with sales cannot be deleted', async ({ page, context }) => {
 });
 
 test('an event of another organization cannot be edited', async ({ page }) => {
-    const response = await page.request.get('/events/00000000-0000-4000-8000-000000000103/edit');
+    const response = await page.request.get(`/events/${OTHER_ORG_DRAFT.id}/edit`);
     expect(response.status()).toBe(404);
 });
 
 // Phoenix kept creation behind the creator role; managing an organization is
 // not enough for a member whose own role is still `buyer`.
 test('a buyer who manages an organization still cannot create an event', async ({ browser }) => {
-    const userId = '00000000-0000-4000-8000-000000000014';
-    const token = 'e2e-session-buyer-participant';
-    await execute(
-        `insert into users (id, email, role, abacate_customer_id, inserted_at, updated_at)
-         values ($1, 'buyer-participant@e2e.test', 'buyer', 'cust_e2e_buyer', now() at time zone 'utc', now() at time zone 'utc')
-         on conflict (id) do nothing`,
-        [userId]
-    );
-    await execute(
-        `insert into organization_memberships (organization_id, user_id, role, inserted_at, updated_at)
-         values ($1, $2, 'participant', now() at time zone 'utc', now() at time zone 'utc')
-         on conflict do nothing`,
-        [DRAFT_ORG.id, userId]
-    );
-    await execute(
-        `insert into sessions (user_id, token, expires_at, inserted_at)
-         values ($1, $2, (now() at time zone 'utc') + interval '1 day', now() at time zone 'utc')
-         on conflict (token) do nothing`,
-        [userId, token]
-    );
+    const buyer = await seedPerson({
+        role: 'buyer',
+        membership: { organizationId: DRAFT_ORG.id, role: 'participant' }
+    });
     const context = await browser.newContext();
-    await signIn(context, token);
+    await signIn(context, buyer.token);
 
     const response = await context.request.post('/events/new?/create', {
         form: { title: 'E2E Forbidden Show', starts_at: '2027-08-01T20:00:00Z', status: 'draft' },

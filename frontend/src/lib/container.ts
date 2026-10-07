@@ -3,10 +3,10 @@ import { readRateLimitConfig } from '$lib/config/rate-limit';
 import { resolveIntegrationMode, type IntegrationMode } from '$lib/config/integrations';
 import { readSmtpConfig } from '$lib/config/smtp';
 import { getQueryableInstance } from '$lib/db/pool';
-import { getFakeAbacatePay } from '$lib/integrations/abacate-pay/fake';
+import { getFakeAbacatePay, type FakeAbacatePay } from '$lib/integrations/abacate-pay/fake';
 import type { AbacatePayGateway } from '$lib/integrations/abacate-pay/gateway';
 import { getLiveAbacatePay } from '$lib/integrations/abacate-pay/live';
-import { getFakeMailer } from '$lib/integrations/mail/fake-mailer';
+import { getFakeMailer, type FakeMailer } from '$lib/integrations/mail/fake-mailer';
 import type { Mailer } from '$lib/integrations/mail/mailer';
 import { getSmtpMailer } from '$lib/integrations/mail/smtp-mailer';
 import { getAuthCodeRepository } from '$lib/modules/accounts/auth-code-repository';
@@ -68,9 +68,17 @@ import { getScanBff, type ScanBff } from './bff/scan';
  * module, exposing that module's service — repositories stay an implementation
  * detail of the module that owns them.
  */
+/** The in-process stand-ins, kept reachable so test-only routes can inspect them. */
+export interface IntegrationFakes {
+    mailer: FakeMailer;
+    abacatePay: FakeAbacatePay;
+}
+
 export interface Container {
     /** Which Abacate Pay and mail implementations this graph was built with. */
     integrationMode: IntegrationMode;
+    /** Null unless `INTEGRATIONS=fake`; the `/e2e-fakes` routes answer 404 without it. */
+    fakes: IntegrationFakes | null;
     abacatePay: AbacatePayGateway;
     mailer: Mailer;
     eventService: EventService;
@@ -112,11 +120,12 @@ function createContainer(): Container {
 
     // integrations: the one place the fake/live choice is made. Live config is
     // only read on the live branch, so a fake run needs no secrets at all.
-    const abacatePay =
+    const fakes: IntegrationFakes | null =
         integrationMode === 'fake'
-            ? getFakeAbacatePay()
-            : getLiveAbacatePay(readAbacatePayConfig());
-    const mailer = integrationMode === 'fake' ? getFakeMailer() : getSmtpMailer(readSmtpConfig());
+            ? { mailer: getFakeMailer(), abacatePay: getFakeAbacatePay() }
+            : null;
+    const abacatePay = fakes?.abacatePay ?? getLiveAbacatePay(readAbacatePayConfig());
+    const mailer = fakes?.mailer ?? getSmtpMailer(readSmtpConfig());
 
     // repositories
     const queryable = getQueryableInstance();
@@ -234,6 +243,7 @@ function createContainer(): Container {
 
     return {
         integrationMode,
+        fakes,
         abacatePay,
         mailer,
         sessionService,

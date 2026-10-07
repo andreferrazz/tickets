@@ -1,3 +1,4 @@
+import { text } from '$lib/utils/form-fields';
 import { parseCentsInput } from '$lib/utils/currency';
 import { fromLocalInputValue } from '$lib/utils/datetime';
 import type {
@@ -51,11 +52,6 @@ export function parseExtraInput(form: FormData): ExtraInput {
 
 export function parseSectionInput(form: FormData): SectionInput {
     return { title: text(form, 'title'), description: text(form, 'description') || null };
-}
-
-export function text(form: FormData, field: string): string {
-    const value = form.get(field);
-    return typeof value === 'string' ? value : '';
 }
 
 function isoFromForm(value: string): string {

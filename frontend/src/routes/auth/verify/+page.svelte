@@ -3,6 +3,7 @@
     import { enhance } from '$app/forms';
     import { goto } from '$app/navigation';
     import { t } from '$lib/i18n';
+    import { verifyFailureMessage } from '$lib/modules/accounts/auth-messages';
     import type { UserDto } from '$lib/modules/accounts/types';
     import { auth } from '$lib/stores/auth.svelte';
     import type { ActionData, PageData } from './$types';
@@ -71,7 +72,7 @@
                 autocomplete="one-time-code"
             />
             {#if form?.error}
-                <div class="error">{form.error}</div>
+                <div class="error">{verifyFailureMessage(form.error)}</div>
             {/if}
             <button type="submit" disabled={busy || code.length !== 6}>
                 {busy ? t('auth.verify.verifying') : t('auth.verify.verify')}

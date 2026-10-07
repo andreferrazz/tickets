@@ -9,6 +9,7 @@ import {
     PUBLISHED_EVENT,
     PUBLISHED_TICKET_TYPE
 } from './support/fixtures';
+import { withoutScripts } from './support/html';
 
 import { signIn } from './support/session';
 
@@ -24,11 +25,12 @@ test('an anonymous visitor sees a published event', async ({ page }) => {
 test('the event is server-rendered, before any JavaScript runs', async ({ request }) => {
     const response = await request.get(`/events/${PUBLISHED_EVENT.id}`);
     const html = await response.text();
+    const htmlMarkup = withoutScripts(html);
 
     expect(response.status()).toBe(200);
-    expect(html).toContain(PUBLISHED_EVENT.title);
-    expect(html).toContain(PUBLISHED_TICKET_TYPE.name);
-    expect(html).toContain(PUBLISHED_BATCH.label);
+    expect(htmlMarkup).toContain(PUBLISHED_EVENT.title);
+    expect(htmlMarkup).toContain(PUBLISHED_TICKET_TYPE.name);
+    expect(htmlMarkup).toContain(PUBLISHED_BATCH.label);
 });
 
 test('a draft is 404 for an anonymous visitor', async ({ request }) => {
@@ -66,7 +68,7 @@ test('an admin opens a draft from an organization they do not belong to', async 
     const response = await page.request.get(`/events/${OTHER_ORG_DRAFT.id}`);
 
     expect(response.status()).toBe(200);
-    expect(await response.text()).toContain(OTHER_ORG_DRAFT.title);
+    expect(withoutScripts(await response.text())).toContain(OTHER_ORG_DRAFT.title);
 });
 
 test('an event that does not exist is 404', async ({ request }) => {

@@ -9,6 +9,8 @@ export const OTHER_ORG = { id: '00000000-0000-4000-8000-000000000002', name: 'E2
 export const MEMBER = {
     id: '00000000-0000-4000-8000-000000000010',
     email: 'member@e2e.test',
+    name: 'E2E Member',
+    taxId: '52998224725',
     role: 'creator',
     token: 'e2e-session-member'
 };
@@ -16,6 +18,8 @@ export const MEMBER = {
 export const ADMIN = {
     id: '00000000-0000-4000-8000-000000000011',
     email: 'admin@e2e.test',
+    name: 'E2E Admin',
+    taxId: '11144477735',
     role: 'admin',
     token: 'e2e-session-admin'
 };
@@ -130,7 +134,7 @@ export const ADMIN_ORDER = {
 
 export const SEEDED_ORDERS = [MEMBER_PAID_ORDER, MEMBER_PENDING_ORDER, ADMIN_ORDER];
 
-/** A pending invitation MEMBER sent into their organization. */
+/** A pending invitation MEMBER sent into their organization. Read-only: no spec accepts it. */
 export const PENDING_INVITATION = {
     id: '00000000-0000-4000-8000-000000000700',
     inviterId: MEMBER.id,

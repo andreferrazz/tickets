@@ -6,6 +6,7 @@ import {
     PUBLISHED_EVENT,
     PUBLISHED_TICKET_TYPE
 } from './support/fixtures';
+import { withoutScripts } from './support/html';
 import { signIn } from './support/session';
 
 const DASHBOARD = `/events/${PUBLISHED_EVENT.id}/dashboard`;
@@ -29,11 +30,13 @@ test('a manager sees revenue, stock and recent orders server-rendered', async ({
 
     const html = await (await page.request.get(DASHBOARD)).text();
 
-    expect(html).toContain('246,90'); // one paid order of two tickets
-    expect(html).toContain(PUBLISHED_TICKET_TYPE.name);
+    const htmlMarkup = withoutScripts(html);
+
+    expect(htmlMarkup).toContain('246,90'); // one paid order of two tickets
+    expect(htmlMarkup).toContain(PUBLISHED_TICKET_TYPE.name);
     // The span carries Svelte's scoped class hash, hence the pattern.
-    expect(html).toMatch(/3<span class="muted[^"]*">\/10<\/span>/); // reserved / capacity
-    expect(html).toContain(MEMBER.email); // recent orders
+    expect(htmlMarkup).toMatch(/3<span class="muted[^"]*">\/10<\/span>/); // reserved / capacity
+    expect(htmlMarkup).toContain(MEMBER.email); // recent orders
 });
 
 test('the buyers of a ticket type are rendered from the query string', async ({
@@ -46,8 +49,8 @@ test('the buyers of a ticket type are rendered from the query string', async ({
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole('cell', { name: 'E2E User' })).toBeVisible();
-    await expect(dialog.getByRole('cell', { name: '39053344705' })).toBeVisible();
+    await expect(dialog.getByRole('cell', { name: MEMBER.name })).toBeVisible();
+    await expect(dialog.getByRole('cell', { name: MEMBER.taxId })).toBeVisible();
     // Paid (2) plus pending (1) tickets, as the stock card counts them.
     await expect(dialog.getByRole('cell', { name: '3', exact: true })).toBeVisible();
 });
@@ -78,7 +81,9 @@ test('the orders page lists the paid orders of the event with validated counts',
 
     const html = await (await page.request.get(`/events/${PUBLISHED_EVENT.id}/orders`)).text();
 
-    expect(html).toContain('E2E User');
-    expect(html).toContain('1/2'); // one of the two ticket passes was scanned
-    expect(html).toContain('246,90');
+    const htmlMarkup = withoutScripts(html);
+
+    expect(htmlMarkup).toContain(MEMBER.name);
+    expect(htmlMarkup).toContain('1/2'); // one of the two ticket passes was scanned
+    expect(htmlMarkup).toContain('246,90');
 });

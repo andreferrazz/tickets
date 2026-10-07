@@ -99,7 +99,7 @@
     }
 </script>
 
-<svelte:window on:keydown={onKeydown} />
+<svelte:window onkeydown={onKeydown} />
 
 <header class="head">
     <h1>{t('eventOrders.title')}</h1>

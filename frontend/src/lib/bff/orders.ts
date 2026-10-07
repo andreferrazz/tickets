@@ -1,3 +1,4 @@
+import { logLoadFailure } from './load-failure';
 import type { OrderMapper } from '$lib/modules/orders/mapper';
 import type { OrderService } from '$lib/modules/orders/service';
 import type { OrderDto, PassDto } from '$lib/modules/orders/types';
@@ -21,7 +22,7 @@ export interface OrdersBff {
 }
 
 export function getOrdersBff(service: OrderService, mapper: OrderMapper): OrdersBff {
-    ordersBff ??= {
+    return {
         async index(user) {
             try {
                 const orders = await service.listForBuyer(user);
@@ -30,7 +31,7 @@ export function getOrdersBff(service: OrderService, mapper: OrderMapper): Orders
                     loadFailed: false
                 };
             } catch (cause) {
-                logFailure('orders_list_load_failed', { userId: user.id }, cause);
+                logLoadFailure('orders_list_load_failed', { userId: user.id }, cause);
                 return { orders: [], loadFailed: true };
             }
         },
@@ -48,16 +49,9 @@ export function getOrdersBff(service: OrderService, mapper: OrderMapper): Orders
                     loadFailed: false
                 };
             } catch (cause) {
-                logFailure('order_detail_load_failed', { userId: user.id, id }, cause);
+                logLoadFailure('order_detail_load_failed', { userId: user.id, id }, cause);
                 return { order: null, passes: [], loadFailed: true };
             }
         }
     };
-    return ordersBff;
 }
-
-function logFailure(event: string, context: Record<string, string>, cause: unknown): void {
-    console.error(JSON.stringify({ event, ...context, error: String(cause) }));
-}
-
-let ordersBff: OrdersBff | null = null;

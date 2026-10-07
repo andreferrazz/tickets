@@ -6,7 +6,7 @@ export interface InvitationMapper {
 }
 
 export function getInvitationMapper(): InvitationMapper {
-    invitationMapper ??= {
+    return {
         toDto(row) {
             return {
                 id: row.id,
@@ -19,7 +19,4 @@ export function getInvitationMapper(): InvitationMapper {
             };
         }
     };
-    return invitationMapper;
 }
-
-let invitationMapper: InvitationMapper | null = null;

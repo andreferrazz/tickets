@@ -1,5 +1,6 @@
 import { fail, redirect, type RequestEvent } from '@sveltejs/kit';
-import { text } from '$lib/modules/events/management-forms';
+import { statusForFailure } from '$lib/forms/action-status';
+import { text } from '$lib/utils/form-fields';
 import { requireSessionUser } from '$lib/modules/sessions/require-user';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -23,9 +24,7 @@ type Outcome = { ok: true } | { ok: false; failure: string };
 
 function answer(name: string, result: Outcome) {
     if (result.ok) return { action: name, ok: true };
-    const status =
-        result.failure === 'forbidden' ? 403 : result.failure === 'not_found' ? 404 : 422;
-    return fail(status, { action: name, error: result.failure });
+    return fail(statusForFailure(result.failure), { action: name, error: result.failure });
 }
 
 function caller(event: RequestEvent) {

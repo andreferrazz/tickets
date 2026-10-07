@@ -1,3 +1,4 @@
+import { logLoadFailure } from './load-failure';
 import type { EventDetailMapper } from '$lib/modules/events/detail-mapper';
 import type { EventDetailService } from '$lib/modules/events/detail-service';
 import type { EventService } from '$lib/modules/events/service';
@@ -19,7 +20,7 @@ export function getEventDetailBff(
     detailService: EventDetailService,
     mapper: EventDetailMapper
 ): EventsBff {
-    eventDetailBff ??= {
+    return {
         async show(user, id): Promise<EventsData> {
             try {
                 const event = await service.getVisible(user, id);
@@ -30,15 +31,9 @@ export function getEventDetailBff(
                 const rows = await detailService.loadRows(event.id);
                 return { event: mapper.toDto(event, rows), loadFailed: false };
             } catch (cause) {
-                console.error(
-                    JSON.stringify({ event: 'event_detail_load_failed', id, error: String(cause) })
-                );
+                logLoadFailure('event_detail_load_failed', { id }, cause);
                 return { event: null, loadFailed: true };
             }
         }
     };
-
-    return eventDetailBff;
 }
-
-let eventDetailBff: EventsBff | null = null;
