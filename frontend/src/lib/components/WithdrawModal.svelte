@@ -175,7 +175,7 @@
                 {#if editingPix}
                     <div class="pix-form">
                         <select bind:value={pixKeyTypeDraft} disabled={pixSaving}>
-                            {#each PIX_TYPES as kt}
+                            {#each PIX_TYPES as kt (kt)}
                                 <option value={kt}
                                     >{t(`withdraw.pixKeyTypes.${kt}` as TranslationKey)}</option
                                 >

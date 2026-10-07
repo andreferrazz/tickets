@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { resolve } from '$app/paths';
     import { goto, invalidateAll } from '$app/navigation';
     import { page } from '$app/state';
     import { formatBRL } from '$lib/api';
@@ -50,12 +51,14 @@
         <h1>{t('dashboard.title')}</h1>
         <div class="head-actions">
             <a
-                href="/organizations/{stats.organization.id}/invitations"
+                href={resolve('/organizations/[id]/invitations', { id: stats.organization.id })}
                 class="btn secondary small"
             >
                 {t('dashboard.manageInvitations')}
             </a>
-            <a href="/events/{stats.eventId}" class="btn secondary small">←</a>
+            <a href={resolve('/events/[id]', { id: stats.eventId })} class="btn secondary small"
+                >←</a
+            >
         </div>
     </header>
 
@@ -109,17 +112,26 @@
                 ></div>
             </div>
             <div class="muted small">{t('dashboard.checkInsHint')}</div>
-            <a href="/events/{stats.eventId}/scan" class="btn small scan-btn">
+            <a
+                href={resolve('/events/[id]/scan', { id: stats.eventId })}
+                class="btn small scan-btn"
+            >
                 {t('dashboard.scanTickets')}
             </a>
         </div>
         <div class="card kpi">
             <div class="muted small">{t('dashboard.ordersPaid')}</div>
             <strong class="big">{stats.totals.ordersPaid}</strong>
-            <a href="/events/{stats.eventId}/orders" class="btn small view-orders-btn">
+            <a
+                href={resolve('/events/[id]/orders', { id: stats.eventId })}
+                class="btn small view-orders-btn"
+            >
                 {t('dashboard.viewOrders')}
             </a>
-            <a href="/events/{stats.eventId}/comp" class="btn small secondary view-orders-btn">
+            <a
+                href={resolve('/events/[id]/comp', { id: stats.eventId })}
+                class="btn small secondary view-orders-btn"
+            >
                 {t('dashboard.sendComp')}
             </a>
         </div>

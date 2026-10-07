@@ -1,10 +1,11 @@
 <script lang="ts">
+    import { resolve } from '$app/paths';
     import '../app.css';
     import { auth } from '$lib/stores/auth.svelte';
     import { theme } from '$lib/stores/theme.svelte';
     import { enhance } from '$app/forms';
     import { t } from '$lib/i18n';
-    import { goto } from '$app/navigation';
+    import { afterNavigate, goto } from '$app/navigation';
     import { page } from '$app/state';
     import { onMount } from 'svelte';
     import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -17,9 +18,8 @@
     let menuOpen = $state(false);
 
     // Collapse the mobile menu after navigating so the panel doesn't linger
-    // over the new page.
-    $effect(() => {
-        page.url.pathname;
+    // over the new page. A navigation hook, not an effect: nothing is derived here.
+    afterNavigate(() => {
         menuOpen = false;
     });
 
@@ -45,7 +45,7 @@
         if (page.url.pathname.startsWith('/auth/')) return;
         // The login modal handles profile completion in-page; don't yank the user away.
         if (loginModalStore.open) return;
-        goto('/auth/profile');
+        goto(resolve('/auth/profile'));
     });
 
     // The /profile logout action revokes the session and clears the cookie;
@@ -60,7 +60,7 @@
 
 <nav class="nav">
     <div class="nav-inner">
-        <a href="/" class="brand">🎟 Tickets</a>
+        <a href={resolve('/')} class="brand">🎟 Tickets</a>
         <button
             class="secondary small nav-toggle"
             aria-expanded={menuOpen}
@@ -71,24 +71,24 @@
             {menuOpen ? '✕' : '☰'}
         </button>
         <div id="nav-links" class="nav-links" class:open={menuOpen}>
-            <a href="/" class:active={page.url.pathname === '/'}>{t('nav.events')}</a>
+            <a href={resolve('/')} class:active={page.url.pathname === '/'}>{t('nav.events')}</a>
             {#if auth.isAuthed}
-                <a href="/orders" class:active={page.url.pathname.startsWith('/orders')}
+                <a href={resolve('/orders')} class:active={page.url.pathname.startsWith('/orders')}
                     >{t('nav.myOrders')}</a
                 >
                 {#if auth.isCreator}
-                    <a href="/events/new">{t('nav.newEvent')}</a>
+                    <a href={resolve('/events/new')}>{t('nav.newEvent')}</a>
                 {/if}
                 {#if auth.hasStaffMembership}
-                    <a href="/scan" class:active={page.url.pathname.startsWith('/scan')}
+                    <a href={resolve('/scan')} class:active={page.url.pathname.startsWith('/scan')}
                         >{t('nav.scan')}</a
                     >
                 {/if}
                 {#if auth.isAdmin}
-                    <a href="/admin/invitations">{t('nav.invitations')}</a>
-                    <a href="/admin/users">{t('nav.users')}</a>
+                    <a href={resolve('/admin/invitations')}>{t('nav.invitations')}</a>
+                    <a href={resolve('/admin/users')}>{t('nav.users')}</a>
                 {/if}
-                <a href="/profile" class="who">{auth.user?.email}</a>
+                <a href={resolve('/profile')} class="who">{auth.user?.email}</a>
                 <form
                     method="POST"
                     action="/profile?/logout"
@@ -98,7 +98,7 @@
                     <button class="secondary small" type="submit">{t('nav.logout')}</button>
                 </form>
             {:else}
-                <a href="/auth/login" class="btn small">{t('nav.login')}</a>
+                <a href={resolve('/auth/login')} class="btn small">{t('nav.login')}</a>
             {/if}
             <button
                 class="secondary small theme-toggle"

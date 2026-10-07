@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { resolve } from '$app/paths';
     import { goto } from '$app/navigation';
     import { t } from '$lib/i18n';
     import { auth } from '$lib/stores/auth.svelte';
@@ -27,9 +28,13 @@
         const { token, user, organization } = data.accepted;
         await auth.set(token, user);
         const target =
-            organization.role === 'leader' ? `/onboarding/organization/${organization.id}` : '/';
+            organization.role === 'leader'
+                ? resolve('/onboarding/organization/[id]', { id: organization.id })
+                : resolve('/');
         await goto(
-            user.profileComplete ? target : `/auth/profile?next=${encodeURIComponent(target)}`
+            user.profileComplete
+                ? target
+                : `${resolve('/auth/profile')}?next=${encodeURIComponent(target)}`
         );
     });
 </script>
@@ -39,7 +44,7 @@
         {#if error}
             <h1>{t('invite.errorTitle')}</h1>
             <p class="error">{error}</p>
-            <a href="/auth/login">{t('invite.goLogin')}</a>
+            <a href={resolve('/auth/login')}>{t('invite.goLogin')}</a>
         {:else}
             <p>{t('invite.accepting')}</p>
         {/if}

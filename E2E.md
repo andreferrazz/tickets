@@ -45,6 +45,7 @@ the same files `npm run db:migrate` applies everywhere else.
 | `auth.spec.ts` | Passwordless login end to end: code by email (read back from `auth_codes`), profile step with the fake Abacate customer, `next` carried through, logout, admin impersonation link | Wrong code refused; invalid CPF refused before any customer call; pending invitation accepted on first login |
 | `event-management.spec.ts` | Creator builds an event through the real forms: ticket type, priced and free batches (product only for the priced one), close a batch, publish; extras and sections through the page actions | Section with extras refused; batch with sales refused; another organization's event is 404 |
 | `organization.spec.ts` | Leader invites a participant who joins by the link; admin invites a new leader whose organization is born with the invitation and renamed on arrival; role change and removal from the team page | Duplicate pending invitation refused; expired and unknown links refused with their own messages; the leader row has no controls |
+| `login-modal.spec.ts` | The in-page login modal on the event page: email, code and profile steps through the same actions as the auth pages, ending signed in without leaving the event | "Change email" keeps the typed address |
 
 ## Planned
 

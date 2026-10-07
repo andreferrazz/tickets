@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { resolve } from '$app/paths';
     import { goto } from '$app/navigation';
     import { api, ApiError, formatBRL } from '$lib/api';
     import PaymentMethodModal from '$lib/components/PaymentMethodModal.svelte';
@@ -115,7 +116,7 @@
             if (order.abacate_payment_url) {
                 window.location.href = order.abacate_payment_url;
             } else {
-                await goto(`/orders/${order.id}`);
+                await goto(resolve('/orders/[id]', { id: order.id }));
             }
         } catch (e) {
             if (e instanceof ApiError && e.message === 'extra_exceeds_tickets') {
@@ -145,11 +146,13 @@
             </div>
             {#if canEdit}
                 <div class="row creator-actions">
-                    <a href="/events/{event.id}/dashboard" class="btn secondary small"
-                        >{t('event.dashboard')}</a
+                    <a
+                        href={resolve('/events/[id]/dashboard', { id: event.id })}
+                        class="btn secondary small">{t('event.dashboard')}</a
                     >
-                    <a href="/events/{event.id}/edit" class="btn secondary small"
-                        >{t('common.edit')}</a
+                    <a
+                        href={resolve('/events/[id]/edit', { id: event.id })}
+                        class="btn secondary small">{t('common.edit')}</a
                     >
                 </div>
             {/if}

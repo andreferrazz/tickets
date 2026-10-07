@@ -62,11 +62,6 @@
         max-width: 420px;
         margin: 3rem auto;
     }
-    .field-error {
-        color: var(--danger, #b91c1c);
-        font-size: 0.85rem;
-        margin-top: -0.25rem;
-    }
     input[aria-invalid='true'] {
         border-color: var(--danger, #b91c1c);
     }
