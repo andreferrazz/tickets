@@ -1,8 +1,12 @@
 ARG ELIXIR_VERSION=1.19.5
-ARG OTP_VERSION=27.1.3
+# 27.1.3 could no longer install Hex: its TLS client rejects the certificate
+# chain builds.hex.pm serves now (key_usage_mismatch), which fails
+# `mix local.hex`. Fixed in later 27.x patches; same OTP major, so the release
+# is otherwise unchanged.
+ARG OTP_VERSION=27.3.4.16
 ARG DEBIAN_CODENAME=bookworm
 
-ARG BUILDER_IMAGE="hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-${DEBIAN_CODENAME}-20260505-slim"
+ARG BUILDER_IMAGE="hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-${DEBIAN_CODENAME}-20260824-slim"
 ARG RUNNER_IMAGE="debian:${DEBIAN_CODENAME}-slim"
 
 FROM ${BUILDER_IMAGE} AS builder
