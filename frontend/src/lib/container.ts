@@ -8,7 +8,11 @@ import { getLiveAbacatePay } from '$lib/integrations/abacate-pay/live';
 import { getFakeMailer } from '$lib/integrations/mail/fake-mailer';
 import type { Mailer } from '$lib/integrations/mail/mailer';
 import { getSmtpMailer } from '$lib/integrations/mail/smtp-mailer';
+import { getAuthCodeRepository } from '$lib/modules/accounts/auth-code-repository';
+import { getAuthService } from '$lib/modules/accounts/auth-service';
 import { getUserMapper } from '$lib/modules/accounts/mapper';
+import { getProfileService } from '$lib/modules/accounts/profile-service';
+import { getFixedWindowRateLimiter } from '$lib/modules/accounts/rate-limit';
 import { getUserRepository } from '$lib/modules/accounts/repository';
 import { getEventDetailMapper } from '$lib/modules/events/detail-mapper';
 import { getEventDetailRepository } from '$lib/modules/events/detail-repository';
@@ -37,6 +41,7 @@ import type { SessionService } from '$lib/modules/sessions/service';
 import { getEventDetailBff, type EventsBff } from './bff/events';
 import { getHomeBff, type HomeBff } from './bff/home';
 import { getAdminBff, type AdminBff } from './bff/admin';
+import { getAuthBff, type AuthBff } from './bff/auth';
 import { getDashboardBff, type DashboardBff } from './bff/dashboard';
 import { getEventOrdersBff, type EventOrdersBff } from './bff/event-orders';
 import { getOrdersBff, type OrdersBff } from './bff/orders';
@@ -63,6 +68,7 @@ export interface Container {
     organizationsBff: OrganizationsBff;
     adminBff: AdminBff;
     scanBff: ScanBff;
+    authBff: AuthBff;
 }
 
 /**
@@ -99,6 +105,7 @@ function createContainer(): Container {
     const invitationRepository = getInvitationRepository(queryable);
     const userRepository = getUserRepository(queryable);
     const eventStatsRepository = getEventStatsRepository(queryable);
+    const authCodeRepository = getAuthCodeRepository(queryable);
 
     // services
     const sessionService = getSessionService(sessionRepository);
@@ -121,6 +128,18 @@ function createContainer(): Container {
         invitations: invitationRepository,
         organizations: organizationService
     });
+    const authService = getAuthService({
+        queryable,
+        users: userRepository,
+        authCodes: authCodeRepository,
+        sessions: sessionRepository,
+        invitations: invitationRepository,
+        organizations: organizationRepository,
+        mailer
+    });
+    const profileService = getProfileService({ users: userRepository, abacatePay });
+    // Process-local, like the ETS table it replaces: one instance per server.
+    const rateLimiter = getFixedWindowRateLimiter();
 
     // mappers
     const eventMapper = getEventMapper();
@@ -154,6 +173,14 @@ function createContainer(): Container {
         eventMapper,
         organizations: organizationService
     });
+    const authBff = getAuthBff({
+        auth: authService,
+        profile: profileService,
+        users: userRepository,
+        organizations: organizationRepository,
+        userMapper,
+        rateLimiter
+    });
 
     return {
         integrationMode,
@@ -168,7 +195,8 @@ function createContainer(): Container {
         eventOrdersBff,
         organizationsBff,
         adminBff,
-        scanBff
+        scanBff,
+        authBff
     };
 }
 

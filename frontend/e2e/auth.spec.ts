@@ -1,0 +1,120 @@
+import { expect, test, type Page } from '@playwright/test';
+import { parse } from 'devalue';
+import { latestAuthCode, userColumn } from './support/auth-codes';
+import { ADMIN, DRAFT_ORG, MEMBER, PENDING_INVITATION } from './support/fixtures';
+import { signIn } from './support/session';
+
+const VALID_CPF = '390.533.447-05';
+const VALID_PHONE = '(11) 99999-9999';
+
+/** Drives the real login form up to the verified session. */
+async function logInWithCode(page: Page, email: string): Promise<void> {
+    await page.goto('/auth/login');
+    await page.getByLabel('E-mail').fill(email);
+    await page.getByRole('button', { name: 'Enviar código' }).click();
+    await expect(page).toHaveURL(/\/auth\/verify\?email=/);
+
+    await page.getByLabel('Código de 6 dígitos').fill(await latestAuthCode(email));
+    await page.getByRole('button', { name: 'Verificar' }).click();
+}
+
+async function completeProfile(page: Page, cpf: string): Promise<void> {
+    await page.getByLabel('Nome completo').fill('Nova Pessoa');
+    await page.getByLabel('Celular').fill(VALID_PHONE);
+    await page.getByLabel('CPF ou CNPJ').fill(cpf);
+    await page.getByRole('button', { name: 'Salvar e continuar' }).click();
+}
+
+test('a first login creates a buyer, asks for the profile and registers the customer', async ({
+    page
+}) => {
+    const email = 'first-login@e2e.test';
+
+    await logInWithCode(page, email);
+    await expect(page).toHaveURL(/\/auth\/profile/);
+
+    await completeProfile(page, VALID_CPF);
+    await expect(page).toHaveURL('/');
+
+    expect(await userColumn(email, 'role')).toBe('buyer');
+    // The fake Abacate Pay names its customers after the tax id it was given.
+    expect(await userColumn(email, 'abacate_customer_id')).toBe('cust_fake_39053344705');
+    // The session cookie, not the browser's copy, is what server pages trust.
+    expect((await page.request.get('/orders')).status()).toBe(200);
+});
+
+test('an invalid tax id is refused before any customer is registered', async ({ page }) => {
+    const email = 'bad-cpf@e2e.test';
+
+    await logInWithCode(page, email);
+    await completeProfile(page, '111.111.111-11');
+
+    await expect(page.getByText('CPF ou CNPJ inválido.')).toBeVisible();
+    expect(await userColumn(email, 'abacate_customer_id')).toBeNull();
+});
+
+test('a wrong code is refused', async ({ page }) => {
+    await page.goto('/auth/verify?email=nobody%40e2e.test');
+
+    await page.getByLabel('Código de 6 dígitos').fill('000000');
+    await page.getByRole('button', { name: 'Verificar' }).click();
+
+    await expect(page.getByText('invalid or expired code')).toBeVisible();
+});
+
+// Logging in with the email a pending invitation names consumes it: the buyer
+// becomes a creator with the invited membership, in one transaction.
+test('a pending invitation is accepted on first login', async ({ page }) => {
+    await logInWithCode(page, PENDING_INVITATION.email);
+    await completeProfile(page, VALID_CPF);
+    await expect(page).toHaveURL('/');
+
+    expect(await userColumn(PENDING_INVITATION.email, 'role')).toBe('creator');
+    const team = await page.request.get(`/organizations/${DRAFT_ORG.id}/invitations`);
+    expect(team.status()).toBe(200);
+});
+
+test('the next parameter survives the whole flow', async ({ page }) => {
+    const email = 'next-param@e2e.test';
+    await page.goto('/auth/login?next=%2Forders');
+    await page.getByLabel('E-mail').fill(email);
+    await page.getByRole('button', { name: 'Enviar código' }).click();
+    await page.getByLabel('Código de 6 dígitos').fill(await latestAuthCode(email));
+    await page.getByRole('button', { name: 'Verificar' }).click();
+
+    await expect(page).toHaveURL(/\/auth\/profile\?next=%2Forders/);
+    await completeProfile(page, VALID_CPF);
+    await expect(page).toHaveURL('/orders');
+});
+
+test('logging out revokes the session', async ({ context, page }) => {
+    await signIn(context, MEMBER.token);
+    await page.goto('/profile');
+    await expect(page.getByText(MEMBER.email)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Sair' }).click();
+
+    await expect(page).toHaveURL('/');
+    expect((await page.request.get('/orders', { maxRedirects: 0 })).status()).toBe(303);
+});
+
+test('an admin can mint a link that signs in as another user', async ({ browser }) => {
+    const admin = await browser.newContext();
+    await signIn(admin, ADMIN.token);
+    const response = await admin.request.post('/admin/users?/impersonate', {
+        form: { userId: MEMBER.id },
+        headers: { 'x-sveltekit-action': 'true' }
+    });
+    const body = (await response.json()) as { type: string; data: string };
+    expect(body.type).toBe('success');
+    const { token } = parse(body.data) as { token: string };
+    await admin.close();
+
+    const visitor = await browser.newContext();
+    const page = await visitor.newPage();
+    await page.goto(`/auth/impersonate?token=${token}`);
+    await expect(page).toHaveURL('/');
+    const html = await (await page.request.get('/orders')).text();
+    expect(html).toContain('E2E Published Show'); // MEMBER's order, so the link signed in as them
+    await visitor.close();
+});

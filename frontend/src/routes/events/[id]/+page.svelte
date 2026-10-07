@@ -89,7 +89,7 @@
 
     async function buy() {
         if (!event || isClosed || lines.length === 0) return;
-        if (!auth.isAuthed || !auth.user?.profile_complete) {
+        if (!auth.isAuthed || !auth.user?.profileComplete) {
             const ok = await requestLogin();
             if (!ok) return;
         }
