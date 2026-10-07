@@ -1,6 +1,6 @@
 <script lang="ts">
     import { resolve } from '$app/paths';
-    import { goto, invalidateAll } from '$app/navigation';
+    import { goto } from '$app/navigation';
     import { page } from '$app/state';
     import { formatBRL } from '$lib/api';
     import BuyerModal, { type BuyerTarget } from '$lib/components/BuyerModal.svelte';
@@ -14,7 +14,6 @@
     // Server-rendered: an event this visitor may not manage never reaches this
     // component; the load function answers 404 instead.
     const stats = $derived(data.stats);
-    let withdrawOpen = $state(false);
 
     function pct(sold: number, capacity: number | null): number {
         if (!capacity || capacity <= 0) return 0;
@@ -33,6 +32,14 @@
     function closeBuyers() {
         const url = new URL(page.url);
         url.searchParams.delete('buyers');
+        goto(url, { noScroll: true, keepFocus: true });
+    }
+
+    // The withdraw dialog is open while the URL says so, like the buyers list:
+    // the load only hands over `payouts` for a leader who asked for it.
+    function closeWithdraw() {
+        const url = new URL(page.url);
+        url.searchParams.delete('withdraw');
         goto(url, { noScroll: true, keepFocus: true });
     }
 
@@ -75,11 +82,12 @@
                 {t('dashboard.feesDeducted', { amount: formatBRL(stats.totals.feesCents) })}
             </div>
             <div class="muted small">{t('dashboard.netRevenueHint')}</div>
-            <!-- Withdraw ("Sacar dinheiro") button hidden for now. -->
+            <!-- Withdraw ("Sacar dinheiro") button hidden for now. The dialog it
+                 opens works and is reachable at `?withdraw=1`; unhide this to offer it. -->
             <!-- {#if stats.canWithdraw}
-				<button type="button" class="btn small withdraw-btn" onclick={() => (withdrawOpen = true)}>
+				<a class="btn small withdraw-btn" href="?withdraw=1" data-sveltekit-noscroll>
 					{t('dashboard.withdraw')}
-				</button>
+				</a>
 			{/if} -->
         </div>
         <div class="card kpi">
@@ -245,14 +253,8 @@
     </section>
 {/if}
 
-{#if stats}
-    <WithdrawModal
-        eventId={stats.eventId}
-        {stats}
-        open={withdrawOpen}
-        onClose={() => (withdrawOpen = false)}
-        onChange={invalidateAll}
-    />
+{#if stats && data.payouts}
+    <WithdrawModal {stats} payouts={data.payouts} onClose={closeWithdraw} />
 {/if}
 <BuyerModal
     target={data.buyers?.target ?? null}

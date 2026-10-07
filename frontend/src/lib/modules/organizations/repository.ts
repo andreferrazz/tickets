@@ -1,5 +1,5 @@
 import type { Queryable } from '$lib/db/queryable';
-import type { OrgRole } from '$lib/types';
+import type { OrgRole, PixKeyType } from '$lib/types';
 import type {
     AddMemberOutcome,
     MemberChangeOutcome,
@@ -40,6 +40,8 @@ export interface OrganizationRepository {
 
     insert(name: string): Promise<OrganizationRow>;
     rename(id: string, name: string): Promise<void>;
+    /** The Pix destination of the organization's payouts; key and type always change together. */
+    setPayoutKey(id: string, pixKey: string, pixKeyType: PixKeyType): Promise<void>;
     /** Whether the user behind `email` already belongs to `organizationId`. */
     isEmailMember(email: string, organizationId: string): Promise<boolean>;
     /** Never touches the leader row: that is a transfer, not a role change. */
@@ -112,6 +114,14 @@ export function getOrganizationRepository(queryable: Queryable): OrganizationRep
         async rename(id, name) {
             const sql = `update organizations set name = $2, updated_at = now() at time zone 'utc' where id = $1`;
             await queryable.query(sql, [id, name]);
+        },
+
+        async setPayoutKey(id, pixKey, pixKeyType) {
+            const sql = `
+                update organizations
+                set pix_key = $2, pix_key_type = $3, updated_at = now() at time zone 'utc'
+                where id = $1`;
+            await queryable.query(sql, [id, pixKey, pixKeyType]);
         },
 
         async isEmailMember(email, organizationId) {

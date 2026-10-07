@@ -10,7 +10,7 @@ export interface SeededPerson {
 
 export interface NewPerson {
     role: 'buyer' | 'creator';
-    membership?: { organizationId: string; role: 'participant' | 'staff' };
+    membership?: { organizationId: string; role: 'leader' | 'participant' | 'staff' };
     /** A boleto is issued to a name and a tax id; only its buyers need one. */
     taxId?: string;
 }
@@ -36,6 +36,19 @@ export async function seedPerson(person: NewPerson): Promise<SeededPerson> {
         );
     }
     return { id, email, token: await seedSession(id) };
+}
+
+/**
+ * An organization of its own, with no members and no Pix key. For specs that
+ * change what an organization holds, which the seeded ones must never see.
+ */
+export async function seedOrganization(): Promise<string> {
+    const [{ id }] = await queryRows<{ id: string }>(
+        `insert into organizations (name, inserted_at, updated_at)
+         values ($1, now() at time zone 'utc', now() at time zone 'utc') returning id`,
+        [`E2E Org ${uniqueToken('own').slice(-8)}`]
+    );
+    return id;
 }
 
 /** A fresh one-day session for `userId`. */

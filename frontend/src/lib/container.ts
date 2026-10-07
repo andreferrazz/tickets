@@ -77,6 +77,8 @@ import {
     type PassCheckInService
 } from '$lib/modules/passes/checkin-service';
 import { getPassRepository } from '$lib/modules/passes/repository';
+import { getPayoutRepository } from '$lib/modules/payouts/repository';
+import { getPayoutService, type PayoutService } from '$lib/modules/payouts/service';
 import { getSessionRepository } from '$lib/modules/sessions/repository';
 import { getSessionService } from '$lib/modules/sessions/service';
 import type { SessionService } from '$lib/modules/sessions/service';
@@ -134,6 +136,8 @@ export interface Container {
     orderCancellation: OrderCancellation;
     /** Free tickets from the comp page's `send` action. */
     compTickets: CompTicketIssuer;
+    /** Withdrawals behind the dashboard's withdraw dialog; its actions call it directly. */
+    payouts: PayoutService;
     /** Payment events from Abacate Pay; `/webhooks/abacate-pay` hands every delivery to it. */
     abacateWebhook: AbacateWebhook;
     /** The stale-order sweep; `hooks.server.ts` runs it on a timer when switched on. */
@@ -293,6 +297,13 @@ function createContainer(): Container {
         fulfilment: orderFulfilment,
         abacatePay
     });
+    const payouts = getPayoutService({
+        queryable,
+        payouts: getPayoutRepository(queryable),
+        stats: eventStatsService,
+        organizations: organizationRepository,
+        abacatePay
+    });
     // Process-local, like the ETS table it replaces: one instance per server.
     const rateLimiter = getFixedWindowRateLimiter();
     const rateLimits = readRateLimitConfig();
@@ -370,6 +381,7 @@ function createContainer(): Container {
         orderPlacement,
         orderCancellation,
         compTickets,
+        payouts,
         abacateWebhook,
         orderReconciler,
         userMapper
