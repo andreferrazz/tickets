@@ -3,7 +3,7 @@
 -- The schema as Phoenix left it after its last Ecto migration (20261006000000),
 -- captured with `pg_dump --schema-only --no-owner --no-privileges` on 2026-10-06
 -- and edited only to drop psql meta-commands and the search_path reset.
--- From here on the schema is owned by frontend/db/migrations; the Ecto
+-- From here on the schema is owned by db/migrations; the Ecto
 -- migrations under backend/priv/repo/migrations are frozen.
 --
 -- A database Phoenix already built is not re-created: db/migrate.ts records this

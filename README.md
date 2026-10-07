@@ -1,7 +1,7 @@
-# Tickets frontend
+# Tickets
 
 The SvelteKit app: pages, form actions and the server modules behind them.
-Conventions are in `../CLAUDE.md`; the test catalog is `../E2E.md`.
+Conventions are in `CLAUDE.md`; the test catalog is `E2E.md`.
 
 ```
 cp .env.example .env         # then set DATABASE_URL; INTEGRATIONS=fake needs no secrets

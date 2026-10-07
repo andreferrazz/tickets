@@ -21,9 +21,9 @@
 
 ## Tests
 
-- Tests run with a single command: `npm test` in `frontend/`.
-- `frontend/`: Playwright e2e only — a few specs covering the main flow, no
-  unit tests. Specs live in `frontend/e2e/`. They run against the seeded
+- Tests run with a single command: `npm test`.
+- Playwright e2e only — a few specs covering the main flow, no
+  unit tests. Specs live in `e2e/`. They run against the seeded
   `tickets_e2e` database (built by `e2e/support/database.ts`), never
   `backend_dev`. Every spec is cataloged in `E2E.md`; a PR that adds or
   changes a flow updates the spec and the catalog together.
@@ -35,13 +35,13 @@
 - Inject dependencies through constructor/parameter, not global/import.
   Server modules: each factory takes one `deps` object and returns an
   interface (`eventService(deps: { repository })`). The graph is assembled
-  only in `frontend/src/lib/container.ts` and reaches handlers via
+  only in `src/lib/container.ts` and reaches handlers via
   `event.locals.container`.
 - Wrap third-party libs behind a thin interface owned by this project.
 
 ## Structure
 
-- Schema changes are SQL files in `frontend/db/migrations` (`NNNN_name.sql`),
+- Schema changes are SQL files in `db/migrations` (`NNNN_name.sql`),
   applied with `npm run db:migrate`.
 - Follow the framework's convention (SvelteKit).
 - Prefer small focused modules over god files.
