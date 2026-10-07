@@ -47,8 +47,8 @@
                             ? (result.data as Verified | undefined)
                             : undefined;
                     if (verified?.user && verified.token) {
-                        // The browser keeps a copy of the token for the endpoints
-                        // Phoenix still serves; the cookie already carries the session.
+                        // The cookie already carries the session; this is the
+                        // store's copy, which the navigation renders from.
                         await auth.set(verified.token, verified.user);
                         await goto(destination(verified.user.profileComplete, verified.next));
                         return;

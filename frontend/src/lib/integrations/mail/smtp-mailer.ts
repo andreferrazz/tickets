@@ -6,7 +6,7 @@ const SENDER_NAME = 'Tickets';
 
 /**
  * Delivers mail over an authenticated SMTP relay with STARTTLS, the same relay
- * settings the Phoenix mailer used (backend/config/runtime.exs: tls :always,
+ * settings the Phoenix mailer used (its config/runtime.exs: tls :always,
  * verify_none, auth :always).
  *
  * @example

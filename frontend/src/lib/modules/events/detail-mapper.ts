@@ -17,10 +17,8 @@ import type {
 /**
  * Assembles an event and its child rows into the shape the event page renders.
  *
- * This is the wire contract Phoenix's `event_detail_json/1` produces, in
+ * This is the wire contract Phoenix's `event_detail_json/1` produced, in
  * camelCase: same nesting, same `active_batch` resolution, same `Lote N` labels.
- * Both are still in use, so a change here belongs in
- * `backend/lib/backend_web/controllers/event_controller.ex` too.
  *
  * @example
  * const dto = eventDetailMapper.toDto(eventRow, childRows);

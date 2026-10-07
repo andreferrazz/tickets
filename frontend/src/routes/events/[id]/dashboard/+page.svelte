@@ -2,7 +2,7 @@
     import { resolve } from '$app/paths';
     import { goto } from '$app/navigation';
     import { page } from '$app/state';
-    import { formatBRL } from '$lib/api';
+    import { formatBRL } from '$lib/utils/currency';
     import BuyerModal, { type BuyerTarget } from '$lib/components/BuyerModal.svelte';
     import WithdrawModal from '$lib/components/WithdrawModal.svelte';
     import { formatDateTime } from '$lib/utils/datetime';

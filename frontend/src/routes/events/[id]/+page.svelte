@@ -2,7 +2,7 @@
     import { applyAction, enhance } from '$app/forms';
     import { invalidateAll } from '$app/navigation';
     import { resolve } from '$app/paths';
-    import { formatBRL } from '$lib/api';
+    import { formatBRL } from '$lib/utils/currency';
     import PaymentMethodModal from '$lib/components/PaymentMethodModal.svelte';
     import { formatDateTime } from '$lib/utils/datetime';
     import { t, tStatus } from '$lib/i18n';

@@ -108,8 +108,8 @@ async function insertOrganizations(client: pg.Client): Promise<void> {
 
 async function insertUsers(client: pg.Client): Promise<void> {
     for (const user of [MEMBER, ADMIN]) {
-        // No profile_complete column: Phoenix derives that flag from name/cellphone/
-        // tax_id when it serialises a user.
+        // No profile_complete column: the flag is derived from name/cellphone/
+        // tax_id when a user is read.
         await client.query(
             `insert into users (id, email, role, name, cellphone, tax_id, abacate_customer_id, inserted_at, updated_at)
 			 values ($1, $2, $3, $5, '11999999999', $6, $4,

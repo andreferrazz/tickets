@@ -3,8 +3,8 @@ import { error, json, type RequestHandler } from '@sveltejs/kit';
 
 /**
  * Mirrors the client's session token into an httpOnly cookie so server loads can
- * see it — the browser cannot set httpOnly cookies itself, and the token is
- * issued by Phoenix, not by this app.
+ * see it — the browser cannot set httpOnly cookies itself, and one signed in
+ * before the cutover holds a token Phoenix issued and no cookie.
  *
  * Planting a token here grants nothing on its own: it only resolves to a user if
  * a matching row exists in `sessions`. SvelteKit's origin check keeps other

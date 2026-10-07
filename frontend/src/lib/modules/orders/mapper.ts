@@ -14,9 +14,7 @@ import type {
 
 /**
  * Turns order, item and pass rows into the wire shapes the buyer pages render:
- * Phoenix's `order_json/1` and `pass_json/1` in camelCase. Both are still in
- * use until the order endpoints retire, so a change here belongs in
- * `backend/lib/backend_web/controllers/order_controller.ex` too.
+ * Phoenix's `order_json/1` and `pass_json/1` in camelCase.
  *
  * @example
  * const dto = orderMapper.toOrderDto(order, items);

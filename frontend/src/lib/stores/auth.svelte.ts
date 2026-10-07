@@ -26,8 +26,8 @@ function load(): Persisted | null {
 
 /**
  * Copies the token into an httpOnly cookie so server-rendered routes know who is
- * asking. localStorage stays the source of truth for the `Authorization: Bearer`
- * header, which every Phoenix-served endpoint still needs.
+ * asking. localStorage keeps its copy only for browsers signed in before the
+ * cutover, which have no cookie yet (see `SESSION_COOKIE`).
  */
 async function storeSessionCookie(token: string): Promise<void> {
     await fetch(SESSION_ENDPOINT, {

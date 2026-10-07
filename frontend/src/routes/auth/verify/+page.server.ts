@@ -14,8 +14,8 @@ export const load: PageServerLoad = ({ url }) => {
 
 /**
  * Step two: the code becomes a session cookie. The token and user are also
- * returned to the page because the browser still keeps a copy for the
- * endpoints Phoenix serves; that copy goes when the last of them moves.
+ * returned to the page because the auth store still keeps a copy, which the
+ * navigation renders from (see `SESSION_COOKIE` for when that copy can go).
  */
 export const actions: Actions = {
     verify: async ({ request, locals, cookies, getClientAddress }) => {

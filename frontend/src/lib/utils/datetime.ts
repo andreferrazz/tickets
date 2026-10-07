@@ -29,9 +29,9 @@ export function fromLocalInputValue(value: string): string {
 
 /**
  * Formats a timestamp the way Phoenix's Jason encoder renders Ecto's
- * `:utc_datetime` — second precision, `Z` suffix, no fractional part. Keeping
- * the wire format byte-identical matters while some endpoints are still served
- * by Phoenix and some by this app.
+ * `:utc_datetime` — second precision, `Z` suffix, no fractional part. The
+ * format was kept byte-identical while both served the same pages, and the
+ * pages still parse it.
  *
  * @example
  * toIso8601Utc(new Date('2026-05-13T01:00:17.482Z')); // '2026-05-13T01:00:17Z'

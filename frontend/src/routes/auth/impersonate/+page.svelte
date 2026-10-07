@@ -36,8 +36,8 @@
                                 ? (result.data as { token: string; user: UserDto } | undefined)
                                 : undefined;
                         if (!signedIn) return update();
-                        // The cookie is set; this is the browser's copy for the
-                        // endpoints Phoenix still serves.
+                        // The cookie is set; this is the store's copy, which the
+                        // navigation renders from.
                         await auth.set(signedIn.token, signedIn.user);
                         await goto(resolve('/'));
                     };

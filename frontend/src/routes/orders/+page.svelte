@@ -2,7 +2,7 @@
     import { applyAction, enhance } from '$app/forms';
     import { resolve } from '$app/paths';
     import { invalidateAll } from '$app/navigation';
-    import { formatBRL } from '$lib/api';
+    import { formatBRL } from '$lib/utils/currency';
     import { t, tStatus } from '$lib/i18n';
     import { cancellationFailureMessage } from '$lib/modules/orders/checkout-messages';
     import { canBuyerCancel } from '$lib/modules/orders/policy';
