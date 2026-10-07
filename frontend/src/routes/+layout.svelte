@@ -76,7 +76,8 @@
                 <a href={resolve('/orders')} class:active={page.url.pathname.startsWith('/orders')}
                     >{t('nav.myOrders')}</a
                 >
-                {#if auth.isCreator}
+                <!-- Not admins: an event needs an organization and they belong to none. -->
+                {#if auth.user?.role === 'creator'}
                     <a href={resolve('/events/new')}>{t('nav.newEvent')}</a>
                 {/if}
                 {#if auth.hasStaffMembership}

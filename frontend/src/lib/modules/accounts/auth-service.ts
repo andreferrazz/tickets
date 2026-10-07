@@ -3,6 +3,7 @@ import type { Queryable } from '$lib/db/queryable';
 import type { Mailer } from '$lib/integrations/mail/mailer';
 import type { InvitationRepository } from '$lib/modules/invitations/repository';
 import type { InvitationRow } from '$lib/modules/invitations/types';
+import { LeaderExistsError } from '$lib/modules/organizations/errors';
 import type { OrganizationRepository } from '$lib/modules/organizations/repository';
 import type { SessionRepository } from '$lib/modules/sessions/repository';
 import { authCodeEmail, CODE_TTL_MINUTES } from './auth-code-email';
@@ -54,15 +55,15 @@ export function getAuthService(deps: AuthServiceDeps): AuthService {
 
         async verifyCode(rawEmail, code) {
             const email = normalizeEmail(rawEmail);
-            const codeId = await deps.authCodes.findValid(email, code);
-            if (!codeId) return null;
+            // Claimed up front, in one statement: a code is spent the moment it is
+            // presented, whatever happens next.
+            if (!(await deps.authCodes.claim(email, code))) return null;
             const existing = await deps.users.findByEmail(email);
             const user = await promoteIfInvited(
                 deps,
                 existing ?? (await deps.users.insertBuyer(email))
             );
             const token = await this.createSession(user);
-            await deps.authCodes.markUsed(codeId);
             return { token, user };
         },
 
@@ -92,17 +93,29 @@ async function promoteIfInvited(deps: AuthServiceDeps, user: UserRow): Promise<U
     if (user.role !== 'buyer') return user;
     const invitation = await deps.invitations.findPendingByEmail(user.email);
     if (!invitation) return user;
-    return deps.queryable.transaction(async (tx) => {
-        const promoted = await applyInvitationRole(deps, tx, user, invitation);
-        await deps.organizations.addMember(
-            tx,
-            invitation.organization_id,
-            user.id,
-            invitation.role
+    try {
+        return await deps.queryable.transaction(async (tx) => {
+            const promoted = await applyInvitationRole(deps, tx, user, invitation);
+            const outcome = await deps.organizations.addMember(
+                tx,
+                invitation.organization_id,
+                user.id,
+                invitation.role
+            );
+            if (outcome === 'leader_exists')
+                throw new LeaderExistsError(invitation.organization_id);
+            await deps.invitations.markAccepted(tx, invitation.id);
+            return promoted;
+        });
+    } catch (cause) {
+        // The invitation cannot be honoured, but that is no reason to refuse the
+        // login itself: they sign in as they were and the invitation stays pending.
+        if (!(cause instanceof LeaderExistsError)) throw cause;
+        console.warn(
+            JSON.stringify({ event: 'invitation_leader_exists', invitationId: invitation.id })
         );
-        await deps.invitations.markAccepted(tx, invitation.id);
-        return promoted;
-    });
+        return user;
+    }
 }
 
 async function applyInvitationRole(

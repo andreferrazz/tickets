@@ -1,4 +1,5 @@
 import type { Queryable } from '$lib/db/queryable';
+import { describeAbacateFailure } from '$lib/integrations/abacate-pay/errors';
 import type { AbacatePayGateway } from '$lib/integrations/abacate-pay/gateway';
 import type { OrganizationService } from '$lib/modules/organizations/service';
 import type { SessionUser } from '$lib/modules/sessions/types';
@@ -23,7 +24,7 @@ import {
     validateSection,
     validateTicketType
 } from './management-validation';
-import type { EventRow, ExtraItemRow, ExtraSectionRow, TicketTypeRow } from './types';
+import type { ExtraItemRow, ExtraSectionRow, TicketTypeRow } from './types';
 
 /**
  * Event management as `Backend.Events` ruled it: every write is scoped to an
@@ -110,6 +111,10 @@ export function getEventManagementService(
 ): EventManagementService {
     const { repository: repo } = deps;
 
+    // Phoenix put every create behind `RequireCreatorPlug`: managing an
+    // organization is not enough for a member whose own role is still `buyer`.
+    const mayCreate = (user: SessionUser) => user.role === 'creator' || user.role === 'admin';
+
     const ownedTicketType = async (
         user: SessionUser,
         id: string
@@ -138,6 +143,7 @@ export function getEventManagementService(
 
     return {
         async createEvent(user, input) {
+            if (!mayCreate(user)) return failed('forbidden');
             const errors = invalid<CreatedEvent>(validateEvent(input));
             if (errors) return errors;
             const organizationId = await resolveOrganization(deps, user);
@@ -172,6 +178,7 @@ export function getEventManagementService(
         },
 
         async createTicketType(user, eventId, input) {
+            if (!mayCreate(user)) return failed('forbidden');
             const event = await deps.managedEvents.find(user, eventId);
             if (!event) return failed('not_found');
             const errors = invalid<void>(validateTicketType(input));
@@ -195,6 +202,7 @@ export function getEventManagementService(
         },
 
         async createBatch(user, ticketTypeId, input) {
+            if (!mayCreate(user)) return failed('forbidden');
             const ticketType = await ownedTicketType(user, ticketTypeId);
             if (!ticketType) return failed('not_found');
             const errors = invalid<void>(validateBatch(input));
@@ -241,11 +249,12 @@ export function getEventManagementService(
         },
 
         async createExtra(user, eventId, input) {
+            if (!mayCreate(user)) return failed('forbidden');
             const event = await deps.managedEvents.find(user, eventId);
             if (!event) return failed('not_found');
             const errors = invalid<void>(validateExtra(input));
             if (errors) return errors;
-            const sectionId = await resolveSection(repo, event, input.sectionId);
+            const sectionId = await resolveSection(repo, event.id, input.sectionId);
             if (!sectionId) return failed('section_not_found');
             return withProduct(deps, async (tx) => {
                 const extra = await repo.insertExtra(tx, event.id, {
@@ -267,7 +276,13 @@ export function getEventManagementService(
             if (!extra) return failed('not_found');
             const errors = invalid<void>(validateExtra(input));
             if (errors) return errors;
-            const sectionId = input.sectionId ?? extra.section_id;
+            // The section comes from the form, so it must be one of this event's.
+            const sectionId = await resolveSection(
+                repo,
+                extra.event_id,
+                input.sectionId ?? extra.section_id
+            );
+            if (!sectionId) return failed('section_not_found');
             await repo.updateExtra(extra.id, { ...input, sectionId, name: input.name.trim() });
             return ok(undefined);
         },
@@ -279,6 +294,7 @@ export function getEventManagementService(
         },
 
         async createSection(user, eventId, input) {
+            if (!mayCreate(user)) return failed('forbidden');
             const event = await deps.managedEvents.find(user, eventId);
             if (!event) return failed('not_found');
             const errors = invalid<void>(validateSection(input));
@@ -337,13 +353,13 @@ async function resolveOrganization(
 
 async function resolveSection(
     repo: EventManagementRepository,
-    event: EventRow,
+    eventId: string,
     sectionId: string | null
 ): Promise<string | null> {
-    if (!sectionId) return repo.defaultSectionId(event.id);
+    if (!sectionId) return repo.defaultSectionId(eventId);
     if (!isUuid(sectionId)) return null;
     const section = await repo.findSection(sectionId);
-    return section?.event_id === event.id ? section.id : null;
+    return section?.event_id === eventId ? section.id : null;
 }
 
 // Zero-priced records get no product: Abacate rejects them and the checkout
@@ -370,7 +386,10 @@ async function withProduct(
     } catch (cause) {
         if (!(cause instanceof ProductSyncError)) throw cause;
         console.warn(
-            JSON.stringify({ event: 'abacate_product_create_failed', error: String(cause.cause) })
+            JSON.stringify({
+                event: 'abacate_product_create_failed',
+                ...describeAbacateFailure(cause.cause)
+            })
         );
         return failed('abacate_unavailable');
     }

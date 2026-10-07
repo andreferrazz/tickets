@@ -27,7 +27,8 @@ function getConnectionString(): string {
         return url;
     }
     throw new Error(
-        `DATABASE_URL must be a postgres:// or postgresql:// connection string, got: ${url ?? '(unset)'}`
+        // Only the scheme is echoed: the rest of the value holds the password.
+        `DATABASE_URL must be a postgres:// or postgresql:// connection string, got scheme: ${url ? url.split('://')[0] : '(unset)'}`
     );
 }
 

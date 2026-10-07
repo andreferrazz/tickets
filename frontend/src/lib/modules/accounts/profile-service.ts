@@ -1,4 +1,4 @@
-import { AbacatePayError } from '$lib/integrations/abacate-pay/errors';
+import { AbacatePayError, describeAbacateFailure } from '$lib/integrations/abacate-pay/errors';
 import type { AbacatePayGateway } from '$lib/integrations/abacate-pay/gateway';
 import type { SessionUser } from '$lib/modules/sessions/types';
 import { validateProfile, type ProfileFieldErrors, type ProfileInput } from './profile-validation';
@@ -50,7 +50,7 @@ export function getProfileService(deps: ProfileServiceDeps): ProfileService {
                 console.warn(
                     JSON.stringify({
                         event: 'abacate_customer_create_failed',
-                        error: String(cause)
+                        ...describeAbacateFailure(cause)
                     })
                 );
                 return { ok: false, failure: classify(cause) };

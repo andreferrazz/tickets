@@ -10,6 +10,7 @@ import { getFakeMailer } from '$lib/integrations/mail/fake-mailer';
 import type { Mailer } from '$lib/integrations/mail/mailer';
 import { getSmtpMailer } from '$lib/integrations/mail/smtp-mailer';
 import { getAuthCodeRepository } from '$lib/modules/accounts/auth-code-repository';
+import { getImpersonationRepository } from '$lib/modules/accounts/impersonation-repository';
 import { getAuthService } from '$lib/modules/accounts/auth-service';
 import { getUserMapper, type UserMapper } from '$lib/modules/accounts/mapper';
 import { getProfileService } from '$lib/modules/accounts/profile-service';
@@ -128,6 +129,7 @@ function createContainer(): Container {
     const userRepository = getUserRepository(queryable);
     const eventStatsRepository = getEventStatsRepository(queryable);
     const authCodeRepository = getAuthCodeRepository(queryable);
+    const impersonationRepository = getImpersonationRepository(queryable);
     const eventManagementRepository = getEventManagementRepository(queryable);
 
     // services
@@ -179,6 +181,7 @@ function createContainer(): Container {
     });
     // Process-local, like the ETS table it replaces: one instance per server.
     const rateLimiter = getFixedWindowRateLimiter();
+    const rateLimits = readRateLimitConfig();
 
     // mappers
     const eventMapper = getEventMapper();
@@ -224,7 +227,9 @@ function createContainer(): Container {
         organizations: organizationRepository,
         userMapper,
         rateLimiter,
-        requestCodeLimit: readRateLimitConfig().requestCodePerMinute
+        requestCodeLimit: rateLimits.requestCodePerMinute,
+        verifyAttemptLimit: rateLimits.verifyAttemptsPerCode,
+        impersonations: impersonationRepository
     });
 
     return {

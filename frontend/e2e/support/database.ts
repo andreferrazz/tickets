@@ -37,6 +37,7 @@ const ADMIN_URL = `postgres://${PG_AUTH}@${PG_HOST}:${PG_PORT}/postgres`;
 // Only the tables these specs read. Truncating the whole schema would also wipe
 // the migration bookkeeping and make the database look unmigrated.
 const SEEDED_TABLES = [
+    'impersonation_tokens',
     'auth_codes',
     'invitations',
     'passes',

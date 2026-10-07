@@ -1,12 +1,13 @@
 import type { EventDto } from './types';
 
-export type EditableStatus = 'draft' | 'published' | 'closed';
+/** `cancelled` cannot be chosen in the form, but an event that already is stays so. */
+export type EditableStatus = 'draft' | 'published' | 'closed' | 'cancelled';
 
 export interface EventInput {
     title: string;
-    description: string;
+    description: string | null;
     ticketsDescription: string | null;
-    location: string;
+    location: string | null;
     /** ISO 8601 UTC. */
     startsAt: string;
     coverImageUrl: string | null;

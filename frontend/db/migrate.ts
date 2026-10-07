@@ -31,6 +31,8 @@ export interface AppliedMigration {
 }
 
 export const BASELINE_FILE = '0001_baseline.sql';
+/** The last frozen Ecto migration; the baseline is a dump taken right after it. */
+const LAST_ECTO_VERSION = '20261006000000';
 const TRACKING_TABLE = 'public.sql_migrations';
 const FILE_NAME = /^\d{4}_[a-z0-9_]+\.sql$/;
 const DEFAULT_DIR = fileURLToPath(new URL('./migrations/', import.meta.url));
@@ -90,16 +92,29 @@ async function applyFile(client: pg.Client, dir: string, name: string): Promise<
         await client.query('commit');
         return execute;
     } catch (cause) {
-        await client.query('rollback');
+        // A rollback that fails itself (connection gone) must not mask the cause.
+        await client.query('rollback').catch(() => undefined);
         throw new Error(`migration ${name} failed: ${(cause as Error).message}`, { cause });
     }
 }
 
 // Ecto creates schema_migrations before its first migration, so its presence
-// means Phoenix built this database and the baseline is already in place.
+// means Phoenix built this database and the baseline is already in place. But
+// only if Phoenix got to its last migration: the baseline is that schema, and
+// recording it over an older one would let later files run against the wrong shape.
 async function builtByPhoenix(client: pg.Client): Promise<boolean> {
     const { rows } = await client.query<{ present: string | null }>(
         `select to_regclass('public.schema_migrations')::text as present`
     );
-    return rows[0]?.present !== null;
+    if (rows[0]?.present === null) return false;
+    const latest = await client.query<{ version: string | null }>(
+        'select max(version)::text as version from public.schema_migrations'
+    );
+    const version = latest.rows[0]?.version ?? null;
+    if (version !== LAST_ECTO_VERSION) {
+        throw new Error(
+            `database was built by Phoenix but its last migration is ${version ?? '(none)'}, expected ${LAST_ECTO_VERSION}: run \`mix ecto.migrate\` first`
+        );
+    }
+    return true;
 }

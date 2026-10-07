@@ -41,6 +41,11 @@ export function validateExtra(input: ExtraInput): FieldErrors {
     const errors: FieldErrors = {};
     if (!input.name.trim()) errors.name = [BLANK];
     if (!Number.isInteger(input.priceCents) || input.priceCents < 0) errors.priceCents = [NEGATIVE];
+    const quantity = input.quantityTotal;
+    // Null means unlimited; anything else must be a whole, non-negative stock.
+    if (quantity !== null && (!Number.isInteger(quantity) || quantity < 0)) {
+        errors.quantityTotal = [NEGATIVE];
+    }
     return errors;
 }
 

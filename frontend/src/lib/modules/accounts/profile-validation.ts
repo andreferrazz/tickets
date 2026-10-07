@@ -17,6 +17,7 @@ export type ProfileValidation =
 // pages translate them by matching on this text.
 const BLANK = "can't be blank";
 const TOO_SHORT = 'should be at least 2 character(s)';
+const TOO_LONG = 'should be at most 255 character(s)';
 const BAD_TAX_ID = 'must be a valid CPF (11 digits) or CNPJ (14 digits)';
 const BAD_CELLPHONE = 'must be a valid Brazilian mobile';
 const NAME_MAX = 255;
@@ -36,7 +37,8 @@ export function validateProfile(input: ProfileInput): ProfileValidation {
     const cellphone = normalizeBrazilianCellphone(input.cellphone);
     const fieldErrors: ProfileFieldErrors = {};
     if (!name) fieldErrors.name = [BLANK];
-    else if (name.length < 2 || name.length > NAME_MAX) fieldErrors.name = [TOO_SHORT];
+    else if (name.length < 2) fieldErrors.name = [TOO_SHORT];
+    else if (name.length > NAME_MAX) fieldErrors.name = [TOO_LONG];
     if (!input.cellphone.trim()) fieldErrors.cellphone = [BLANK];
     else if (!cellphone) fieldErrors.cellphone = [BAD_CELLPHONE];
     if (!taxId) fieldErrors.taxId = [BLANK];
