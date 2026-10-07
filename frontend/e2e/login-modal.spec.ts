@@ -2,12 +2,14 @@ import { expect, test } from '@playwright/test';
 import { latestAuthCode, userColumn } from './support/auth-codes';
 import { PUBLISHED_EVENT } from './support/fixtures';
 import { waitForHydration } from './support/hydration';
+import { completeProfile, fakeCustomerId, VALID_CPF } from './support/profile';
+import { uniqueEmail } from './support/unique';
 
 // The modal posts to the same three actions as the login pages, so this covers
 // the in-page flow: a visitor who is not signed in presses "buy" and ends up
 // signed in with a complete profile without ever leaving the event.
 test('a visitor signs in and completes their profile inside the login modal', async ({ page }) => {
-    const email = 'modal-buyer@e2e.test';
+    const email = uniqueEmail('modal-buyer');
     await page.goto(`/events/${PUBLISHED_EVENT.id}`);
     await waitForHydration(page);
 
@@ -29,13 +31,10 @@ test('a visitor signs in and completes their profile inside the login modal', as
     await dialog.getByRole('button', { name: 'Verificar' }).click();
 
     await expect(dialog.getByRole('heading', { name: 'Complete seu cadastro' })).toBeVisible();
-    await dialog.getByLabel('Nome completo').fill('Compradora Modal');
-    await dialog.getByLabel('Celular').fill('(11) 99999-9999');
-    await dialog.getByLabel('CPF ou CNPJ').fill('390.533.447-05');
-    await dialog.getByRole('button', { name: 'Salvar e continuar' }).click();
+    await completeProfile(dialog);
 
     await expect(page.getByRole('heading', { name: 'Complete seu cadastro' })).toHaveCount(0);
-    expect(await userColumn(email, 'abacate_customer_id')).toBe('cust_fake_39053344705');
+    expect(await userColumn(email, 'abacate_customer_id')).toBe(fakeCustomerId(VALID_CPF));
     // The cookie set by the verify action is what the server trusts.
     expect((await page.request.get('/orders')).status()).toBe(200);
 });

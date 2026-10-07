@@ -8,6 +8,7 @@ import {
     OWN_ORG_DRAFT,
     PENDING_INVITATION
 } from './support/fixtures';
+import { withoutScripts } from './support/html';
 import { signIn } from './support/session';
 
 const TEAM_PAGE = `/organizations/${DRAFT_ORG.id}/invitations`;
@@ -20,9 +21,11 @@ test('a leader sees the members and pending invitations of their organization', 
 
     const html = await (await page.request.get(TEAM_PAGE)).text();
 
-    expect(html).toContain(DRAFT_ORG.name);
-    expect(html).toContain(MEMBER.email);
-    expect(html).toContain(PENDING_INVITATION.email);
+    const htmlMarkup = withoutScripts(html);
+
+    expect(htmlMarkup).toContain(DRAFT_ORG.name);
+    expect(htmlMarkup).toContain(MEMBER.email);
+    expect(htmlMarkup).toContain(PENDING_INVITATION.email);
 });
 
 // Admins bypass membership for the page, but the invitation list stays the one
@@ -32,10 +35,11 @@ test('an admin opens an organization they do not belong to', async ({ context, p
 
     const response = await page.request.get(TEAM_PAGE);
     const html = await response.text();
+    const htmlMarkup = withoutScripts(html);
 
     expect(response.status()).toBe(200);
-    expect(html).toContain(DRAFT_ORG.name);
-    expect(html).toContain(MEMBER.email);
+    expect(htmlMarkup).toContain(DRAFT_ORG.name);
+    expect(htmlMarkup).toContain(MEMBER.email);
     expect(html).not.toContain(PENDING_INVITATION.email);
 });
 
@@ -54,7 +58,8 @@ test('the admin users page lists users for admins and sends others home', async 
     const admin = await browser.newContext();
     await signIn(admin, ADMIN.token);
     const html = await (await admin.request.get('/admin/users')).text();
-    expect(html).toContain(MEMBER.email);
+    const htmlMarkup = withoutScripts(html);
+    expect(htmlMarkup).toContain(MEMBER.email);
     await admin.close();
 
     const member = await browser.newContext();
@@ -87,6 +92,8 @@ test('the scan landing lists the events of the organizations the user belongs to
 
     const html = await (await page.request.get('/scan')).text();
 
-    expect(html).toContain(OWN_ORG_DRAFT.title);
+    const htmlMarkup = withoutScripts(html);
+
+    expect(htmlMarkup).toContain(OWN_ORG_DRAFT.title);
     expect(html).not.toContain(OTHER_ORG_DRAFT.title);
 });
