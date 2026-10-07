@@ -82,6 +82,22 @@ test('the next parameter survives the whole flow', async ({ page }) => {
     await expect(page).toHaveURL('/orders');
 });
 
+// Abandoning the profile step does not get a visitor past it: the server
+// answers every page with the step, and brings them back afterwards.
+test('an unfinished profile is asked for before any other page', async ({ page }) => {
+    await logInWithCode(page, uniqueEmail('unfinished'));
+    await expect(page).toHaveURL(/\/auth\/profile/);
+
+    const served = await page.request.get('/orders', { maxRedirects: 0 });
+    expect(served.status()).toBe(303);
+    expect(served.headers()['location']).toBe('/auth/profile?next=%2Forders');
+
+    await page.goto('/orders');
+    await expect(page).toHaveURL(/\/auth\/profile\?next=%2Forders/);
+    await completeProfile(page);
+    await expect(page).toHaveURL('/orders');
+});
+
 test('the next parameter cannot send a visitor to another site', async ({ context, page }) => {
     await signIn(context, MEMBER.token);
 

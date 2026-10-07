@@ -8,4 +8,6 @@ import type { Role } from '$lib/types';
 export interface SessionUser {
     id: string;
     role: Role;
+    /** False until the profile step is done; such a caller is sent there first. */
+    profileComplete: boolean;
 }

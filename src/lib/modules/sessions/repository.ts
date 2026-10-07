@@ -18,7 +18,9 @@ export function getSessionRepository(queryable: Queryable): SessionRepository {
     return {
         async findUserByToken(token: string): Promise<SessionUser | null> {
             const sql = `
-				select u.id, u.role
+				select u.id, u.role,
+				       -- The same rule the user mapper applies when it serialises a user.
+				       u.abacate_customer_id is not null as "profileComplete"
 				from sessions s
 				join users u on u.id = s.user_id
 				where s.token = $1 and s.expires_at > (now() at time zone 'utc')`;
