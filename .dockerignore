@@ -1,0 +1,11 @@
+node_modules
+.svelte-kit
+build
+.env
+.env.*
+*.local
+.git
+.claude
+backend
+test-results
+playwright-report

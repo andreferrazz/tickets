@@ -1,6 +1,6 @@
 # E2E.md — the test catalog
 
-The Playwright specs under `frontend/e2e/` are the only automated tests on the
+The Playwright specs under `e2e/` are the only automated tests on the
 SvelteKit side. There are no unit tests by decision: each spec drives the real
 app against a seeded database, with the external services swapped for
 in-process fakes.
@@ -14,12 +14,12 @@ in-process fakes.
    bitten or are likely to. A new edge case is appended to the owning spec and
    gets a mention in that spec's row here.
 3. Specs run against `tickets_e2e`, never `backend_dev`. The harness in
-   `frontend/e2e/support/database.ts` builds it from the SQL migrations in
-   `frontend/db/migrations` and seeds it; the fixtures in
-   `frontend/e2e/support/fixtures.ts` are the only world the specs know.
+   `e2e/support/database.ts` builds it from the SQL migrations in
+   `db/migrations` and seeds it; the fixtures in
+   `e2e/support/fixtures.ts` are the only world the specs know.
 4. External services never run in e2e. The app boots with `INTEGRATIONS=fake`
-   (set in `frontend/playwright.config.ts`), which selects the fake
-   implementations in `frontend/src/lib/container.ts`.
+   (set in `playwright.config.ts`), which selects the fake
+   implementations in `src/lib/container.ts`.
 5. Specs are F.I.R.S.T.: fast (seconds) and independent. The seeded fixtures are
    read-only: a spec that needs to change a person, a session or an invitation
    creates its own (`support/unique.ts`, `support/people.ts`), so the suite passes
@@ -41,12 +41,12 @@ in-process fakes.
 ## Running
 
 ```
-cd frontend && npm test          # Postgres on localhost:5432
+npm test                        # Postgres on localhost:5432
 PGPORT=55432 npm test            # a Postgres on another port (PGHOST works too)
 npx playwright test --workers=1  # the order-independence check
 ```
 
-Needs only a reachable Postgres: the schema comes from `frontend/db/migrations`,
+Needs only a reachable Postgres: the schema comes from `db/migrations`,
 the same files `npm run db:migrate` applies everywhere else.
 
 ## Catalog
