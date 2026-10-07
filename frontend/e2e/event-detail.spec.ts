@@ -10,6 +10,7 @@ import {
     PUBLISHED_TICKET_TYPE
 } from './support/fixtures';
 import { withoutScripts } from './support/html';
+import { seedPerson } from './support/people';
 
 import { signIn } from './support/session';
 
@@ -83,4 +84,34 @@ test('a malformed event id is 404', async ({ request }) => {
     const response = await request.get('/events/not-a-uuid');
 
     expect(response.status()).toBe(404);
+});
+
+// These links used to appear after hydration, once the browser had asked
+// Phoenix for the visitor's memberships. The server decides now.
+test('the dashboard and edit links are served to a manager and to nobody else', async ({
+    browser,
+    request
+}) => {
+    const path = `/events/${PUBLISHED_EVENT.id}`;
+    // The server writes the href relative to the page it is on.
+    const dashboardLink = new RegExp(`href="[^"]*${path}/dashboard"`);
+    const staff = await seedPerson({
+        role: 'buyer',
+        membership: { organizationId: PUBLISHED_EVENT.organizationId, role: 'staff' }
+    });
+    const served: Record<string, boolean> = {};
+
+    for (const [who, token] of Object.entries({
+        manager: MEMBER.token,
+        admin: ADMIN.token,
+        staff: staff.token
+    })) {
+        const context = await browser.newContext();
+        await signIn(context, token);
+        served[who] = dashboardLink.test(await (await context.request.get(path)).text());
+        await context.close();
+    }
+    served.anonymous = dashboardLink.test(await (await request.get(path)).text());
+
+    expect(served).toEqual({ manager: true, admin: true, staff: false, anonymous: false });
 });

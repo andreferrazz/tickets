@@ -1,7 +1,8 @@
 import { browser } from '$app/environment';
+import { invalidateAll } from '$app/navigation';
 import { fromApiUser } from '$lib/modules/accounts/legacy';
 import type { UserDto } from '$lib/modules/accounts/types';
-import type { OrganizationMembership, User } from '$lib/types';
+import type { User } from '$lib/types';
 
 const STORAGE_KEY = 'tickets.auth';
 const SESSION_ENDPOINT = '/api/session';
@@ -49,9 +50,6 @@ function migrateUser(user: UserDto | User): UserDto {
 class AuthStore {
     token = $state<string | null>(null);
     user = $state<UserDto | null>(null);
-    memberships = $state<OrganizationMembership[] | null>(null);
-
-    #inflight: Promise<OrganizationMembership[]> | null = null;
 
     constructor() {
         const p = load();
@@ -68,11 +66,12 @@ class AuthStore {
     async set(token: string, user: UserDto): Promise<void> {
         this.token = token;
         this.user = user;
-        this.memberships = null;
-        this.#inflight = null;
         if (!browser) return;
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user }));
         await storeSessionCookie(token);
+        // What the server said about an anonymous visitor (the navigation,
+        // whether they may buy or manage) is stale the moment they sign in.
+        await invalidateAll();
     }
 
     setUser(user: UserDto): void {
@@ -96,68 +95,13 @@ class AuthStore {
     async clear(): Promise<void> {
         this.token = null;
         this.user = null;
-        this.memberships = null;
-        this.#inflight = null;
         if (!browser) return;
         localStorage.removeItem(STORAGE_KEY);
         await dropSessionCookie();
     }
 
-    /**
-     * Lazily fetches the user's org memberships once per session, deduping
-     * concurrent callers. Pass `force: true` after an event that should
-     * invalidate the cache (e.g. accepting another invitation).
-     */
-    async loadMemberships(force = false): Promise<OrganizationMembership[]> {
-        if (!this.token) return [];
-        if (!force && this.memberships) return this.memberships;
-        if (!force && this.#inflight) return this.#inflight;
-
-        // Import lazily to avoid the api ↔ auth cycle at module-load time.
-        const { api } = await import('$lib/api');
-        this.#inflight = api
-            .myOrganizations()
-            .then((rows) => {
-                this.memberships = rows;
-                return rows;
-            })
-            .finally(() => {
-                this.#inflight = null;
-            });
-
-        return this.#inflight;
-    }
-
-    /**
-     * True when the user may manage `orgId`: an admin, or a `leader`/`participant`
-     * member. `staff` members are scan-only and excluded here.
-     */
-    canManageOrg(orgId: string | null | undefined): boolean {
-        if (!orgId) return false;
-        if (this.user?.role === 'admin') return true;
-        return !!this.memberships?.some(
-            (m) => m.id === orgId && (m.role === 'leader' || m.role === 'participant')
-        );
-    }
-
-    /** True when the user may scan `orgId`'s tickets: an admin or any member (incl. staff). */
-    canScan(orgId: string | null | undefined): boolean {
-        if (!orgId) return false;
-        if (this.user?.role === 'admin') return true;
-        return !!this.memberships?.some((m) => m.id === orgId);
-    }
-
-    /** True when the user holds a scan-only `staff` membership in any org. */
-    get hasStaffMembership(): boolean {
-        return !!this.memberships?.some((m) => m.role === 'staff');
-    }
-
     get isAuthed(): boolean {
         return !!this.token;
-    }
-
-    get isCreator(): boolean {
-        return this.user?.role === 'creator' || this.user?.role === 'admin';
     }
 
     get isAdmin(): boolean {

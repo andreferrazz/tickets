@@ -25,8 +25,20 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     // Whether "buy" can go straight to checkout or must ask the visitor to sign
     // in and complete their profile first.
     const viewer = locals.user ? await locals.container.authBff.currentUser(locals.user) : null;
-    return { ...data, viewerReady: viewer?.profileComplete ?? false };
+    return {
+        ...data,
+        viewerReady: viewer?.profileComplete ?? false,
+        canManage: data.event ? await managesEvent(locals, data.event.organizationId) : false
+    };
 };
+
+// Whether to offer the dashboard and edit links: a creator or admin who
+// manages the event's organization. The pages behind them check for themselves.
+async function managesEvent(locals: App.Locals, organizationId: string): Promise<boolean> {
+    const user = locals.user;
+    if (!user || user.role === 'buyer') return false;
+    return locals.container.organizations.canManage(user, organizationId);
+}
 
 /**
  * Checkout: the cart arrives as one quantity field per item, the order is

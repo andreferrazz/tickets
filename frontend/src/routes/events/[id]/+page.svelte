@@ -12,7 +12,7 @@
     import { auth } from '$lib/stores/auth.svelte';
     import { requestLogin } from '$lib/stores/loginModal.svelte';
     import type { PaymentMethod } from '$lib/types';
-    import { onMount, tick } from 'svelte';
+    import { tick } from 'svelte';
     import type { ActionData, PageData, SubmitFunction } from './$types';
 
     let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -78,20 +78,12 @@
         return sum;
     });
 
-    // Always false in the server HTML: the auth store is browser-only, so the
-    // creator actions appear on hydration.
-    const canEdit = $derived(
-        !!auth.isCreator && !!event && auth.canManageOrg(event.organizationId)
-    );
+    // Decided by the server, so the links are in the served HTML for those
+    // who manage the event and in nobody else's.
+    const canEdit = $derived(data.canManage);
 
     // Closed events stay viewable but no longer sell: block cart edits and checkout.
     const isClosed = $derived(event?.status === 'closed');
-
-    onMount(() => {
-        // Best-effort: memberships only gate the edit affordance (canEdit) and must never
-        // block viewing a public event. A stale token is cleared globally in request().
-        if (auth.isAuthed) void auth.loadMemberships().catch(() => {});
-    });
 
     function bump(key: string, delta: number, max: number) {
         if (isClosed) return;

@@ -3,7 +3,7 @@ import { latestAuthCode, userColumn } from './support/auth-codes';
 import { ADMIN, DRAFT_ORG, MEMBER } from './support/fixtures';
 import { withoutScripts } from './support/html';
 import { waitForHydration } from './support/hydration';
-import { seedInvitation, seedSession } from './support/people';
+import { seedInvitation, seedPerson, seedSession } from './support/people';
 import { completeProfile, fakeCustomerId, VALID_CPF } from './support/profile';
 import { signIn } from './support/session';
 import { uniqueEmail } from './support/unique';
@@ -166,4 +166,30 @@ test('a session token is not an impersonation link', async ({ page }) => {
 
     await expect(page.getByText(DEAD_LINK)).toBeVisible();
     expect((await page.request.get('/orders', { maxRedirects: 0 })).status()).toBe(303);
+});
+
+// The menu entry used to come from Phoenix after hydration; the layout's own
+// load decides it now, and it is re-read when the login lands.
+test('scan-only staff get "Validar" in the navigation once signed in; a buyer does not', async ({
+    browser
+}) => {
+    const people = [
+        await seedPerson({
+            role: 'buyer',
+            membership: { organizationId: DRAFT_ORG.id, role: 'staff' }
+        }),
+        await seedPerson({ role: 'buyer' })
+    ];
+    const scanLinks: number[] = [];
+
+    for (const person of people) {
+        const context = await browser.newContext();
+        const page = await context.newPage();
+        await logInWithCode(page, person.email);
+        await expect(page.getByRole('link', { name: 'Meus pedidos' })).toBeVisible();
+        scanLinks.push(await page.getByRole('link', { name: 'Validar', exact: true }).count());
+        await context.close();
+    }
+
+    expect(scanLinks).toEqual([1, 0]);
 });
