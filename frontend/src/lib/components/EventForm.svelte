@@ -29,9 +29,7 @@
     // svelte-ignore state_referenced_locally
     let cover_image_url = $state(initial.coverImageUrl ?? '');
     // svelte-ignore state_referenced_locally
-    let status = $state<'draft' | 'published' | 'closed'>(
-        initial.status === 'published' || initial.status === 'closed' ? initial.status : 'draft'
-    );
+    let status = $state<'draft' | 'published' | 'closed' | 'cancelled'>(initial.status ?? 'draft');
     let busy = $state(false);
 </script>
 
@@ -86,6 +84,9 @@
             <option value="draft">{t('eventForm.draft')}</option>
             <option value="published">{t('eventForm.published')}</option>
             <option value="closed">{t('eventForm.closed')}</option>
+            {#if initial.status === 'cancelled'}
+                <option value="cancelled">{t('status.cancelled')}</option>
+            {/if}
         </select>
     </div>
     {#if error}

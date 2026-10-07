@@ -21,6 +21,8 @@ async function acceptAsNewVisitor(browser: Browser, link: string): Promise<Page>
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto(link);
+    await waitForHydration(page);
+    await page.getByRole('button', { name: 'Aceitar convite' }).click();
     await expect(page).not.toHaveURL(/\/invite\//);
     return page;
 }
@@ -38,7 +40,14 @@ test('a leader invites a participant, who joins by opening the link', async ({
     await page.getByRole('button', { name: 'Enviar convite' }).click();
     await expect(page.getByText(email)).toBeVisible();
 
-    const visitor = await acceptAsNewVisitor(browser, await inviteLink(email));
+    const link = await inviteLink(email);
+    // A mail scanner or link preview fetching the link must not use it up.
+    await page.request.get(link);
+    expect(
+        await queryValue<string>('select status from invitations where email = $1', [email])
+    ).toBe('pending');
+
+    const visitor = await acceptAsNewVisitor(browser, link);
     // A brand-new buyer has no profile yet, so the profile step comes first.
     await expect(visitor).toHaveURL(/\/auth\/profile/);
 

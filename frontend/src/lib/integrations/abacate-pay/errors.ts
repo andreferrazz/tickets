@@ -18,3 +18,15 @@ export class AbacatePayError extends Error {
         this.name = 'AbacatePayError';
     }
 }
+
+/**
+ * What is safe to log about a failed Abacate Pay call: the kind and status,
+ * never the message, which can echo the name, tax id or phone we sent.
+ *
+ * @example
+ * console.warn(JSON.stringify({ event: 'abacate_customer_create_failed', ...describeAbacateFailure(cause) }));
+ */
+export function describeAbacateFailure(cause: unknown): { failure: string; status: number | null } {
+    if (cause instanceof AbacatePayError) return { failure: cause.failure, status: cause.status };
+    return { failure: 'unexpected', status: null };
+}

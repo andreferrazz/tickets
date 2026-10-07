@@ -14,6 +14,7 @@ export function profileFieldError(
     if (!message) return null;
     if (message === "can't be blank") return t('auth.profile.fieldRequired');
     if (message.includes('at least')) return t('auth.profile.fieldTooShort');
+    if (message.includes('at most')) return t('auth.profile.fieldTooLong');
     if (field === 'taxId') return t('auth.profile.fieldInvalidTaxId');
     if (field === 'cellphone') return t('auth.profile.fieldInvalidCellphone');
     return message;

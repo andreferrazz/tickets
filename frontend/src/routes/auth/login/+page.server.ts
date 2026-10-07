@@ -1,4 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { clientAddressOf } from '$lib/utils/client-address';
 import { safeNext } from '$lib/utils/next';
 import type { Actions } from './$types';
 
@@ -16,24 +17,15 @@ export const actions: Actions = {
 
         const outcome = await locals.container.authBff.requestCode(
             email,
-            clientAddress(getClientAddress)
+            clientAddressOf(getClientAddress)
         );
         if (outcome === 'rate_limited') {
             return fail(429, { error: 'too many requests — try again in a minute' });
         }
+        if (outcome === 'invalid_email') return fail(400, { error: 'invalid email' });
 
         const params = new URLSearchParams({ email });
         if (next) params.set('next', next);
         redirect(303, `/auth/verify?${params}`);
     }
 };
-
-// Behind a proxy without the address header, or in a test runner, there may be
-// no address; one shared bucket is safer than skipping the limit.
-function clientAddress(read: () => string): string {
-    try {
-        return read();
-    } catch {
-        return 'unknown';
-    }
-}

@@ -48,6 +48,7 @@ function action(name: string, run: Run) {
 
 function statusFor(failure: string): number {
     if (failure === 'not_found') return 404;
+    if (failure === 'forbidden') return 403;
     if (failure === 'abacate_unavailable') return 502;
     if (failure === 'batch_has_sales' || failure === 'section_not_empty') return 409;
     return 422;

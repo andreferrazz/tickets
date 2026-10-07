@@ -1,6 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { parse } from 'devalue';
-import { MEMBER } from './support/fixtures';
+import { DRAFT_ORG, MEMBER } from './support/fixtures';
 import { signIn } from './support/session';
 import { execute, queryValue } from './support/sql';
 
@@ -165,4 +165,44 @@ test('a batch with sales cannot be deleted', async ({ page, context }) => {
 test('an event of another organization cannot be edited', async ({ page }) => {
     const response = await page.request.get('/events/00000000-0000-4000-8000-000000000103/edit');
     expect(response.status()).toBe(404);
+});
+
+// Phoenix kept creation behind the creator role; managing an organization is
+// not enough for a member whose own role is still `buyer`.
+test('a buyer who manages an organization still cannot create an event', async ({ browser }) => {
+    const userId = '00000000-0000-4000-8000-000000000014';
+    const token = 'e2e-session-buyer-participant';
+    await execute(
+        `insert into users (id, email, role, abacate_customer_id, inserted_at, updated_at)
+         values ($1, 'buyer-participant@e2e.test', 'buyer', 'cust_e2e_buyer', now() at time zone 'utc', now() at time zone 'utc')
+         on conflict (id) do nothing`,
+        [userId]
+    );
+    await execute(
+        `insert into organization_memberships (organization_id, user_id, role, inserted_at, updated_at)
+         values ($1, $2, 'participant', now() at time zone 'utc', now() at time zone 'utc')
+         on conflict do nothing`,
+        [DRAFT_ORG.id, userId]
+    );
+    await execute(
+        `insert into sessions (user_id, token, expires_at, inserted_at)
+         values ($1, $2, (now() at time zone 'utc') + interval '1 day', now() at time zone 'utc')
+         on conflict (token) do nothing`,
+        [userId, token]
+    );
+    const context = await browser.newContext();
+    await signIn(context, token);
+
+    const response = await context.request.post('/events/new?/create', {
+        form: { title: 'E2E Forbidden Show', starts_at: '2027-08-01T20:00:00Z', status: 'draft' },
+        headers: { 'x-sveltekit-action': 'true' }
+    });
+    const body = (await response.json()) as { type: string; data: string };
+
+    expect(body.type).toBe('failure');
+    expect((parse(body.data) as { error: string }).error).toBe('forbidden');
+    expect(
+        await queryValue<string>(`select id from events where title = 'E2E Forbidden Show'`, [])
+    ).toBeNull();
+    await context.close();
 });

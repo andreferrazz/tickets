@@ -17,7 +17,8 @@ export function getSessionService(repository: SessionRepository): SessionService
             if (!token) return null;
 
             try {
-                return repository.findUserByToken(token);
+                // Awaited here so a failed query lands in the catch below.
+                return await repository.findUserByToken(token);
             } catch (cause) {
                 console.error(
                     JSON.stringify({ event: 'session_lookup_failed', error: String(cause) })

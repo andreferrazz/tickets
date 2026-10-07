@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { parse } from 'devalue';
 import { latestAuthCode, userColumn } from './support/auth-codes';
 import { ADMIN, DRAFT_ORG, MEMBER, PENDING_INVITATION } from './support/fixtures';
+import { waitForHydration } from './support/hydration';
 import { signIn } from './support/session';
 import { execute } from './support/sql';
 
@@ -108,7 +109,7 @@ test('logging out revokes the session', async ({ context, page }) => {
     expect((await page.request.get('/orders', { maxRedirects: 0 })).status()).toBe(303);
 });
 
-test('an admin can mint a link that signs in as another user', async ({ browser }) => {
+test('an admin mints a single-use link that signs in as another user', async ({ browser }) => {
     const admin = await browser.newContext();
     await signIn(admin, ADMIN.token);
     const response = await admin.request.post('/admin/users?/impersonate', {
@@ -119,12 +120,61 @@ test('an admin can mint a link that signs in as another user', async ({ browser 
     expect(body.type).toBe('success');
     const { token } = parse(body.data) as { token: string };
     await admin.close();
+    const link = `/auth/impersonate?token=${token}`;
 
     const visitor = await browser.newContext();
     const page = await visitor.newPage();
-    await page.goto(`/auth/impersonate?token=${token}`);
+    await page.goto(link);
+    // Opening the link signs nobody in: that takes the button.
+    expect((await page.request.get('/orders', { maxRedirects: 0 })).status()).toBe(303);
+    await waitForHydration(page);
+    await page.getByRole('button', { name: `Entrar como ${MEMBER.email}` }).click();
     await expect(page).toHaveURL('/');
     const html = await (await page.request.get('/orders')).text();
     expect(html).toContain('E2E Published Show'); // MEMBER's order, so the link signed in as them
     await visitor.close();
+
+    const second = await (await browser.newContext()).newPage();
+    await second.goto(link);
+    await expect(second.getByText('Não foi possível acessar com este link.')).toBeVisible();
+    await second.context().close();
+});
+
+// The link used to carry a session token, and any live session token worked:
+// anyone could sign a victim into their own account by sending them a link.
+test('a session token is not an impersonation link', async ({ page }) => {
+    await page.goto(`/auth/impersonate?token=${ADMIN.token}`);
+
+    await expect(page.getByText('Não foi possível acessar com este link.')).toBeVisible();
+    expect((await page.request.get('/orders', { maxRedirects: 0 })).status()).toBe(303);
+});
+
+test('the next parameter cannot send a visitor to another site', async ({ context, page }) => {
+    await signIn(context, MEMBER.token);
+
+    // A tab is stripped by browsers, which would turn this into //evil.example.
+    const hostile = await page.request.get('/auth/profile?next=/%09/evil.example', {
+        maxRedirects: 0
+    });
+    const honest = await page.request.get('/auth/profile?next=/orders', { maxRedirects: 0 });
+
+    expect(hostile.headers()['location']).toBe('/');
+    expect(honest.headers()['location']).toBe('/orders');
+});
+
+test('guesses at a login code are cut off', async ({ page }) => {
+    const email = 'throttled@e2e.test';
+    for (let attempt = 0; attempt < 5; attempt++) {
+        await page.request.post('/auth/verify?/verify', {
+            form: { email, code: '000000' },
+            headers: { 'x-sveltekit-action': 'true' }
+        });
+    }
+
+    await page.goto(`/auth/verify?email=${encodeURIComponent(email)}`);
+    await waitForHydration(page);
+    await page.getByLabel('Código de 6 dígitos').fill('000000');
+    await page.getByRole('button', { name: 'Verificar' }).click();
+
+    await expect(page.getByText(/too many attempts/)).toBeVisible();
 });

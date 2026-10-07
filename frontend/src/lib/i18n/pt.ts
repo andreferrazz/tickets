@@ -54,6 +54,7 @@ export const pt = {
         'Serviço de pagamento indisponível. Tente novamente em instantes.',
     'auth.profile.fieldRequired': 'Campo obrigatório.',
     'auth.profile.fieldTooShort': 'Valor muito curto.',
+    'auth.profile.fieldTooLong': 'Valor muito longo.',
     'auth.profile.fieldInvalidTaxId': 'CPF ou CNPJ inválido.',
     'auth.profile.fieldInvalidCellphone':
         'Celular inválido. Use um número de celular brasileiro com DDD (ex: 11 99999-9999).',
@@ -64,6 +65,9 @@ export const pt = {
     'invite.errorAlreadyAccepted': 'Este convite já foi utilizado.',
     'invite.errorFallback': 'Não foi possível aceitar o convite.',
     'invite.goLogin': 'Ir para o login',
+    'invite.title': 'Convite para {org}',
+    'invite.hint': 'Ao aceitar, você entrará como {email}.',
+    'invite.accept': 'Aceitar convite',
 
     // Onboarding — set organization name (first step after a leader accepts an invite)
     'onboarding.org.title': 'Nomeie sua organização',
@@ -386,6 +390,9 @@ export const pt = {
     'impersonate.errorTitle': 'Link inválido',
     'impersonate.errorFallback': 'Não foi possível acessar com este link.',
     'impersonate.goLogin': 'Ir para o login',
+    'impersonate.confirmTitle': 'Entrar como outro usuário',
+    'impersonate.hint': 'Este link funciona uma única vez e expira em 10 minutos.',
+    'impersonate.confirm': 'Entrar como {email}',
 
     // Org-scoped invitations (leader inviting participants to their org)
     'orgInvitations.title': 'Convidar para {org}',

@@ -46,6 +46,7 @@ export interface OrderDetail extends OrderWithItems {
 
 export interface OrderItemDto {
     id: string;
+    orderId: string;
     itemType: PassKind;
     itemId: string;
     itemName: string;

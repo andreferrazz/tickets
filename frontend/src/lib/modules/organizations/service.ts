@@ -60,8 +60,8 @@ export function getOrganizationService(repository: OrganizationRepository): Orga
         },
 
         async managerRoleFor(user, organizationId) {
-            if (user.role === 'admin') return 'leader';
             if (!isUuid(organizationId)) return null;
+            if (user.role === 'admin') return 'leader';
             const role = await repository.findMemberRole(user.id, organizationId);
             return role === 'leader' || role === 'participant' ? role : null;
         },

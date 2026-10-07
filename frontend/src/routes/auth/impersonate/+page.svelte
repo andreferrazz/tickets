@@ -1,30 +1,55 @@
 <script lang="ts">
-    import { resolve } from '$app/paths';
+    import { enhance } from '$app/forms';
     import { goto } from '$app/navigation';
+    import { resolve } from '$app/paths';
     import { t } from '$lib/i18n';
+    import type { UserDto } from '$lib/modules/accounts/types';
     import { auth } from '$lib/stores/auth.svelte';
-    import { onMount } from 'svelte';
-    import type { PageData } from './$types';
+    import type { ActionData, PageData } from './$types';
 
-    let { data }: { data: PageData } = $props();
+    let { data, form }: { data: PageData; form: ActionData } = $props();
 
-    // The server already turned a live token into the cookie; what is left is
-    // the browser's copy for the endpoints Phoenix still serves.
-    onMount(async () => {
-        if (!data.token || !data.user) return;
-        await auth.set(data.token, data.user);
-        await goto(resolve('/'));
-    });
+    let busy = $state(false);
+    // A link that was already used answers the action with an error even though
+    // the page loaded fine a moment ago.
+    const dead = $derived(!data.targetEmail || !!form?.error);
 </script>
 
 <div class="impersonate-wrap">
     <div class="card stack">
-        {#if !data.user}
+        {#if dead}
             <h1>{t('impersonate.errorTitle')}</h1>
             <p class="error">{t('impersonate.errorFallback')}</p>
             <a href={resolve('/auth/login')}>{t('impersonate.goLogin')}</a>
         {:else}
-            <p>{t('impersonate.loading')}</p>
+            <h1>{t('impersonate.confirmTitle')}</h1>
+            <p class="muted">{t('impersonate.hint')}</p>
+            <form
+                method="POST"
+                action="?/confirm"
+                use:enhance={() => {
+                    busy = true;
+                    return async ({ result, update }) => {
+                        busy = false;
+                        const signedIn =
+                            result.type === 'success'
+                                ? (result.data as { token: string; user: UserDto } | undefined)
+                                : undefined;
+                        if (!signedIn) return update();
+                        // The cookie is set; this is the browser's copy for the
+                        // endpoints Phoenix still serves.
+                        await auth.set(signedIn.token, signedIn.user);
+                        await goto(resolve('/'));
+                    };
+                }}
+            >
+                <input type="hidden" name="token" value={data.token} />
+                <button type="submit" disabled={busy}>
+                    {busy
+                        ? t('impersonate.loading')
+                        : t('impersonate.confirm', { email: data.targetEmail ?? '' })}
+                </button>
+            </form>
         {/if}
     </div>
 </div>

@@ -4,10 +4,12 @@ export interface AuthCodeRepository {
     /** Drops every unused code for `email` and stores `code`, valid for `ttlMinutes`. */
     replacePending(email: string, code: string, ttlMinutes: number): Promise<void>;
 
-    /** The id of an unused, unexpired `code` for `email`, or null. */
-    findValid(email: string, code: string): Promise<string | null>;
-
-    markUsed(id: string): Promise<void>;
+    /**
+     * Marks an unused, unexpired `code` for `email` as used and says whether
+     * there was one. One statement, so two requests racing with the same code
+     * cannot both win.
+     */
+    claim(email: string, code: string): Promise<boolean>;
 }
 
 export function getAuthCodeRepository(queryable: Queryable): AuthCodeRepository {
@@ -24,17 +26,13 @@ export function getAuthCodeRepository(queryable: Queryable): AuthCodeRepository 
             });
         },
 
-        async findValid(email, code) {
+        async claim(email, code) {
             const sql = `
-                select id from auth_codes
+                update auth_codes set used = true
                 where email = $1 and code = $2 and used = false
-                  and expires_at > (now() at time zone 'utc')`;
-            const rows = await queryable.query<{ id: string }>(sql, [email, code]);
-            return rows[0]?.id ?? null;
-        },
-
-        async markUsed(id) {
-            await queryable.query(`update auth_codes set used = true where id = $1`, [id]);
+                  and expires_at > (now() at time zone 'utc')
+                returning id`;
+            return (await queryable.query<{ id: string }>(sql, [email, code])).length > 0;
         }
     };
 }

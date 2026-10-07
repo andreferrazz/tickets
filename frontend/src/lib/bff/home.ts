@@ -53,7 +53,7 @@ function searchFilter(search: string) {
         }
 
         const title = event.title.toLowerCase();
-        const location = event.location.toLowerCase();
+        const location = (event.location ?? '').toLowerCase();
         const needle = search.toLowerCase();
 
         return title.includes(needle) || location.includes(needle);

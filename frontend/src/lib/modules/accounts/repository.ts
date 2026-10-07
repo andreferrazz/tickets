@@ -7,9 +7,9 @@ export interface UserRepository {
     listUsers(): Promise<UserRow[]>;
     findById(id: string): Promise<UserRow | null>;
     /** `email` must already be normalized (trimmed, lower-case). */
-    findByEmail(email: string): Promise<UserRow | null>;
+    findByEmail(email: string, db?: Queryable): Promise<UserRow | null>;
     /** The minimal account a first login creates. */
-    insertBuyer(email: string): Promise<UserRow>;
+    insertBuyer(email: string, db?: Queryable): Promise<UserRow>;
     /** Buyer to creator on an accepted invitation; runs inside the caller's transaction. */
     promoteToCreator(db: Queryable, userId: string, invitedBy: string): Promise<UserRow>;
     /** Name, cellphone, tax id and the Abacate customer id in one update. */
@@ -34,20 +34,19 @@ export function getUserRepository(queryable: Queryable): UserRepository {
             return rows[0] ?? null;
         },
 
-        async findByEmail(email) {
-            const rows = await queryable.query<UserRow>(
-                `select ${COLUMNS} from users where email = $1`,
-                [email]
-            );
+        async findByEmail(email, db = queryable) {
+            const rows = await db.query<UserRow>(`select ${COLUMNS} from users where email = $1`, [
+                email
+            ]);
             return rows[0] ?? null;
         },
 
-        async insertBuyer(email) {
+        async insertBuyer(email, db = queryable) {
             const sql = `
                 insert into users (email, role, inserted_at, updated_at)
                 values ($1, 'buyer', now() at time zone 'utc', now() at time zone 'utc')
                 returning ${COLUMNS}`;
-            return firstRow(await queryable.query<UserRow>(sql, [email]), 'insert user');
+            return firstRow(await db.query<UserRow>(sql, [email]), 'insert user');
         },
 
         async promoteToCreator(db, userId, invitedBy) {

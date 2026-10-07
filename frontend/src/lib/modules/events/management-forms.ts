@@ -1,6 +1,14 @@
 import { parseCentsInput } from '$lib/utils/currency';
 import { fromLocalInputValue } from '$lib/utils/datetime';
-import type { BatchInput, EventInput, ExtraInput, SectionInput } from './management-types';
+import type {
+    BatchInput,
+    EditableStatus,
+    EventInput,
+    ExtraInput,
+    SectionInput
+} from './management-types';
+
+const EDITABLE_STATUSES: readonly EditableStatus[] = ['draft', 'published', 'closed', 'cancelled'];
 
 /**
  * Reads the edit page's forms. Prices arrive as the user typed them
@@ -11,12 +19,13 @@ export function parseEventInput(form: FormData): EventInput {
     const status = text(form, 'status');
     return {
         title: text(form, 'title'),
-        description: text(form, 'description').trim(),
+        // Blank is stored as NULL, as Ecto's cast did, so a column has one way of being empty.
+        description: text(form, 'description').trim() || null,
         ticketsDescription: text(form, 'tickets_description').trim() || null,
-        location: text(form, 'location'),
+        location: text(form, 'location').trim() || null,
         startsAt: isoFromForm(text(form, 'starts_at')),
         coverImageUrl: text(form, 'cover_image_url') || null,
-        status: status === 'published' || status === 'closed' ? status : 'draft'
+        status: EDITABLE_STATUSES.find((known) => known === status) ?? 'draft'
     };
 }
 

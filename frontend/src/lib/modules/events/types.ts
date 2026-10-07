@@ -8,9 +8,10 @@ export interface EventRow {
     organization_id: string;
     created_by_id: string | null;
     title: string;
-    description: string;
+    /** Null on rows Phoenix wrote from a blank field. */
+    description: string | null;
     tickets_description: string | null;
-    location: string;
+    location: string | null;
     starts_at: Date;
     ends_at: Date | null;
     cover_image_url: string | null;
@@ -24,9 +25,9 @@ export interface EventDto {
     organizationId: string;
     createdById: string | null;
     title: string;
-    description: string;
+    description: string | null;
     ticketsDescription: string | null;
-    location: string;
+    location: string | null;
     startsAt: string;
     endsAt: string | null;
     coverImageUrl: string | null;

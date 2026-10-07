@@ -82,6 +82,7 @@ export function getOrderMapper(): OrderMapper {
 function toItemDto(item: OrderItemRow): OrderItemDto {
     return {
         id: item.id,
+        orderId: item.order_id,
         itemType: item.item_type,
         itemId: item.item_id,
         itemName: item.item_name,
