@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import type {
     AbacatePayGateway,
     CreatedPayout,
@@ -5,9 +6,10 @@ import type {
     PaymentState,
     SettledPaymentMethod
 } from './gateway';
+import { AbacatePayError } from './errors';
 
 /**
- * In-memory Abacate Pay for e2e runs and local development. Ids are
+ * In-memory Abacate Pay for e2e runs and local development. Product and customer ids are
  * deterministic, a hosted checkout's url is its own `completionUrl` (the
  * browser "pays" by coming back, as the Phoenix test mock did), and every
  * payment stays pending until `settle` says otherwise.
@@ -20,6 +22,8 @@ import type {
 export interface FakeAbacatePay extends AbacatePayGateway {
     /** What later `getCheckout`/`getTransparent` calls report for `id`. */
     settle(id: string, state: Partial<PaymentState>): void;
+    /** From now on, asking about `id` fails the way an Abacate outage does. */
+    cutOff(id: string): void;
     /** Every payout requested, newest last. */
     readonly payouts: readonly (NewPayout & CreatedPayout)[];
 }
@@ -29,8 +33,18 @@ const BOLETO_TTL_DAYS = 3;
 export function getFakeAbacatePay(): FakeAbacatePay {
     const states = new Map<string, PaymentState>();
     const payouts: (NewPayout & CreatedPayout)[] = [];
+    const unreachable = new Set<string>();
+    const stateOf = (id: string, method: SettledPaymentMethod | null): PaymentState => {
+        if (unreachable.has(id))
+            throw new AbacatePayError('upstream', 503, `fake outage for ${id}`);
+        return states.get(id) ?? pending(method);
+    };
+    // Unique per boot: orders outlive the process in a development database,
+    // and a restarted counter would hand a new order an old order's checkout id.
+    const boot = randomBytes(4).toString('hex');
     let sequence = 0;
-    const nextId = (prefix: string) => `${prefix}_fake_${String(++sequence).padStart(6, '0')}`;
+    const nextId = (prefix: string) =>
+        `${prefix}_fake_${boot}_${String(++sequence).padStart(6, '0')}`;
 
     return {
         payouts,
@@ -55,10 +69,10 @@ export function getFakeAbacatePay(): FakeAbacatePay {
             };
         },
         async getCheckout(checkoutId) {
-            return states.get(checkoutId) ?? pending(null);
+            return stateOf(checkoutId, null);
         },
         async getTransparent(transparentId) {
-            return states.get(transparentId) ?? pending('BOLETO');
+            return stateOf(transparentId, 'BOLETO');
         },
         async createPayout(payout) {
             const created: CreatedPayout = {
@@ -71,6 +85,9 @@ export function getFakeAbacatePay(): FakeAbacatePay {
         },
         settle(id, state) {
             states.set(id, { ...(states.get(id) ?? pending(null)), ...state });
+        },
+        cutOff(id) {
+            unreachable.add(id);
         }
     };
 }

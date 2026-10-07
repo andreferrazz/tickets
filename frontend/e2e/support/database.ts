@@ -38,6 +38,9 @@ const ADMIN_URL = `postgres://${PG_AUTH}@${PG_HOST}:${PG_PORT}/postgres`;
 // the migration bookkeeping and make the database look unmigrated.
 const SEEDED_TABLES = [
     'impersonation_tokens',
+    // The fake Abacate numbers its checkouts from one on every boot, so a log
+    // kept from an earlier run would be about this run's ids.
+    'webhook_events',
     'auth_codes',
     'invitations',
     'passes',

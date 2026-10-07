@@ -1,4 +1,5 @@
 import { readAbacatePayConfig } from '$lib/config/abacate-pay';
+import { readAbacateWebhookSecret } from '$lib/config/abacate-webhook';
 import { readRateLimitConfig } from '$lib/config/rate-limit';
 import { resolveIntegrationMode, type IntegrationMode } from '$lib/config/integrations';
 import { readSmtpConfig } from '$lib/config/smtp';
@@ -50,9 +51,19 @@ import { getEventOrderService } from '$lib/modules/orders/manager-service';
 import { getOrderMapper } from '$lib/modules/orders/mapper';
 import { getOrderStateRepository } from '$lib/modules/orders/order-state-repository';
 import { getOrderPlacement, type OrderPlacement } from '$lib/modules/orders/placement-service';
+import {
+    getOrderReconciler,
+    type OrderReconciler
+} from '$lib/modules/orders/reconciliation-service';
 import { getOrderRepository } from '$lib/modules/orders/repository';
 import { getReservationRepository } from '$lib/modules/orders/reservation-repository';
+import { getOrderSettlement } from '$lib/modules/orders/settlement-service';
 import { getStockReservation } from '$lib/modules/orders/stock-reservation';
+import {
+    getAbacateWebhook,
+    type AbacateWebhook
+} from '$lib/modules/webhooks/abacate-webhook-service';
+import { getWebhookLogRepository } from '$lib/modules/webhooks/webhook-log-repository';
 import { getOrderService } from '$lib/modules/orders/service';
 import type { EventService } from '$lib/modules/events/service';
 import { getOrganizationMapper } from '$lib/modules/organizations/mapper';
@@ -123,6 +134,10 @@ export interface Container {
     orderCancellation: OrderCancellation;
     /** Free tickets from the comp page's `send` action. */
     compTickets: CompTicketIssuer;
+    /** Payment events from Abacate Pay; `/webhooks/abacate-pay` hands every delivery to it. */
+    abacateWebhook: AbacateWebhook;
+    /** The stale-order sweep; `hooks.server.ts` runs it on a timer when switched on. */
+    orderReconciler: OrderReconciler;
     /** For the one load that signs a user in outside the auth BFF: the invite link. */
     userMapper: UserMapper;
 }
@@ -262,6 +277,22 @@ function createContainer(): Container {
         stock: stockReservation,
         freeOrders
     });
+    const orderSettlement = getOrderSettlement({
+        orderStates: orderStateRepository,
+        fulfilment: orderFulfilment,
+        stock: stockReservation
+    });
+    const abacateWebhook = getAbacateWebhook({
+        secret: readAbacateWebhookSecret(),
+        log: getWebhookLogRepository(queryable),
+        settlement: orderSettlement
+    });
+    const orderReconciler = getOrderReconciler({
+        orderStates: orderStateRepository,
+        stock: stockReservation,
+        fulfilment: orderFulfilment,
+        abacatePay
+    });
     // Process-local, like the ETS table it replaces: one instance per server.
     const rateLimiter = getFixedWindowRateLimiter();
     const rateLimits = readRateLimitConfig();
@@ -339,6 +370,8 @@ function createContainer(): Container {
         orderPlacement,
         orderCancellation,
         compTickets,
+        abacateWebhook,
+        orderReconciler,
         userMapper
     };
 }
