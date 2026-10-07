@@ -11,8 +11,7 @@ import type {
     OrganizationMembership,
     PaymentMethod,
     Payout,
-    PayoutSettings,
-    ValidateResult
+    PayoutSettings
 } from '$lib/types';
 
 const BASE = PUBLIC_API_URL;
@@ -99,12 +98,7 @@ export const api = {
             method: 'POST',
             body: { item_id: itemId, recipients }
         }),
-    cancelOrder: (id: string) => request<Order>(`/orders/${id}/cancel`, { method: 'POST' }),
-    validatePass: (eventId: string, token: string) =>
-        request<ValidateResult>(`/events/${eventId}/passes/validate`, {
-            method: 'POST',
-            body: { token }
-        })
+    cancelOrder: (id: string) => request<Order>(`/orders/${id}/cancel`, { method: 'POST' })
 };
 
 export function formatBRL(cents: number): string {

@@ -56,9 +56,10 @@ the same files `npm run db:migrate` applies everywhere else.
 | `event-management.spec.ts` | Creator builds an event through the real forms: ticket type, priced and free batches (product only for the priced one), close a batch, publish; extras and sections through the page actions | Section with extras refused; batch with sales refused; another organization's event is 404; a buyer who manages an organization cannot create |
 | `organization.spec.ts` | Leader invites a participant who joins from the emailed link; admin invites a new leader whose organization is born with the invitation and renamed on arrival; role change and removal from the team page | A GET of the link leaves it pending; used, expired and unknown links refused with their own messages; duplicate pending invitation refused; the leader row has no controls |
 | `login-modal.spec.ts` | The in-page login modal on the event page: email, code and profile steps through the same actions as the auth pages, ending signed in without leaving the event | "Change email" keeps the typed address |
+| `checkin.spec.ts` | The scanner for an event: a ticket is admitted once and the second scan shows when it was first used; an extras pass lists what to hand over; scan-only staff can validate | A pass of another event and an unknown code are refused and admit nothing; outsiders get a 404, not a 403; anonymous sent to login |
 
 ## Planned
 
 One spec per remaining migration step, added by the PR that ports the flow:
-`checkin` (10), `checkout` (11), `webhook` and `order-expiry` (12), `payout` (13).
+`checkout` (11), `webhook` and `order-expiry` (12), `payout` (13).
 The step numbers are those of the migration plan, not of `PLAN.md`.

@@ -49,6 +49,11 @@ import {
     getOrganizationService,
     type OrganizationService
 } from '$lib/modules/organizations/service';
+import {
+    getPassCheckInService,
+    type PassCheckInService
+} from '$lib/modules/passes/checkin-service';
+import { getPassRepository } from '$lib/modules/passes/repository';
 import { getSessionRepository } from '$lib/modules/sessions/repository';
 import { getSessionService } from '$lib/modules/sessions/service';
 import type { SessionService } from '$lib/modules/sessions/service';
@@ -98,6 +103,8 @@ export interface Container {
     /** Membership and rename writes; the team and onboarding actions call it directly. */
     organizations: OrganizationService;
     invitationWrites: InvitationWriteService;
+    /** Pass validation at the door; the scan page's load and action call it directly. */
+    passCheckIn: PassCheckInService;
     /** For the one load that signs a user in outside the auth BFF: the invite link. */
     userMapper: UserMapper;
 }
@@ -140,6 +147,7 @@ function createContainer(): Container {
     const authCodeRepository = getAuthCodeRepository(queryable);
     const impersonationRepository = getImpersonationRepository(queryable);
     const eventManagementRepository = getEventManagementRepository(queryable);
+    const passRepository = getPassRepository(queryable);
 
     // services
     const sessionService = getSessionService(sessionRepository);
@@ -170,6 +178,11 @@ function createContainer(): Container {
         invitations: invitationRepository,
         organizations: organizationRepository,
         mailer
+    });
+    const passCheckIn = getPassCheckInService({
+        passes: passRepository,
+        events: eventRepository,
+        organizations: organizationRepository
     });
     const profileService = getProfileService({ users: userRepository, abacatePay });
     const invitationWrites = getInvitationWriteService({
@@ -261,6 +274,7 @@ function createContainer(): Container {
         eventManagement,
         organizations: organizationService,
         invitationWrites,
+        passCheckIn,
         userMapper
     };
 }
