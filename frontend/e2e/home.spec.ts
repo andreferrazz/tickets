@@ -7,6 +7,8 @@ import {
     OWN_ORG_DRAFT,
     PUBLISHED_EVENT
 } from './support/fixtures';
+import { waitForHydration } from './support/hydration';
+import { withoutScripts } from './support/html';
 
 import { signIn } from './support/session';
 
@@ -21,9 +23,10 @@ test('an anonymous visitor sees published events and no drafts', async ({ page }
 test('the event list is server-rendered, before any JavaScript runs', async ({ request }) => {
     const response = await request.get('/');
     const html = await response.text();
+    const htmlMarkup = withoutScripts(html);
 
     expect(response.status()).toBe(200);
-    expect(html).toContain(PUBLISHED_EVENT.title);
+    expect(htmlMarkup).toContain(PUBLISHED_EVENT.title);
     // Drafts must not leak into anonymous HTML even though the page is prerendered
     // on the server, which is where a visibility bug would be invisible in the UI.
     expect(html).not.toContain(OWN_ORG_DRAFT.title);
@@ -53,11 +56,10 @@ test('an admin sees drafts from an organization they do not belong to', async ({
 });
 
 // The form has no submit button, so ticking the box only submits once the page
-// has hydrated. Waiting for the network to settle asserts that path instead of
-// racing it.
+// has hydrated.
 test('closed events stay hidden until the visitor asks for them', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await waitForHydration(page);
     await expect(page.getByRole('heading', { name: CLOSED_EVENT.title })).toHaveCount(0);
 
     await page.getByRole('checkbox').check();
@@ -71,9 +73,10 @@ test('closed events stay hidden until the visitor asks for them', async ({ page 
 // a regression can't hide behind client-side rendering.
 test('the closed filter is applied server-side', async ({ request }) => {
     const withClosed = await (await request.get('/?closed=1')).text();
+    const withClosedMarkup = withoutScripts(withClosed);
     const withoutClosed = await (await request.get('/')).text();
 
-    expect(withClosed).toContain(CLOSED_EVENT.title);
+    expect(withClosedMarkup).toContain(CLOSED_EVENT.title);
     expect(withoutClosed).not.toContain(CLOSED_EVENT.title);
 });
 

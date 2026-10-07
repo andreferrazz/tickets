@@ -8,6 +8,7 @@ import {
     MISSING_EVENT_ID,
     PUBLISHED_EVENT
 } from './support/fixtures';
+import { withoutScripts } from './support/html';
 import { signIn } from './support/session';
 
 test('an anonymous visitor is sent to log in and brought back afterwards', async ({ request }) => {
@@ -36,8 +37,10 @@ test('the order list is server-rendered', async ({ context, page }) => {
 
     const html = await (await page.request.get('/orders')).text();
 
-    expect(html).toContain(PUBLISHED_EVENT.title);
-    expect(html).toContain(MEMBER_PAID_ORDER.id);
+    const htmlMarkup = withoutScripts(html);
+
+    expect(htmlMarkup).toContain(PUBLISHED_EVENT.title);
+    expect(htmlMarkup).toContain(MEMBER_PAID_ORDER.id);
     expect(html).not.toContain(ADMIN_ORDER.id);
 });
 
@@ -46,11 +49,13 @@ test('a paid order shows its items, total and one QR code per pass', async ({ co
 
     const html = await (await page.request.get(`/orders/${MEMBER_PAID_ORDER.id}`)).text();
 
-    expect(html).toContain('E2E Pista × 2');
-    expect(html).toContain('246,90');
-    expect(html.split('data:image/png;base64,').length - 1).toBe(2);
+    const htmlMarkup = withoutScripts(html);
+
+    expect(htmlMarkup).toContain('E2E Pista × 2');
+    expect(htmlMarkup).toContain('246,90');
+    expect(htmlMarkup.split('data:image/png;base64,').length - 1).toBe(2);
     // One of the two seeded passes has already been scanned.
-    expect(html.split('Já validado').length - 1).toBe(1);
+    expect(htmlMarkup.split('Já validado').length - 1).toBe(1);
 });
 
 test('a pending order offers the payment link', async ({ context, page }) => {
@@ -78,4 +83,14 @@ test('another buyer’s order, a missing id and a malformed id are all 404', asy
         expect(response.status(), id).toBe(404);
         expect(await response.text()).not.toContain(CLOSED_EVENT.title);
     }
+});
+
+// A miss outside /events/[id] used to fall through to SvelteKit's bare page.
+test('a missing order shows the app\u2019s own error page', async ({ context, page }) => {
+    await signIn(context, MEMBER.token);
+
+    await page.goto(`/orders/${MISSING_EVENT_ID}`);
+
+    await expect(page.getByText('Página não encontrada.')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Eventos' }).first()).toBeVisible();
 });
