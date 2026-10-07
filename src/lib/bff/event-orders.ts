@@ -14,7 +14,13 @@ export interface EventOrdersBff {
     index(user: SessionUser, eventId: string): Promise<EventOrdersData>;
 }
 
-export function getEventOrdersBff(service: EventOrderService, mapper: OrderMapper): EventOrdersBff {
+export function getEventOrdersBff({
+    service,
+    mapper
+}: {
+    service: EventOrderService;
+    mapper: OrderMapper;
+}): EventOrdersBff {
     return {
         async index(user, eventId) {
             try {

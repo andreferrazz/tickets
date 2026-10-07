@@ -4,6 +4,7 @@ import { readRateLimitConfig } from '$lib/config/rate-limit';
 import { resolveIntegrationMode, type IntegrationMode } from '$lib/config/integrations';
 import { readSmtpConfig } from '$lib/config/smtp';
 import { getQueryableInstance } from '$lib/db/pool';
+import type { Queryable } from '$lib/db/queryable';
 import { getFakeAbacatePay, type FakeAbacatePay } from '$lib/integrations/abacate-pay/fake';
 import type { AbacatePayGateway } from '$lib/integrations/abacate-pay/gateway';
 import { getLiveAbacatePay } from '$lib/integrations/abacate-pay/live';
@@ -93,17 +94,17 @@ import { getOrdersBff, type OrdersBff } from './bff/orders';
 import { getOrganizationsBff, type OrganizationsBff } from './bff/organizations';
 import { getScanBff, type ScanBff } from './bff/scan';
 
-/**
- * Everything a request handler is allowed to reach for. One entry per domain
- * module, exposing that module's service — repositories stay an implementation
- * detail of the module that owns them.
- */
 /** The in-process stand-ins, kept reachable so test-only routes can inspect them. */
 export interface IntegrationFakes {
     mailer: FakeMailer;
     abacatePay: FakeAbacatePay;
 }
 
+/**
+ * Everything a request handler is allowed to reach for. One entry per domain
+ * module, exposing that module's service — repositories stay an implementation
+ * detail of the module that owns them.
+ */
 export interface Container {
     /** Which Abacate Pay and mail implementations this graph was built with. */
     integrationMode: IntegrationMode;
@@ -161,231 +162,294 @@ export function getContainer(): Container {
 
 function createContainer(): Container {
     const integrationMode = resolveIntegrationMode();
-
-    // integrations: the one place the fake/live choice is made. Live config is
-    // only read on the live branch, so a fake run needs no secrets at all.
-    const fakes: IntegrationFakes | null =
-        integrationMode === 'fake'
-            ? { mailer: getFakeMailer(), abacatePay: getFakeAbacatePay() }
-            : null;
-    const abacatePay = fakes?.abacatePay ?? getLiveAbacatePay(readAbacatePayConfig());
-    const mailer = fakes?.mailer ?? getSmtpMailer(readSmtpConfig());
-
-    // repositories
+    const integrations = buildIntegrations(integrationMode);
     const queryable = getQueryableInstance();
-    const sessionRepository = getSessionRepository(queryable);
-    const eventRepository = getEventRepository(queryable);
-    const eventDetailRepository = getEventDetailRepository(queryable);
-    const orderRepository = getOrderRepository(queryable);
-    const organizationRepository = getOrganizationRepository(queryable);
-    const invitationRepository = getInvitationRepository(queryable);
-    const userRepository = getUserRepository(queryable);
-    const eventStatsRepository = getEventStatsRepository(queryable);
-    const authCodeRepository = getAuthCodeRepository(queryable);
-    const impersonationRepository = getImpersonationRepository(queryable);
-    const eventManagementRepository = getEventManagementRepository(queryable);
-    const passRepository = getPassRepository(queryable);
-    const reservationRepository = getReservationRepository(queryable);
-    const orderStateRepository = getOrderStateRepository(queryable);
+    const repositories = buildRepositories(queryable);
+    const mappers = buildMappers();
+    const core = buildCoreServices({ queryable, repositories, integrations });
+    const orders = buildOrderServices({ queryable, repositories, integrations, core });
+    const bffs = buildBffs({ repositories, mappers, core });
+    return {
+        integrationMode,
+        ...integrations,
+        sessionService: core.sessionService,
+        eventService: core.eventService,
+        ...bffs,
+        eventManagement: core.eventManagement,
+        organizations: core.organizationService,
+        invitationWrites: core.invitationWrites,
+        passCheckIn: core.passCheckIn,
+        ...orders,
+        userMapper: mappers.userMapper
+    };
+}
 
-    // services
-    const sessionService = getSessionService(sessionRepository);
-    const eventService = getEventService(eventRepository);
-    const eventDetailService = getEventDetailService(eventDetailRepository);
-    const orderService = getOrderService(orderRepository);
-    const organizationService = getOrganizationService(organizationRepository);
+type Integrations = Pick<Container, 'fakes' | 'abacatePay' | 'mailer'>;
+type Repositories = ReturnType<typeof buildRepositories>;
+type Mappers = ReturnType<typeof buildMappers>;
+type CoreServices = ReturnType<typeof buildCoreServices>;
+type OrderServices = Pick<
+    Container,
+    | 'orderPlacement'
+    | 'orderCancellation'
+    | 'compTickets'
+    | 'payouts'
+    | 'abacateWebhook'
+    | 'orderReconciler'
+>;
+type Bffs = Pick<
+    Container,
+    | 'homeBff'
+    | 'eventsBff'
+    | 'ordersBff'
+    | 'dashboardBff'
+    | 'eventOrdersBff'
+    | 'organizationsBff'
+    | 'adminBff'
+    | 'scanBff'
+    | 'authBff'
+    | 'eventManagementBff'
+>;
+
+// The one place the fake/live choice is made. Live config is only read on the
+// live branch, so a fake run needs no secrets at all.
+function buildIntegrations(mode: IntegrationMode): Integrations {
+    const fakes: IntegrationFakes | null =
+        mode === 'fake' ? { mailer: getFakeMailer(), abacatePay: getFakeAbacatePay() } : null;
+    const abacatePay = fakes?.abacatePay ?? getLiveAbacatePay({ config: readAbacatePayConfig() });
+    const mailer = fakes?.mailer ?? getSmtpMailer(readSmtpConfig());
+    return { fakes, abacatePay, mailer };
+}
+
+function buildRepositories(queryable: Queryable) {
+    return {
+        sessions: getSessionRepository({ queryable }),
+        events: getEventRepository({ queryable }),
+        eventDetails: getEventDetailRepository({ queryable }),
+        orders: getOrderRepository({ queryable }),
+        organizations: getOrganizationRepository({ queryable }),
+        invitations: getInvitationRepository({ queryable }),
+        users: getUserRepository({ queryable }),
+        eventStats: getEventStatsRepository({ queryable }),
+        authCodes: getAuthCodeRepository({ queryable }),
+        impersonations: getImpersonationRepository({ queryable }),
+        eventManagement: getEventManagementRepository({ queryable }),
+        passes: getPassRepository({ queryable }),
+        reservations: getReservationRepository({ queryable }),
+        orderStates: getOrderStateRepository({ queryable }),
+        webhookLog: getWebhookLogRepository({ queryable }),
+        payouts: getPayoutRepository({ queryable })
+    };
+}
+
+function buildMappers() {
+    const eventMapper = getEventMapper();
+    return {
+        eventMapper,
+        eventDetailMapper: getEventDetailMapper({ mapper: eventMapper }),
+        orderMapper: getOrderMapper(),
+        eventStatsMapper: getEventStatsMapper(),
+        organizationMapper: getOrganizationMapper(),
+        invitationMapper: getInvitationMapper(),
+        userMapper: getUserMapper()
+    };
+}
+
+interface CoreServiceDeps {
+    queryable: Queryable;
+    repositories: Repositories;
+    integrations: Integrations;
+}
+
+// Everything that is not the money path: who the caller is, what they may see
+// and manage, and how they got in.
+function buildCoreServices({ queryable, repositories: repos, integrations }: CoreServiceDeps) {
+    const { abacatePay, mailer } = integrations;
+    const organizationService = getOrganizationService({ repository: repos.organizations });
+    const eventDetailService = getEventDetailService({ repository: repos.eventDetails });
     const managedEvents = getManagedEventFinder({
-        events: eventRepository,
-        organizations: organizationService
-    });
-    const eventStatsService = getEventStatsService({
-        managedEvents,
-        details: eventDetailService,
-        stats: eventStatsRepository,
-        organizations: organizationService
-    });
-    const eventOrderService = getEventOrderService({ orders: orderRepository, managedEvents });
-    const invitationService = getInvitationService({
-        invitations: invitationRepository,
+        events: repos.events,
         organizations: organizationService
     });
     const authService = getAuthService({
         queryable,
-        users: userRepository,
-        authCodes: authCodeRepository,
-        sessions: sessionRepository,
-        invitations: invitationRepository,
-        organizations: organizationRepository,
+        users: repos.users,
+        authCodes: repos.authCodes,
+        sessions: repos.sessions,
+        invitations: repos.invitations,
+        organizations: repos.organizations,
         mailer
     });
-    const passCheckIn = getPassCheckInService({
-        passes: passRepository,
-        events: eventRepository,
-        organizations: organizationRepository
-    });
-    const profileService = getProfileService({ users: userRepository, abacatePay });
-    const invitationWrites = getInvitationWriteService({
-        queryable,
-        invitations: invitationRepository,
-        organizations: organizationRepository,
+    return {
         organizationService,
-        users: userRepository,
-        auth: authService,
+        eventDetailService,
+        managedEvents,
+        authService,
+        sessionService: getSessionService({ repository: repos.sessions }),
+        eventService: getEventService({ repository: repos.events }),
+        orderService: getOrderService({ repository: repos.orders }),
+        eventStatsService: getEventStatsService({
+            managedEvents,
+            details: eventDetailService,
+            stats: repos.eventStats,
+            organizations: organizationService
+        }),
+        eventOrderService: getEventOrderService({ orders: repos.orders, managedEvents }),
+        invitationService: getInvitationService({
+            invitations: repos.invitations,
+            organizations: organizationService
+        }),
+        passCheckIn: getPassCheckInService({
+            passes: repos.passes,
+            events: repos.events,
+            organizations: repos.organizations
+        }),
+        profileService: getProfileService({ users: repos.users, abacatePay }),
+        invitationWrites: getInvitationWriteService({
+            queryable,
+            invitations: repos.invitations,
+            organizations: repos.organizations,
+            organizationService,
+            users: repos.users,
+            auth: authService,
+            mailer
+        }),
+        eventManagement: getEventManagementService({
+            queryable,
+            repository: repos.eventManagement,
+            managedEvents,
+            organizations: organizationService,
+            abacatePay
+        })
+    };
+}
+
+interface OrderServiceDeps extends CoreServiceDeps {
+    core: CoreServices;
+}
+
+// The money path: reserving stock, placing and settling orders, paying out.
+function buildOrderServices(deps: OrderServiceDeps): OrderServices {
+    const { queryable, repositories: repos, core } = deps;
+    const { abacatePay, mailer } = deps.integrations;
+    const { managedEvents } = core;
+    const orderStates = repos.orderStates;
+    const cart = getCartResolver({ reservations: repos.reservations });
+    const stock = getStockReservation({
+        queryable,
+        reservations: repos.reservations,
+        passes: repos.passes
+    });
+    const fulfilment = getOrderFulfilment({
+        queryable,
+        orderStates,
+        orders: repos.orders,
+        passes: repos.passes,
         mailer
     });
-    const eventManagement = getEventManagementService({
-        queryable,
-        repository: eventManagementRepository,
-        managedEvents,
-        organizations: organizationService,
-        abacatePay
-    });
-    const cartResolver = getCartResolver(reservationRepository);
-    const stockReservation = getStockReservation({
-        queryable,
-        reservations: reservationRepository,
-        passes: passRepository
-    });
-    const orderFulfilment = getOrderFulfilment({
-        queryable,
-        orderStates: orderStateRepository,
-        orders: orderRepository,
-        passes: passRepository,
-        mailer
-    });
-    const freeOrders = getFreeOrderSettlement({
-        orderStates: orderStateRepository,
-        fulfilment: orderFulfilment,
-        stock: stockReservation
-    });
-    const orderPlacement = getOrderPlacement({
-        events: eventRepository,
-        users: userRepository,
-        cart: cartResolver,
-        stock: stockReservation,
-        freeOrders,
-        orderStates: orderStateRepository,
-        abacatePay
-    });
-    const orderCancellation = getOrderCancellation({
-        orderStates: orderStateRepository,
-        stock: stockReservation,
-        managedEvents,
-        abacatePay,
-        fulfilment: orderFulfilment
-    });
-    const compTickets = getCompTicketIssuer({
-        managedEvents,
-        users: userRepository,
-        cart: cartResolver,
-        stock: stockReservation,
-        freeOrders
-    });
-    const orderSettlement = getOrderSettlement({
-        orderStates: orderStateRepository,
-        fulfilment: orderFulfilment,
-        stock: stockReservation
-    });
-    const abacateWebhook = getAbacateWebhook({
-        secret: readAbacateWebhookSecret(),
-        log: getWebhookLogRepository(queryable),
-        settlement: orderSettlement
-    });
-    const orderReconciler = getOrderReconciler({
-        orderStates: orderStateRepository,
-        stock: stockReservation,
-        fulfilment: orderFulfilment,
-        abacatePay
-    });
-    const payouts = getPayoutService({
-        queryable,
-        payouts: getPayoutRepository(queryable),
-        stats: eventStatsService,
-        organizations: organizationRepository,
-        abacatePay
-    });
-    // Process-local, like the ETS table it replaces: one instance per server.
-    const rateLimiter = getFixedWindowRateLimiter();
+    const freeOrders = getFreeOrderSettlement({ orderStates, fulfilment, stock });
+    const settlement = getOrderSettlement({ orderStates, fulfilment, stock });
+    return {
+        orderPlacement: getOrderPlacement({
+            events: repos.events,
+            users: repos.users,
+            cart,
+            stock,
+            freeOrders,
+            orderStates,
+            abacatePay
+        }),
+        orderCancellation: getOrderCancellation({
+            orderStates,
+            stock,
+            managedEvents,
+            abacatePay,
+            fulfilment
+        }),
+        compTickets: getCompTicketIssuer({
+            managedEvents,
+            users: repos.users,
+            cart,
+            stock,
+            freeOrders
+        }),
+        abacateWebhook: getAbacateWebhook({
+            secret: readAbacateWebhookSecret(),
+            log: repos.webhookLog,
+            settlement
+        }),
+        orderReconciler: getOrderReconciler({ orderStates, stock, fulfilment, abacatePay }),
+        payouts: getPayoutService({
+            queryable,
+            payouts: repos.payouts,
+            stats: core.eventStatsService,
+            organizations: repos.organizations,
+            abacatePay
+        })
+    };
+}
+
+interface BffDeps {
+    repositories: Repositories;
+    mappers: Mappers;
+    core: CoreServices;
+}
+
+function buildBffs({ repositories: repos, mappers, core }: BffDeps): Bffs {
+    const { eventMapper, orderMapper, invitationMapper, userMapper } = mappers;
+    return {
+        homeBff: getHomeBff({ service: core.eventService, mapper: eventMapper }),
+        eventsBff: getEventDetailBff({
+            service: core.eventService,
+            detailService: core.eventDetailService,
+            mapper: mappers.eventDetailMapper
+        }),
+        ordersBff: getOrdersBff({ service: core.orderService, mapper: orderMapper }),
+        dashboardBff: getDashboardBff({
+            service: core.eventStatsService,
+            mapper: mappers.eventStatsMapper
+        }),
+        eventOrdersBff: getEventOrdersBff({ service: core.eventOrderService, mapper: orderMapper }),
+        organizationsBff: getOrganizationsBff({
+            organizations: core.organizationService,
+            organizationMapper: mappers.organizationMapper,
+            invitations: core.invitationService,
+            invitationMapper
+        }),
+        adminBff: getAdminBff({
+            invitations: core.invitationService,
+            invitationMapper,
+            users: repos.users,
+            userMapper
+        }),
+        scanBff: getScanBff({
+            events: core.eventService,
+            eventMapper,
+            organizations: core.organizationService
+        }),
+        eventManagementBff: getEventManagementBff({
+            managedEvents: core.managedEvents,
+            details: core.eventDetailService,
+            detailMapper: mappers.eventDetailMapper
+        }),
+        authBff: buildAuthBff({ repositories: repos, mappers, core })
+    };
+}
+
+function buildAuthBff({ repositories: repos, mappers, core }: BffDeps): AuthBff {
     const rateLimits = readRateLimitConfig();
-
-    // mappers
-    const eventMapper = getEventMapper();
-    const eventDetailMapper = getEventDetailMapper(eventMapper);
-    const orderMapper = getOrderMapper();
-    const eventStatsMapper = getEventStatsMapper();
-    const organizationMapper = getOrganizationMapper();
-    const invitationMapper = getInvitationMapper();
-    const userMapper = getUserMapper();
-
-    // bff
-    const homeBff = getHomeBff(eventService, eventMapper);
-    const eventsBff = getEventDetailBff(eventService, eventDetailService, eventDetailMapper);
-    const ordersBff = getOrdersBff(orderService, orderMapper);
-    const dashboardBff = getDashboardBff(eventStatsService, eventStatsMapper);
-    const eventOrdersBff = getEventOrdersBff(eventOrderService, orderMapper);
-    const organizationsBff = getOrganizationsBff({
-        organizations: organizationService,
-        organizationMapper,
-        invitations: invitationService,
-        invitationMapper
-    });
-    const adminBff = getAdminBff({
-        invitations: invitationService,
-        invitationMapper,
-        users: userRepository,
-        userMapper
-    });
-    const scanBff = getScanBff({
-        events: eventService,
-        eventMapper,
-        organizations: organizationService
-    });
-    const eventManagementBff = getEventManagementBff({
-        managedEvents,
-        details: eventDetailService,
-        detailMapper: eventDetailMapper
-    });
-    const authBff = getAuthBff({
-        auth: authService,
-        profile: profileService,
-        users: userRepository,
-        organizations: organizationRepository,
-        userMapper,
-        rateLimiter,
+    return getAuthBff({
+        auth: core.authService,
+        profile: core.profileService,
+        users: repos.users,
+        organizations: repos.organizations,
+        userMapper: mappers.userMapper,
+        // Process-local, like the ETS table it replaces: one instance per server.
+        rateLimiter: getFixedWindowRateLimiter(),
         requestCodeLimit: rateLimits.requestCodePerMinute,
         verifyAttemptLimit: rateLimits.verifyAttemptsPerCode,
-        impersonations: impersonationRepository
+        impersonations: repos.impersonations
     });
-
-    return {
-        integrationMode,
-        fakes,
-        abacatePay,
-        mailer,
-        sessionService,
-        eventService,
-        homeBff,
-        eventsBff,
-        ordersBff,
-        dashboardBff,
-        eventOrdersBff,
-        organizationsBff,
-        adminBff,
-        scanBff,
-        authBff,
-        eventManagementBff,
-        eventManagement,
-        organizations: organizationService,
-        invitationWrites,
-        passCheckIn,
-        orderPlacement,
-        orderCancellation,
-        compTickets,
-        payouts,
-        abacateWebhook,
-        orderReconciler,
-        userMapper
-    };
 }
 
 let container: Container | null;

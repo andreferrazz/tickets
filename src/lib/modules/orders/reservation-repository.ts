@@ -72,7 +72,11 @@ export interface ReservationRepository {
 
 const NOW = "now() at time zone 'utc'";
 
-export function getReservationRepository(queryable: Queryable): ReservationRepository {
+export function getReservationRepository({
+    queryable
+}: {
+    queryable: Queryable;
+}): ReservationRepository {
     return {
         // The open batch with the lowest sequence is the one on sale, as
         // `Backend.Events.active_batch/1` picked it.

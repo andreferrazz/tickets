@@ -15,11 +15,15 @@ export interface EventsBff {
     show(user: SessionUser | null, id: string): Promise<EventsData>;
 }
 
-export function getEventDetailBff(
-    service: EventService,
-    detailService: EventDetailService,
-    mapper: EventDetailMapper
-): EventsBff {
+export function getEventDetailBff({
+    service,
+    detailService,
+    mapper
+}: {
+    service: EventService;
+    detailService: EventDetailService;
+    mapper: EventDetailMapper;
+}): EventsBff {
     return {
         async show(user, id): Promise<EventsData> {
             try {

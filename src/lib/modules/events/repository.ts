@@ -24,7 +24,7 @@ export interface EventRepository {
     listEventsForOrganizations(organizationIds: readonly string[]): Promise<EventRow[]>;
 }
 
-export function getEventRepository(queryable: Queryable): EventRepository {
+export function getEventRepository({ queryable }: { queryable: Queryable }): EventRepository {
     return {
         listPublicEvents() {
             const sql = `

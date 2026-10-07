@@ -20,7 +20,11 @@ export interface CartResolver {
     ): Promise<OrderOutcome<ReservableLine[], CartFailure>>;
 }
 
-export function getCartResolver(reservations: ReservationRepository): CartResolver {
+export function getCartResolver({
+    reservations
+}: {
+    reservations: ReservationRepository;
+}): CartResolver {
     const resolveTicket = async (eventId: string, line: CartLine): Promise<Resolved> => {
         const ticket = await reservations.findSellableTicket(line.itemId);
         if (!ticket || ticket.event_id !== eventId) return { ok: false, failure: 'invalid_item' };

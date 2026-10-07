@@ -14,7 +14,7 @@ export interface SessionRepository {
     deleteByToken(token: string): Promise<void>;
 }
 
-export function getSessionRepository(queryable: Queryable): SessionRepository {
+export function getSessionRepository({ queryable }: { queryable: Queryable }): SessionRepository {
     return {
         async findUserByToken(token: string): Promise<SessionUser | null> {
             const sql = `

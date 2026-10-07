@@ -22,7 +22,11 @@ export interface EventDetailRepository {
     listExtraItems(eventId: string): Promise<ExtraItemRow[]>;
 }
 
-export function getEventDetailRepository(queryable: Queryable): EventDetailRepository {
+export function getEventDetailRepository({
+    queryable
+}: {
+    queryable: Queryable;
+}): EventDetailRepository {
     return {
         listTicketTypes(eventId: string) {
             const sql = `

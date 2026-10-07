@@ -40,7 +40,7 @@ export interface PayoutRepository {
 const BLOCKING_STATUSES: readonly PayoutStatus[] = ['pending', 'complete', 'refunded', 'expired'];
 const NOW = "now() at time zone 'utc'";
 
-export function getPayoutRepository(queryable: Queryable): PayoutRepository {
+export function getPayoutRepository({ queryable }: { queryable: Queryable }): PayoutRepository {
     return {
         listRecent(eventId, limit) {
             const sql = `

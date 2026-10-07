@@ -50,7 +50,11 @@ export interface OrganizationService {
     ): Promise<OrganizationResult>;
 }
 
-export function getOrganizationService(repository: OrganizationRepository): OrganizationService {
+export function getOrganizationService({
+    repository
+}: {
+    repository: OrganizationRepository;
+}): OrganizationService {
     return {
         async canManage(user, organizationId) {
             return (await this.managerRoleFor(user, organizationId)) !== null;

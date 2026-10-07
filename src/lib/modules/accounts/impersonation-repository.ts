@@ -22,7 +22,11 @@ export interface ImpersonationRepository {
 
 const LIVE = `used_at is null and expires_at > (now() at time zone 'utc')`;
 
-export function getImpersonationRepository(queryable: Queryable): ImpersonationRepository {
+export function getImpersonationRepository({
+    queryable
+}: {
+    queryable: Queryable;
+}): ImpersonationRepository {
     return {
         async insert(row) {
             const sql = `

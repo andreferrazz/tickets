@@ -15,7 +15,7 @@ export interface OrderService {
     getForBuyer(user: SessionUser, id: string): Promise<OrderDetail | null>;
 }
 
-export function getOrderService(repository: OrderRepository): OrderService {
+export function getOrderService({ repository }: { repository: OrderRepository }): OrderService {
     return {
         async listForBuyer(user) {
             const orders = await repository.listForBuyer(user.id);
