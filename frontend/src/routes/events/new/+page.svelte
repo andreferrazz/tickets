@@ -1,25 +1,23 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { api } from '$lib/api';
-	import EventForm from '$lib/components/EventForm.svelte';
-	import { t } from '$lib/i18n';
-	import { auth } from '$lib/stores/auth.svelte';
-	import type { Event } from '$lib/types';
-	import { onMount } from 'svelte';
+    import EventForm from '$lib/components/EventForm.svelte';
+    import { t } from '$lib/i18n';
+    import type { ActionData } from './$types';
 
-	onMount(() => {
-		if (!auth.isAuthed) goto('/auth/login');
-		else if (!auth.isCreator) goto('/');
-	});
+    let { form }: { form: ActionData } = $props();
 
-	async function save(data: Partial<Event>) {
-		const ev = await api.createEvent(data);
-		await goto(`/events/${ev.id}/edit`);
-	}
+    // An admin reaches this page but belongs to no organization, so the server
+    // cannot place the event; the message says so rather than a generic failure.
+    const error = $derived(
+        form?.error === 'organization_id_required'
+            ? t('eventNew.noOrganization')
+            : form?.error
+              ? t('eventForm.saveFailed')
+              : null
+    );
 </script>
 
 <h1>{t('eventNew.title')}</h1>
 <p class="muted">{t('eventNew.subtitle')}</p>
 <div class="card" style="margin-top: 1rem;">
-	<EventForm submitLabel={t('eventNew.cta')} onSubmit={save} />
+    <EventForm submitLabel={t('eventNew.cta')} action="?/create" {error} />
 </div>

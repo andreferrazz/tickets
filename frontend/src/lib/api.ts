@@ -100,28 +100,6 @@ export const api = {
         request<OrganizationMembership[]>('/me/organizations', { fetcher }),
     getEvent: (id: string, fetcher?: typeof fetch) =>
         request<EventDetail>(`/events/${id}`, { fetcher }),
-    createEvent: (body: Partial<Event>) => request<Event>('/events', { method: 'POST', body }),
-    updateEvent: (id: string, body: Partial<Event>) =>
-        request<Event>(`/events/${id}`, { method: 'PUT', body }),
-    deleteEvent: (id: string) => request<{ deleted: true }>(`/events/${id}`, { method: 'DELETE' }),
-    createTicketType: (eventId: string, body: Pick<TicketType, 'name'> & Partial<TicketType>) =>
-        request<TicketType>(`/events/${eventId}/ticket-types`, { method: 'POST', body }),
-    updateTicketType: (id: string, body: Partial<TicketType>) =>
-        request<TicketType>(`/ticket-types/${id}`, { method: 'PUT', body }),
-    deleteTicketType: (id: string) =>
-        request<{ deleted: true }>(`/ticket-types/${id}`, { method: 'DELETE' }),
-    createBatch: (ticketTypeId: string, body: Pick<Batch, 'price_cents' | 'quantity_total'>) =>
-        request<Batch>(`/ticket-types/${ticketTypeId}/batches`, { method: 'POST', body }),
-    updateBatch: (id: string, body: Partial<Pick<Batch, 'price_cents' | 'quantity_total'>>) =>
-        request<Batch>(`/batches/${id}`, { method: 'PUT', body }),
-    closeBatch: (id: string) =>
-        request<Batch>(`/batches/${id}/close`, { method: 'POST', body: {} }),
-    deleteBatch: (id: string) => request<{ deleted: true }>(`/batches/${id}`, { method: 'DELETE' }),
-    createExtra: (eventId: string, body: Partial<ExtraItem> & { section_id: string }) =>
-        request<ExtraItem>(`/events/${eventId}/extras`, { method: 'POST', body }),
-    updateExtra: (id: string, body: Partial<ExtraItem>) =>
-        request<ExtraItem>(`/extras/${id}`, { method: 'PUT', body }),
-    deleteExtra: (id: string) => request<{ deleted: true }>(`/extras/${id}`, { method: 'DELETE' }),
     updatePayoutSettings: (orgId: string, body: PayoutSettings) =>
         request<Organization>(`/organizations/${orgId}/payout-settings`, {
             method: 'PATCH',
@@ -130,12 +108,6 @@ export const api = {
     createPayout: (eventId: string, body: { amount_cents: number }) =>
         request<Payout>(`/events/${eventId}/payouts`, { method: 'POST', body }),
     listPayouts: (eventId: string) => request<Payout[]>(`/events/${eventId}/payouts`),
-    createExtraSection: (eventId: string, body: Partial<ExtraSection>) =>
-        request<ExtraSection>(`/events/${eventId}/extra-sections`, { method: 'POST', body }),
-    updateExtraSection: (id: string, body: Partial<ExtraSection>) =>
-        request<ExtraSection>(`/extra-sections/${id}`, { method: 'PUT', body }),
-    deleteExtraSection: (id: string) =>
-        request<{ deleted: true }>(`/extra-sections/${id}`, { method: 'DELETE' }),
     createOrder: (event_id: string, items: CartLine[], payment_method?: PaymentMethod) =>
         request<Order>('/orders', {
             method: 'POST',

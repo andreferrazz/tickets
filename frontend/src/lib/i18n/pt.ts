@@ -277,6 +277,7 @@ export const pt = {
     'eventNew.title': 'Novo evento',
     'eventNew.subtitle': 'Crie o evento e depois adicione tipos de ingresso e complementos.',
     'eventNew.cta': 'Criar evento',
+    'eventNew.noOrganization': 'Você precisa fazer parte de exatamente uma organização para criar eventos.',
 
     // Event edit
     'eventEdit.title': 'Editar evento',

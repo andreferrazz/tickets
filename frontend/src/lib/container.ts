@@ -20,6 +20,11 @@ import { getEventDetailService } from '$lib/modules/events/detail-service';
 import { getEventMapper } from '$lib/modules/events/mapper';
 import { getEventRepository } from '$lib/modules/events/repository';
 import { getManagedEventFinder } from '$lib/modules/events/managed-event';
+import { getEventManagementRepository } from '$lib/modules/events/management-repository';
+import {
+    getEventManagementService,
+    type EventManagementService
+} from '$lib/modules/events/management-service';
 import { getEventService } from '$lib/modules/events/service';
 import { getEventStatsMapper } from '$lib/modules/events/stats-mapper';
 import { getEventStatsRepository } from '$lib/modules/events/stats-repository';
@@ -43,6 +48,7 @@ import { getHomeBff, type HomeBff } from './bff/home';
 import { getAdminBff, type AdminBff } from './bff/admin';
 import { getAuthBff, type AuthBff } from './bff/auth';
 import { getDashboardBff, type DashboardBff } from './bff/dashboard';
+import { getEventManagementBff, type EventManagementBff } from './bff/event-management';
 import { getEventOrdersBff, type EventOrdersBff } from './bff/event-orders';
 import { getOrdersBff, type OrdersBff } from './bff/orders';
 import { getOrganizationsBff, type OrganizationsBff } from './bff/organizations';
@@ -69,6 +75,9 @@ export interface Container {
     adminBff: AdminBff;
     scanBff: ScanBff;
     authBff: AuthBff;
+    eventManagementBff: EventManagementBff;
+    /** Writes behind the event edit page; the actions call it directly. */
+    eventManagement: EventManagementService;
 }
 
 /**
@@ -106,6 +115,7 @@ function createContainer(): Container {
     const userRepository = getUserRepository(queryable);
     const eventStatsRepository = getEventStatsRepository(queryable);
     const authCodeRepository = getAuthCodeRepository(queryable);
+    const eventManagementRepository = getEventManagementRepository(queryable);
 
     // services
     const sessionService = getSessionService(sessionRepository);
@@ -138,6 +148,13 @@ function createContainer(): Container {
         mailer
     });
     const profileService = getProfileService({ users: userRepository, abacatePay });
+    const eventManagement = getEventManagementService({
+        queryable,
+        repository: eventManagementRepository,
+        managedEvents,
+        organizations: organizationService,
+        abacatePay
+    });
     // Process-local, like the ETS table it replaces: one instance per server.
     const rateLimiter = getFixedWindowRateLimiter();
 
@@ -173,6 +190,11 @@ function createContainer(): Container {
         eventMapper,
         organizations: organizationService
     });
+    const eventManagementBff = getEventManagementBff({
+        managedEvents,
+        details: eventDetailService,
+        detailMapper: eventDetailMapper
+    });
     const authBff = getAuthBff({
         auth: authService,
         profile: profileService,
@@ -196,7 +218,9 @@ function createContainer(): Container {
         organizationsBff,
         adminBff,
         scanBff,
-        authBff
+        authBff,
+        eventManagementBff,
+        eventManagement
     };
 }
 
