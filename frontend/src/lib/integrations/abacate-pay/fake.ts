@@ -29,6 +29,12 @@ export interface FakeAbacatePay extends AbacatePayGateway {
 }
 
 const BOLETO_TTL_DAYS = 3;
+/**
+ * A payout to a Pix key that starts with this fails as an Abacate outage does.
+ * Keyed on the destination rather than a switch on the fake, so one spec's
+ * outage is not another spec's.
+ */
+export const PAYOUT_OUTAGE_PREFIX = 'outage+';
 
 export function getFakeAbacatePay(): FakeAbacatePay {
     const states = new Map<string, PaymentState>();
@@ -75,6 +81,8 @@ export function getFakeAbacatePay(): FakeAbacatePay {
             return stateOf(transparentId, 'BOLETO');
         },
         async createPayout(payout) {
+            if (payout.pixKey.startsWith(PAYOUT_OUTAGE_PREFIX))
+                throw new AbacatePayError('upstream', 503, 'fake payout outage');
             const created: CreatedPayout = {
                 id: `pyt_fake_${payout.externalId}`,
                 status: 'pending',

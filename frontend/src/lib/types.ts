@@ -26,15 +26,6 @@ export interface Pass {
 
 export type PaymentMethod = 'PIX' | 'CARD' | 'BOLETO';
 
-export interface Organization {
-    id: string;
-    name: string;
-    pix_key?: string | null;
-    pix_key_type?: PixKeyType | null;
-    created_at?: string;
-    updated_at?: string;
-}
-
 export type OrgRole = 'leader' | 'participant' | 'staff';
 
 export interface OrganizationMembership {
@@ -45,23 +36,7 @@ export interface OrganizationMembership {
 
 export type PixKeyType = 'cpf' | 'cnpj' | 'email' | 'phone' | 'evp';
 
-export interface PayoutSettings {
-    pix_key: string | null;
-    pix_key_type: PixKeyType | null;
-}
-
 export type PayoutStatus = 'pending' | 'complete' | 'failed' | 'cancelled' | 'refunded' | 'expired';
-
-export interface Payout {
-    id: string;
-    amount_cents: number;
-    status: PayoutStatus;
-    pix_key: string;
-    pix_key_type: PixKeyType;
-    receipt_url: string | null;
-    error_message: string | null;
-    created_at: string;
-}
 
 export interface RecentOrderRow {
     id: string;

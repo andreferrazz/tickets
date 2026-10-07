@@ -7,6 +7,8 @@ export interface NewSellableEvent {
     ticketStock: number;
     /** An add-on in the event's one section; `stock: null` is unlimited. */
     extra?: { priceCents: number; stock: number | null; limitToTicketCount?: boolean };
+    /** Defaults to MEMBER's organization. */
+    organizationId?: string;
 }
 
 export interface SellableEvent {
@@ -22,7 +24,7 @@ export interface SellableEvent {
 const NOW = "now() at time zone 'utc'";
 
 /**
- * A published event of MEMBER's organization with one ticket type, one open
+ * A published event, of MEMBER's organization unless told otherwise, with one ticket type, one open
  * batch and optionally one extra. Checkout specs sell from their own event, so
  * the stock they take never shows up in what another spec counts.
  *
@@ -35,7 +37,7 @@ export async function seedSellableEvent(spec: NewSellableEvent): Promise<Sellabl
         `insert into events (title, location, starts_at, status, organization_id, created_by_id,
                              inserted_at, updated_at)
          values ($1, 'Sao Paulo', '2027-09-01 20:00:00', 'published', $2, $3, ${NOW}, ${NOW})`,
-        [title, DRAFT_ORG.id, MEMBER.id]
+        [title, spec.organizationId ?? DRAFT_ORG.id, MEMBER.id]
     );
     const ticket = await seedTicket(id, spec);
     const extraId = spec.extra ? await seedExtra(id, spec.extra) : null;

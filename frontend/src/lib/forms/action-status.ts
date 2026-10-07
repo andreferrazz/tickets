@@ -10,7 +10,8 @@ const STATUS_BY_FAILURE: Record<string, number> = {
     already_member: 409,
     out_of_stock: 409,
     already_paid: 409,
-    payment_check_failed: 502
+    payment_check_failed: 502,
+    abacate_refused: 422
 };
 
 /**

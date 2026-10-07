@@ -241,6 +241,7 @@ export const pt = {
     'withdraw.pixKeyTypes.email': 'E-mail',
     'withdraw.pixKeyTypes.phone': 'Celular',
     'withdraw.pixKeyTypes.evp': 'Chave aleatória',
+    'withdraw.pixKeyType': 'Tipo de chave',
     'withdraw.editKey': 'Editar chave',
     'withdraw.saveKey': 'Salvar chave',
     'withdraw.cancel': 'Cancelar',
@@ -253,6 +254,7 @@ export const pt = {
     'withdraw.errors.pixKeyMissing': 'Configure uma chave PIX antes de sacar.',
     'withdraw.errors.insufficientBalance': 'Saldo insuficiente.',
     'withdraw.errors.rateLimited': 'Você já solicitou um saque hoje. Tente novamente amanhã.',
+    'withdraw.errors.pixKeyInvalid': 'Informe uma chave PIX válida.',
     'withdraw.errors.invalidAmount': 'Informe um valor entre R$ 0,01 e R$ 5.000,00.',
     'withdraw.errors.upstream':
         'O provedor de pagamento recusou o saque. Tente novamente em alguns minutos.',

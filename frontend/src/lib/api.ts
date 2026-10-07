@@ -1,6 +1,6 @@
 import { PUBLIC_API_URL } from '$env/static/public';
 import { auth } from '$lib/stores/auth.svelte';
-import type { Organization, OrganizationMembership, Payout, PayoutSettings } from '$lib/types';
+import type { OrganizationMembership } from '$lib/types';
 
 const BASE = PUBLIC_API_URL;
 if (!BASE) {
@@ -63,15 +63,7 @@ async function request<T>(path: string, opts: FetchOptions = {}): Promise<T> {
 
 export const api = {
     myOrganizations: (fetcher?: typeof fetch) =>
-        request<OrganizationMembership[]>('/me/organizations', { fetcher }),
-    updatePayoutSettings: (orgId: string, body: PayoutSettings) =>
-        request<Organization>(`/organizations/${orgId}/payout-settings`, {
-            method: 'PATCH',
-            body
-        }),
-    createPayout: (eventId: string, body: { amount_cents: number }) =>
-        request<Payout>(`/events/${eventId}/payouts`, { method: 'POST', body }),
-    listPayouts: (eventId: string) => request<Payout[]>(`/events/${eventId}/payouts`)
+        request<OrganizationMembership[]>('/me/organizations', { fetcher })
 };
 
 export function formatBRL(cents: number): string {
