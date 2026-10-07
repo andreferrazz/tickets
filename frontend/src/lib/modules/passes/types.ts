@@ -10,6 +10,30 @@ export interface ScannedPassRow {
     checked_in_at: Date | null;
 }
 
+/** A pass about to be issued: one per ticket unit, one for all the extras of an order. */
+export interface PassDraft {
+    /** What the QR code encodes. */
+    token: string;
+    kind: PassKind;
+    itemName: string;
+    /** The ticket line it came from; null on the combined extras pass. */
+    orderItemId: string | null;
+}
+
+/** Whose passes they are: the columns every pass of one order shares. */
+export interface PassOwner {
+    orderId: string;
+    eventId: string;
+    userId: string;
+}
+
+export interface IssuedPassRow {
+    id: string;
+    kind: PassKind;
+    item_name: string;
+    token: string;
+}
+
 /** One extra line of the order an extras pass stands for. */
 export interface ExtraLineRow {
     name: string;

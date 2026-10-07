@@ -1,25 +1,37 @@
 <script lang="ts">
+    import { applyAction, enhance } from '$app/forms';
+    import { invalidateAll } from '$app/navigation';
     import { resolve } from '$app/paths';
-    import { goto } from '$app/navigation';
-    import { api, ApiError, formatBRL } from '$lib/api';
+    import { formatBRL } from '$lib/api';
     import PaymentMethodModal from '$lib/components/PaymentMethodModal.svelte';
     import { formatDateTime } from '$lib/utils/datetime';
     import { t, tStatus } from '$lib/i18n';
+    import { cartFieldName } from '$lib/modules/orders/cart-form';
+    import { placementFailureMessage } from '$lib/modules/orders/checkout-messages';
+    import type { CartLine } from '$lib/modules/orders/checkout-types';
     import { auth } from '$lib/stores/auth.svelte';
     import { requestLogin } from '$lib/stores/loginModal.svelte';
-    import type { CartLine, PaymentMethod } from '$lib/types';
-    import { onMount } from 'svelte';
-    import type { PageData } from './$types';
+    import type { PaymentMethod } from '$lib/types';
+    import { onMount, tick } from 'svelte';
+    import type { ActionData, PageData, SubmitFunction } from './$types';
 
-    let { data }: { data: PageData } = $props();
+    let { data, form }: { data: PageData; form: ActionData } = $props();
 
     // Server-rendered: an event that does not exist, or that this visitor may not
     // see, never reaches this component — the load function answers 404 instead.
     const event = $derived(data.event);
 
-    let buyError = $state<string | null>(null);
+    // What the `buy` action answered when it refused the cart.
+    const buyError = $derived(
+        form?.error ? placementFailureMessage(form.error, form.itemName) : null
+    );
     let busy = $state(false);
     let paymentModalOpen = $state(false);
+    // The cart is posted as a real form: one hidden quantity field per line
+    // plus the method chosen in the modal. The form is remembered from the
+    // button that started the purchase, since the modal submits it later.
+    let buyForm: HTMLFormElement | null = null;
+    let paymentMethod = $state<PaymentMethod | null>(null);
 
     let qty = $state<Record<string, number>>({});
 
@@ -30,17 +42,17 @@
         const out: CartLine[] = [];
         for (const t of event.ticketTypes) {
             const q = qty[`t:${t.id}`] ?? 0;
-            if (q > 0) out.push({ item_type: 'ticket', item_id: t.id, quantity: q });
+            if (q > 0) out.push({ itemType: 'ticket', itemId: t.id, quantity: q });
         }
         for (const x of allExtras) {
             const q = qty[`x:${x.id}`] ?? 0;
-            if (q > 0) out.push({ item_type: 'extra', item_id: x.id, quantity: q });
+            if (q > 0) out.push({ itemType: 'extra', itemId: x.id, quantity: q });
         }
         return out;
     });
 
     const ticketCount = $derived(
-        lines.filter((l) => l.item_type === 'ticket').reduce((acc, l) => acc + l.quantity, 0)
+        lines.filter((l) => l.itemType === 'ticket').reduce((acc, l) => acc + l.quantity, 0)
     );
     // Capped extras must never exceed the live ticket count. When the buyer
     // reduces tickets, trim their existing extra qty silently.
@@ -88,15 +100,17 @@
         qty = { ...qty, [key]: next };
     }
 
-    async function buy() {
+    // The server knows a visitor who arrived signed in; the store knows one who
+    // signed in through the modal a moment ago, before the page data caught up.
+    const readyToBuy = () => data.viewerReady || (auth.isAuthed && !!auth.user?.profileComplete);
+
+    async function buy(e: MouseEvent) {
         if (!event || isClosed || lines.length === 0) return;
-        if (!auth.isAuthed || !auth.user?.profileComplete) {
-            const ok = await requestLogin();
-            if (!ok) return;
-        }
+        buyForm = (e.currentTarget as HTMLButtonElement).form;
+        if (!readyToBuy() && !(await requestLogin())) return;
         // Free orders skip Abacate entirely, so there's no method to choose.
         if (total === 0) {
-            await submitOrder();
+            await submitOrder(null);
         } else {
             paymentModalOpen = true;
         }
@@ -107,27 +121,28 @@
         await submitOrder(method);
     }
 
-    async function submitOrder(method?: PaymentMethod) {
-        if (!event) return;
-        buyError = null;
-        busy = true;
-        try {
-            const order = await api.createOrder(event.id, lines, method);
-            if (order.abacate_payment_url) {
-                window.location.href = order.abacate_payment_url;
-            } else {
-                await goto(resolve('/orders/[id]', { id: order.id }));
-            }
-        } catch (e) {
-            if (e instanceof ApiError && e.message === 'extra_exceeds_tickets') {
-                buyError = t('event.errorExtraExceedsTickets');
-            } else {
-                buyError = e instanceof ApiError ? e.message : t('event.errorFallback');
-            }
-        } finally {
-            busy = false;
-        }
+    async function submitOrder(method: PaymentMethod | null) {
+        paymentMethod = method;
+        // The hidden method field must hold the choice before the form is read.
+        await tick();
+        buyForm?.requestSubmit();
     }
+
+    const submitBuy: SubmitFunction = () => {
+        busy = true;
+        return async ({ result }) => {
+            // The payment page lives at Abacate Pay, outside this app's router.
+            // `busy` stays set: the browser is already leaving.
+            if (result.type === 'redirect' && !result.location.startsWith('/')) {
+                window.location.href = result.location;
+                return;
+            }
+            busy = false;
+            await applyAction(result);
+            // A refusal usually means the stock on screen is stale.
+            if (result.type === 'failure') await invalidateAll();
+        };
+    };
 </script>
 
 {#if !event}
@@ -304,9 +319,23 @@
                 {#if buyError}
                     <div class="error">{buyError}</div>
                 {/if}
-                <button disabled={isClosed || lines.length === 0 || busy} onclick={buy}>
-                    {busy ? t('event.buying') : t('event.buy')}
-                </button>
+                <form method="POST" action="?/buy" use:enhance={submitBuy}>
+                    {#each lines as line (`${line.itemType}:${line.itemId}`)}
+                        <input
+                            type="hidden"
+                            name={cartFieldName(line.itemType, line.itemId)}
+                            value={line.quantity}
+                        />
+                    {/each}
+                    <input type="hidden" name="payment_method" value={paymentMethod ?? ''} />
+                    <button
+                        type="button"
+                        disabled={isClosed || lines.length === 0 || busy}
+                        onclick={buy}
+                    >
+                        {busy ? t('event.buying') : t('event.buy')}
+                    </button>
+                </form>
             </aside>
         </div>
     </article>

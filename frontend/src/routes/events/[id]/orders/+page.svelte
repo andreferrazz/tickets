@@ -1,15 +1,17 @@
 <script lang="ts">
+    import { applyAction, enhance } from '$app/forms';
     import { resolve } from '$app/paths';
     import { invalidateAll } from '$app/navigation';
     import { page } from '$app/state';
-    import { api, ApiError, formatBRL } from '$lib/api';
+    import { formatBRL } from '$lib/api';
+    import { cancellationFailureMessage } from '$lib/modules/orders/checkout-messages';
     import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';
     import { formatDateTime } from '$lib/utils/datetime';
     import { t, tStatus } from '$lib/i18n';
     import { canBuyerCancel } from '$lib/modules/orders/policy';
     import type { EventOrderDto, EventOrderLineDto } from '$lib/modules/orders/types';
     import type { OrderStatus, PaymentMethod } from '$lib/types';
-    import type { PageData } from './$types';
+    import type { PageData, SubmitFunction } from './$types';
 
     let { data }: { data: PageData } = $props();
 
@@ -76,27 +78,26 @@
         if (e.target === e.currentTarget) closeModal();
     }
 
-    // Cancellation still goes through Phoenix until the orders step of the
-    // migration; the list is then re-read from the server.
-    async function cancelSelectedOrder() {
-        if (!selected || cancelling) return;
+    // The list is re-read whatever the answer: a refusal can mean the order
+    // was paid in the meantime. The error is kept here, not read from `form`,
+    // because it belongs to the dialog that is open and is cleared with it.
+    const submitCancel: SubmitFunction = async ({ cancel }) => {
         const ok = await confirmDialog({
             message: t('order.cancelConfirm'),
             confirmText: t('order.cancel'),
             danger: true
         });
-        if (!ok) return;
+        if (!ok) return cancel();
         cancelling = true;
         cancelError = null;
-        try {
-            await api.cancelEventOrder(page.params.id!, selected.id);
-            await invalidateAll();
-        } catch (e) {
-            cancelError = e instanceof ApiError ? e.message : t('order.cancelError');
-        } finally {
+        return async ({ result }) => {
             cancelling = false;
-        }
-    }
+            if (result.type === 'failure')
+                cancelError = cancellationFailureMessage(String(result.data?.error));
+            else await applyAction(result);
+            await invalidateAll();
+        };
+    };
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -267,9 +268,12 @@
                     {#if cancelError}
                         <div class="error">{cancelError}</div>
                     {/if}
-                    <button class="btn danger" onclick={cancelSelectedOrder} disabled={cancelling}>
-                        {cancelling ? t('order.cancelling') : t('order.cancel')}
-                    </button>
+                    <form method="POST" action="?/cancel" use:enhance={submitCancel}>
+                        <input type="hidden" name="order_id" value={selected.id} />
+                        <button class="btn danger" disabled={cancelling}>
+                            {cancelling ? t('order.cancelling') : t('order.cancel')}
+                        </button>
+                    </form>
                 </footer>
             {/if}
         </div>

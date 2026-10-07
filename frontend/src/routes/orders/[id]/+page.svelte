@@ -1,15 +1,17 @@
 <script lang="ts">
+    import { applyAction, enhance } from '$app/forms';
     import { invalidateAll } from '$app/navigation';
     import { page } from '$app/state';
-    import { api, ApiError, formatBRL } from '$lib/api';
+    import { formatBRL } from '$lib/api';
     import { t, tStatus } from '$lib/i18n';
+    import { cancellationFailureMessage } from '$lib/modules/orders/checkout-messages';
     import { canBuyerCancel } from '$lib/modules/orders/policy';
     import type { PassDto } from '$lib/modules/orders/types';
     import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';
     import { formatDateTime } from '$lib/utils/datetime';
-    import type { PageData } from './$types';
+    import type { ActionData, PageData, SubmitFunction } from './$types';
 
-    let { data }: { data: PageData } = $props();
+    let { data, form }: { data: PageData; form: ActionData } = $props();
 
     // Server-rendered: an order that does not exist, or that this visitor did
     // not place, never reaches this component; the load function answers 404.
@@ -18,34 +20,29 @@
     const extraPasses = $derived(data.passes.filter((p) => p.kind === 'extra'));
     const justPaid = $derived(page.url.searchParams.get('paid') === '1');
 
-    let error = $state<string | null>(null);
+    const error = $derived(form?.error ? cancellationFailureMessage(form.error) : null);
     let cancelling = $state(false);
 
     function passLabel(p: PassDto): string {
         return p.kind === 'extra' ? t('order.passExtras') : p.itemName;
     }
 
-    // Cancellation still goes through Phoenix until the orders step of the
-    // migration; the order is then re-read from the server.
-    async function cancelOrder() {
-        if (!order || cancelling) return;
+    // The order is re-read whatever the answer: a refusal can mean it was paid
+    // in the meantime, and the page must then show the passes, not the button.
+    const submitCancel: SubmitFunction = async ({ cancel }) => {
         const ok = await confirmDialog({
             message: t('order.cancelConfirm'),
             confirmText: t('order.cancel'),
             danger: true
         });
-        if (!ok) return;
+        if (!ok) return cancel();
         cancelling = true;
-        error = null;
-        try {
-            await api.cancelOrder(order.id);
-            await invalidateAll();
-        } catch (e) {
-            error = e instanceof ApiError ? e.message : t('order.cancelError');
-        } finally {
+        return async ({ result }) => {
             cancelling = false;
-        }
-    }
+            await applyAction(result);
+            await invalidateAll();
+        };
+    };
 </script>
 
 {#snippet passCard(p: PassDto)}
@@ -104,11 +101,11 @@
     {/if}
 
     {#if canBuyerCancel(order)}
-        <div style="margin-top: 1rem;">
-            <button class="btn danger" onclick={cancelOrder} disabled={cancelling}>
+        <form method="POST" action="?/cancel" style="margin-top: 1rem;" use:enhance={submitCancel}>
+            <button class="btn danger" disabled={cancelling}>
                 {cancelling ? t('order.cancelling') : t('order.cancel')}
             </button>
-        </div>
+        </form>
     {/if}
 
     {#if order.paidAt}

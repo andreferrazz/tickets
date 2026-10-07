@@ -20,8 +20,18 @@ export interface NewEventRow extends EventInput {
 }
 
 export interface NewBatchRow extends BatchInput {
+    /** Chosen by the service, so the Abacate product could be named after it first. */
+    id: string;
     ticketTypeId: string;
     sequence: number;
+    /** The Abacate `prod_*` id; null for a free batch. */
+    productId: string | null;
+}
+
+export interface NewExtraRow extends ExtraInput {
+    id: string;
+    sectionId: string;
+    productId: string | null;
 }
 
 /**
@@ -40,20 +50,14 @@ export interface EventManagementRepository {
     softDeleteTicketType(id: string): Promise<void>;
 
     nextBatchSequence(ticketTypeId: string): Promise<number>;
-    insertBatch(db: Queryable, row: NewBatchRow): Promise<TicketBatchRow>;
-    setBatchProduct(db: Queryable, batchId: string, productId: string): Promise<void>;
+    insertBatch(row: NewBatchRow): Promise<TicketBatchRow>;
     findBatch(id: string): Promise<OwnedBatchRow | null>;
     updateBatch(id: string, input: BatchInput): Promise<void>;
     /** Marks a manual close; a closed batch stays as it was. */
     closeBatch(id: string): Promise<void>;
     deleteBatch(id: string): Promise<void>;
 
-    insertExtra(
-        db: Queryable,
-        eventId: string,
-        input: ExtraInput & { sectionId: string }
-    ): Promise<ExtraItemRow>;
-    setExtraProduct(db: Queryable, extraId: string, productId: string): Promise<void>;
+    insertExtra(eventId: string, row: NewExtraRow): Promise<ExtraItemRow>;
     findExtra(id: string): Promise<ExtraItemRow | null>;
     updateExtra(id: string, input: ExtraInput & { sectionId: string }): Promise<void>;
     softDeleteExtra(id: string): Promise<void>;
@@ -170,19 +174,20 @@ export function getEventManagementRepository(queryable: Queryable): EventManagem
             return (await queryable.query<{ next: number }>(sql, [ticketTypeId]))[0]?.next ?? 1;
         },
 
-        async insertBatch(db, row) {
+        async insertBatch(row) {
             const sql = `
-                insert into ticket_batches (ticket_type_id, sequence, price_cents, quantity_total, quantity_sold, inserted_at)
-                values ($1, $2, $3, $4, 0, ${NOW}) returning ${BATCH_COLUMNS}`;
-            const params = [row.ticketTypeId, row.sequence, row.priceCents, row.quantityTotal];
-            return one(await db.query<TicketBatchRow>(sql, params), 'insert batch');
-        },
-
-        async setBatchProduct(db, batchId, productId) {
-            await db.query(`update ticket_batches set abacate_product_id = $2 where id = $1`, [
-                batchId,
-                productId
-            ]);
+                insert into ticket_batches (id, ticket_type_id, sequence, price_cents, quantity_total,
+                                            quantity_sold, abacate_product_id, inserted_at)
+                values ($1, $2, $3, $4, $5, 0, $6, ${NOW}) returning ${BATCH_COLUMNS}`;
+            const params = [
+                row.id,
+                row.ticketTypeId,
+                row.sequence,
+                row.priceCents,
+                row.quantityTotal,
+                row.productId
+            ];
+            return one(await queryable.query<TicketBatchRow>(sql, params), 'insert batch');
         },
 
         async findBatch(id) {
@@ -210,29 +215,25 @@ export function getEventManagementRepository(queryable: Queryable): EventManagem
             await queryable.query(`delete from ticket_batches where id = $1`, [id]);
         },
 
-        async insertExtra(db, eventId, input) {
+        async insertExtra(eventId, row) {
             const sql = `
-                insert into extra_items (event_id, section_id, name, description, price_cents, quantity_total,
-                                         quantity_sold, show_remaining, limit_to_ticket_count, inserted_at)
-                values ($1, $2, $3, $4, $5, $6, 0, $7, $8, ${NOW}) returning ${EXTRA_COLUMNS}`;
+                insert into extra_items (id, event_id, section_id, name, description, price_cents,
+                                         quantity_total, quantity_sold, show_remaining,
+                                         limit_to_ticket_count, abacate_product_id, inserted_at)
+                values ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, ${NOW}) returning ${EXTRA_COLUMNS}`;
             const params = [
+                row.id,
                 eventId,
-                input.sectionId,
-                input.name,
-                input.description,
-                input.priceCents,
-                input.quantityTotal,
-                input.showRemaining,
-                input.limitToTicketCount
+                row.sectionId,
+                row.name,
+                row.description,
+                row.priceCents,
+                row.quantityTotal,
+                row.showRemaining,
+                row.limitToTicketCount,
+                row.productId
             ];
-            return one(await db.query<ExtraItemRow>(sql, params), 'insert extra');
-        },
-
-        async setExtraProduct(db, extraId, productId) {
-            await db.query(`update extra_items set abacate_product_id = $2 where id = $1`, [
-                extraId,
-                productId
-            ]);
+            return one(await queryable.query<ExtraItemRow>(sql, params), 'insert extra');
         },
 
         async findExtra(id) {

@@ -1,41 +1,36 @@
 <script lang="ts">
+    import { applyAction, enhance } from '$app/forms';
     import { resolve } from '$app/paths';
     import { invalidateAll } from '$app/navigation';
-    import { api, ApiError, formatBRL } from '$lib/api';
+    import { formatBRL } from '$lib/api';
     import { t, tStatus } from '$lib/i18n';
+    import { cancellationFailureMessage } from '$lib/modules/orders/checkout-messages';
     import { canBuyerCancel } from '$lib/modules/orders/policy';
-    import type { OrderDto } from '$lib/modules/orders/types';
     import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';
     import { formatDateTime } from '$lib/utils/datetime';
-    import type { PageData } from './$types';
+    import type { ActionData, PageData, SubmitFunction } from './$types';
 
-    let { data }: { data: PageData } = $props();
+    let { data, form }: { data: PageData; form: ActionData } = $props();
 
-    let error = $state<string | null>(null);
+    const error = $derived(form?.error ? cancellationFailureMessage(form.error) : null);
     let cancellingId = $state<string | null>(null);
 
-    // Cancellation still goes through Phoenix until the orders step of the
-    // migration; the list is then re-read from the server rather than patched
-    // from the response, so there is one source of truth for what is shown.
-    async function cancelOrder(order: OrderDto) {
-        if (cancellingId) return;
+    // The list is re-read from the server rather than patched from the answer,
+    // so there is one source of truth for what is shown.
+    const submitCancel: SubmitFunction = async ({ formData, cancel }) => {
         const ok = await confirmDialog({
             message: t('order.cancelConfirm'),
             confirmText: t('order.cancel'),
             danger: true
         });
-        if (!ok) return;
-        cancellingId = order.id;
-        error = null;
-        try {
-            await api.cancelOrder(order.id);
-            await invalidateAll();
-        } catch (e) {
-            error = e instanceof ApiError ? e.message : t('order.cancelError');
-        } finally {
+        if (!ok) return cancel();
+        cancellingId = String(formData.get('order_id'));
+        return async ({ result }) => {
             cancellingId = null;
-        }
-    }
+            await applyAction(result);
+            await invalidateAll();
+        };
+    };
 </script>
 
 <h1>{t('orders.title')}</h1>
@@ -63,13 +58,12 @@
                     </div>
                 </a>
                 {#if canBuyerCancel(o)}
-                    <button
-                        class="cancel"
-                        onclick={() => cancelOrder(o)}
-                        disabled={cancellingId === o.id}
-                    >
-                        {cancellingId === o.id ? t('order.cancelling') : t('order.cancel')}
-                    </button>
+                    <form method="POST" action="?/cancel" use:enhance={submitCancel}>
+                        <input type="hidden" name="order_id" value={o.id} />
+                        <button class="cancel" disabled={cancellingId !== null}>
+                            {cancellingId === o.id ? t('order.cancelling') : t('order.cancel')}
+                        </button>
+                    </form>
                 {/if}
             </div>
         {/each}
@@ -82,8 +76,10 @@
         flex-direction: column;
         gap: 0.5rem;
     }
-    .cancel {
+    .order-row form {
         align-self: flex-end;
+    }
+    .cancel {
         padding: 0.2rem 0.5rem;
         font-size: 0.8rem;
         font-weight: 500;

@@ -1,6 +1,7 @@
-import { error } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
+import { statusForFailure } from '$lib/forms/action-status';
 import { requireSessionUser } from '$lib/modules/sessions/require-user';
-import type { PageServerLoad } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 
 /**
  * One order with its items and, once issued, its passes with their QR codes.
@@ -17,4 +18,15 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
     }
 
     return data;
+};
+
+/** The buyer cancels their own order; the page re-reads it afterwards. */
+export const actions: Actions = {
+    cancel: async ({ locals, params, url }) => {
+        const user = requireSessionUser(locals.user, url.pathname);
+        const cancellation = locals.container.orderCancellation;
+        const result = await cancellation.cancelForBuyer(user, params.id, url.origin);
+        if (!result.ok) return fail(statusForFailure(result.failure), { error: result.failure });
+        return { cancelled: true };
+    }
 };

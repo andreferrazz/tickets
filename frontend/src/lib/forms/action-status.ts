@@ -1,12 +1,16 @@
 const STATUS_BY_FAILURE: Record<string, number> = {
     not_found: 404,
+    event_not_found: 404,
     forbidden: 403,
     rate_limited: 429,
     abacate_unavailable: 502,
     batch_has_sales: 409,
     section_not_empty: 409,
     already_invited: 409,
-    already_member: 409
+    already_member: 409,
+    out_of_stock: 409,
+    already_paid: 409,
+    payment_check_failed: 502
 };
 
 /**
