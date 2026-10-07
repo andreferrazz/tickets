@@ -1,23 +1,21 @@
 <script lang="ts">
+    import { enhance } from '$app/forms';
+    import { afterNavigate } from '$app/navigation';
     import { resolve } from '$app/paths';
-    import { afterNavigate, goto } from '$app/navigation';
-    import { page } from '$app/state';
-    import { api, ApiError } from '$lib/api';
     import QrScanner from '$lib/components/QrScanner.svelte';
-    import { formatDateTime } from '$lib/utils/datetime';
     import { t } from '$lib/i18n';
-    import { auth } from '$lib/stores/auth.svelte';
-    import type { EventDetail, ValidateResult } from '$lib/types';
-    import { onMount } from 'svelte';
+    import type { CheckInDto, ExtraLineRow } from '$lib/modules/passes/types';
+    import { formatDateTime } from '$lib/utils/datetime';
+    import type { PageProps, SubmitFunction } from './$types';
 
-    let event = $state<EventDetail | null>(null);
-    let loading = $state(true);
-    let allowed = $state(false);
-    let error = $state<string | null>(null);
+    // Server-rendered: whoever reaches this component may scan for the event;
+    // the load function answers 404 for everyone else.
+    let { data, params }: PageProps = $props();
 
     // Back target: the route the user came from. Falls back to the event page on
     // a direct load (refresh / deep link), since staff can't reach the dashboard.
-    let backHref = $state(resolve('/events/[id]', { id: page.params.id! }));
+    // svelte-ignore state_referenced_locally
+    let backHref = $state(resolve('/events/[id]', { id: params.id }));
     afterNavigate(({ from }) => {
         if (from?.url?.pathname) backHref = from.url.pathname + from.url.search;
     });
@@ -31,129 +29,127 @@
     };
     let outcome = $state<ScanOutcome | null>(null);
     let validating = $state(false);
+    let cameraNotice = $state<string | null>(null);
+    let token = $state('');
+    let scanForm = $state<HTMLFormElement | null>(null);
 
-    onMount(async () => {
-        if (!auth.isAuthed) {
-            await goto(
-                `${resolve('/auth/login')}?next=${resolve('/events/[id]/scan', { id: page.params.id! })}`
-            );
-            return;
-        }
-        try {
-            await auth.loadMemberships();
-            event = await api.getEvent(page.params.id!);
-            allowed = auth.canScan(event.organization_id);
-        } catch (e) {
-            error = e instanceof ApiError ? e.message : t('scan.errorFallback');
-        } finally {
-            loading = false;
-        }
-    });
-
-    async function handleToken(token: string) {
+    // The camera and the typed code share one form: a decoded QR fills the
+    // field and submits it, so there is a single path to the server.
+    async function handleToken(decoded: string) {
         if (validating || outcome) return;
-        validating = true;
-        try {
-            const res = await api.validatePass(page.params.id!, token);
-            const items = extraItems(res);
-            // For extras the item list replaces the redundant "Extras" detail; the
-            // already-checked-in timestamp stays useful and shows above the list.
-            outcome =
-                res.status === 'checked_in'
-                    ? {
-                          tone: 'ok',
-                          title: items ? t('scan.extrasTitle') : t('scan.checkedIn'),
-                          detail: items ? undefined : passDetail(res),
-                          items
-                      }
-                    : {
-                          tone: 'warn',
-                          title: items
-                              ? t('scan.alreadyCheckedInExtra')
-                              : t('scan.alreadyCheckedIn'),
-                          detail: alreadyDetail(res),
-                          items
-                      };
-            buzz(res.status === 'checked_in' ? [90] : [40, 60, 40]);
-        } catch (e) {
-            outcome = errorOutcome(e);
-            buzz([120, 80, 120]);
-        } finally {
-            validating = false;
-        }
+        token = decoded;
+        await Promise.resolve();
+        scanForm?.requestSubmit();
     }
+
+    const submitScan: SubmitFunction = () => {
+        validating = true;
+        return async ({ result }) => {
+            validating = false;
+            token = '';
+            const scan = result.type === 'success' ? result.data?.scan : undefined;
+            if (!scan) {
+                outcome = { tone: 'error', title: failureTitle(result) };
+                return buzz([120, 80, 120]);
+            }
+            outcome = scanOutcome(scan);
+            buzz(scan.status === 'checked_in' ? [90] : [40, 60, 40]);
+        };
+    };
 
     // Extra passes bundle every add-on in the order behind the generic name
-    // "Extras"; list the actual items so staff know what to hand over.
-    function extraItems(res: ValidateResult): string[] | undefined {
-        if (res.pass.kind !== 'extra') return undefined;
-        return res.pass.extras.map((e) => `${e.quantity}× ${e.name}`);
-    }
-
-    function passDetail(res: ValidateResult): string {
-        return res.pass.item_name;
-    }
-
-    function alreadyDetail(res: ValidateResult): string {
-        if (!res.pass.checked_in_at) return passDetail(res);
-        return t('scan.alreadyAt', { time: formatDateTime(res.pass.checked_in_at) });
-    }
-
-    function errorOutcome(e: unknown): ScanOutcome {
-        if (e instanceof ApiError) {
-            if (e.status === 422) return { tone: 'error', title: t('scan.wrongEvent') };
-            if (e.status === 403) return { tone: 'error', title: t('scan.forbidden') };
-            if (e.status === 404) return { tone: 'error', title: t('scan.invalid') };
+    // "Extras"; list the actual items so staff know what to hand over. For
+    // them the list replaces the redundant detail line.
+    function scanOutcome(scan: CheckInDto): ScanOutcome {
+        const items =
+            scan.kind === 'extra'
+                ? scan.extras.map((line: ExtraLineRow) => `${line.quantity}× ${line.name}`)
+                : undefined;
+        if (scan.status === 'checked_in') {
+            return {
+                tone: 'ok',
+                title: items ? t('scan.extrasTitle') : t('scan.checkedIn'),
+                detail: items ? undefined : scan.itemName,
+                items
+            };
         }
-        return { tone: 'error', title: t('scan.errorFallback') };
+        return {
+            tone: 'warn',
+            title: items ? t('scan.alreadyCheckedInExtra') : t('scan.alreadyCheckedIn'),
+            detail: scan.checkedInAt
+                ? t('scan.alreadyAt', { time: formatDateTime(scan.checkedInAt) })
+                : scan.itemName,
+            items
+        };
+    }
+
+    function failureTitle(result: { type: string; data?: Record<string, unknown> }): string {
+        const code = result.type === 'failure' ? result.data?.error : null;
+        if (code === 'wrong_event') return t('scan.wrongEvent');
+        if (code === 'forbidden') return t('scan.forbidden');
+        if (code === 'not_found') return t('scan.invalid');
+        return t('scan.errorFallback');
     }
 
     function buzz(pattern: number[]) {
         if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(pattern);
     }
 
+    // No camera is no longer the end of the page: the code can be pasted.
     function onCameraError(kind: 'no-camera' | 'permission') {
-        error = kind === 'no-camera' ? t('scan.noCamera') : t('scan.cameraDenied');
+        cameraNotice = kind === 'no-camera' ? t('scan.noCamera') : t('scan.cameraDenied');
     }
 </script>
 
-{#if loading}
-    <p class="muted">{t('common.loading')}</p>
-{:else if error}
-    <div class="error">{error}</div>
-{:else if !allowed}
-    <div class="error">{t('scan.notAuthorized')}</div>
-{:else}
-    <header class="head">
-        <h1>{t('scan.title')}</h1>
-        <a href={backHref} class="btn secondary small">←</a>
-    </header>
-    {#if event}<p class="muted">{event.title}</p>{/if}
+<header class="head">
+    <h1>{t('scan.title')}</h1>
+    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- already a resolved path, or the page the visitor came from -->
+    <a href={backHref} class="btn secondary small">←</a>
+</header>
+<p class="muted">{data.eventTitle}</p>
 
+{#if cameraNotice}
+    <div class="notice">{cameraNotice}</div>
+{:else}
     <div class="scan-wrap">
         <QrScanner onScan={handleToken} paused={!!outcome} {onCameraError} />
     </div>
-
-    {#if outcome}
-        <div class="result {outcome.tone}" role="status">
-            <strong>{outcome.title}</strong>
-            {#if outcome.detail}<div class="detail">{outcome.detail}</div>{/if}
-            {#if outcome.items}
-                <div class="detail">{t('scan.extrasList')}</div>
-                <ul class="extras">
-                    {#each outcome.items as item, i (`${i}:${item}`)}<li>{item}</li>{/each}
-                </ul>
-            {/if}
-            <button type="button" class="btn" onclick={() => (outcome = null)}>
-                {t('scan.scanNext')}
-            </button>
-        </div>
-    {:else if validating}
-        <p class="muted center">{t('scan.validating')}</p>
-    {:else}
-        <p class="muted center">{t('scan.hint')}</p>
-    {/if}
 {/if}
+
+{#if outcome}
+    <div class="result {outcome.tone}" role="status">
+        <strong>{outcome.title}</strong>
+        {#if outcome.detail}<div class="detail">{outcome.detail}</div>{/if}
+        {#if outcome.items}
+            <div class="detail">{t('scan.extrasList')}</div>
+            <ul class="extras">
+                {#each outcome.items as item, i (`${i}:${item}`)}<li>{item}</li>{/each}
+            </ul>
+        {/if}
+        <button type="button" class="btn" onclick={() => (outcome = null)}>
+            {t('scan.scanNext')}
+        </button>
+    </div>
+{:else if validating}
+    <p class="muted center">{t('scan.validating')}</p>
+{:else}
+    <p class="muted center">{t('scan.hint')}</p>
+{/if}
+
+<form
+    method="POST"
+    action="?/checkin"
+    class="card stack manual"
+    bind:this={scanForm}
+    use:enhance={submitScan}
+>
+    <label for="token">{t('scan.manualLabel')}</label>
+    <input id="token" name="token" bind:value={token} autocomplete="off" required />
+    <p class="muted small">{t('scan.manualHint')}</p>
+    <button type="submit" class="secondary" disabled={validating || !!outcome || !token}>
+        {t('scan.manualSubmit')}
+    </button>
+</form>
 
 <style>
     .head {
@@ -210,5 +206,8 @@
         background: rgba(255, 255, 255, 0.18);
         border: 1px solid rgba(255, 255, 255, 0.4);
         color: #fff;
+    }
+    .manual {
+        margin-top: 1.5rem;
     }
 </style>

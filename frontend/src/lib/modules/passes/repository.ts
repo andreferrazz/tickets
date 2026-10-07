@@ -1,0 +1,54 @@
+import type { Queryable } from '$lib/db/queryable';
+import type { ExtraLineRow, ScannedPassRow } from './types';
+
+export interface PassRepository {
+    findByToken(token: string): Promise<ScannedPassRow | null>;
+
+    /**
+     * Admits the pass if nobody has yet, in one statement, and says whether
+     * this call was the one that did. Two scanners racing on the same code
+     * cannot both be told "admitted".
+     */
+    claimCheckIn(passId: string, scannerId: string): Promise<boolean>;
+
+    /** When the pass was admitted, as stored; null when it has not been. */
+    findCheckedInAt(passId: string): Promise<Date | null>;
+
+    /** The extra items of the order, in the order they were bought. */
+    listExtraLines(orderId: string): Promise<ExtraLineRow[]>;
+}
+
+const COLUMNS = 'id, kind, item_name, event_id, order_id, checked_in_at';
+
+export function getPassRepository(queryable: Queryable): PassRepository {
+    return {
+        async findByToken(token) {
+            const sql = `select ${COLUMNS} from passes where token = $1`;
+            return (await queryable.query<ScannedPassRow>(sql, [token]))[0] ?? null;
+        },
+
+        async claimCheckIn(passId, scannerId) {
+            const sql = `
+                update passes
+                set checked_in_at = now() at time zone 'utc', checked_in_by_user_id = $2,
+                    updated_at = now() at time zone 'utc'
+                where id = $1 and checked_in_at is null
+                returning id`;
+            return (await queryable.query(sql, [passId, scannerId])).length > 0;
+        },
+
+        async findCheckedInAt(passId) {
+            const sql = `select checked_in_at from passes where id = $1`;
+            const rows = await queryable.query<{ checked_in_at: Date | null }>(sql, [passId]);
+            return rows[0]?.checked_in_at ?? null;
+        },
+
+        listExtraLines(orderId) {
+            const sql = `
+                select item_name as name, quantity from order_items
+                where order_id = $1 and item_type = 'extra'
+                order by inserted_at asc, id asc`;
+            return queryable.query<ExtraLineRow>(sql, [orderId]);
+        }
+    };
+}

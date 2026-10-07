@@ -26,6 +26,9 @@ test('a visitor signs in and completes their profile inside the login modal', as
     await dialog.getByRole('button', { name: 'Alterar e-mail' }).click();
     await expect(dialog.getByLabel('E-mail')).toHaveValue(email);
     await dialog.getByRole('button', { name: 'Enviar código' }).click();
+    // The second request replaces the first code; read the mail only once it
+    // has been answered, or the older code is what comes back.
+    await expect(dialog.getByLabel('Código de 6 dígitos')).toBeVisible();
 
     await dialog.getByLabel('Código de 6 dígitos').fill(await latestAuthCode(email));
     await dialog.getByRole('button', { name: 'Verificar' }).click();
