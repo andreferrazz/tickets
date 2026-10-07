@@ -30,7 +30,7 @@ export interface EventDetailMapper {
 }
 
 export function getEventDetailMapper(mapper: EventMapper): EventDetailMapper {
-    eventDetailMapper ??= {
+    return {
         toDto(event: EventRow, rows: EventDetailRows): EventDetailDto {
             return {
                 ...mapper.toDto(event),
@@ -41,11 +41,7 @@ export function getEventDetailMapper(mapper: EventMapper): EventDetailMapper {
             };
         }
     };
-
-    return eventDetailMapper;
 }
-
-let eventDetailMapper: EventDetailMapper | null = null;
 
 function toTicketTypeDto(type: TicketTypeRow, allBatches: TicketBatchRow[]): TicketTypeDto {
     const batches = allBatches.filter((batch) => batch.ticket_type_id === type.id).map(toBatchDto);

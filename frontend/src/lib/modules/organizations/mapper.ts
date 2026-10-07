@@ -8,7 +8,7 @@ export interface OrganizationMapper {
 }
 
 export function getOrganizationMapper(): OrganizationMapper {
-    organizationMapper ??= {
+    return {
         toOrganizationDto(row) {
             return {
                 id: row.id,
@@ -23,7 +23,4 @@ export function getOrganizationMapper(): OrganizationMapper {
             return { userId: row.user_id, email: row.email, role: row.role };
         }
     };
-    return organizationMapper;
 }
-
-let organizationMapper: OrganizationMapper | null = null;

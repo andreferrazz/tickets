@@ -6,7 +6,7 @@ export interface UserMapper {
 }
 
 export function getUserMapper(): UserMapper {
-    userMapper ??= {
+    return {
         toDto(row) {
             return {
                 id: row.id,
@@ -22,7 +22,4 @@ export function getUserMapper(): UserMapper {
             };
         }
     };
-    return userMapper;
 }
-
-let userMapper: UserMapper | null = null;

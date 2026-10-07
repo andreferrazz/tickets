@@ -2,11 +2,11 @@
 export type LoginActionResult = { type: string; data?: Record<string, unknown> };
 
 /**
- * The banner text for a failed login-step action: the `error` the page action
- * returned, or the step's own fallback when it returned none.
+ * The failure code a page action answered with, if it gave one.
  *
- * Example: `failureText(result.data, t('auth.login.errorFallback'))`
+ * @example
+ * error = loginFailureMessage(failureCode(result.data));
  */
-export function failureText(data: Record<string, unknown> | undefined, fallback: string): string {
-    return typeof data?.error === 'string' ? data.error : fallback;
+export function failureCode(payload: Record<string, unknown> | undefined): string | null {
+    return typeof payload?.error === 'string' ? payload.error : null;
 }

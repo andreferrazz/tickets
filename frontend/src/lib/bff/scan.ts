@@ -1,3 +1,4 @@
+import { logLoadFailure } from './load-failure';
 import type { EventMapper } from '$lib/modules/events/mapper';
 import type { EventService } from '$lib/modules/events/service';
 import type { EventDto } from '$lib/modules/events/types';
@@ -21,7 +22,7 @@ export interface ScanBffDeps {
 }
 
 export function getScanBff(deps: ScanBffDeps): ScanBff {
-    scanBff ??= {
+    return {
         async index(user) {
             try {
                 const organizationIds = await deps.organizations.listMemberOrganizationIds(user);
@@ -31,18 +32,9 @@ export function getScanBff(deps: ScanBffDeps): ScanBff {
                     loadFailed: false
                 };
             } catch (cause) {
-                console.error(
-                    JSON.stringify({
-                        event: 'scan_events_load_failed',
-                        userId: user.id,
-                        error: String(cause)
-                    })
-                );
+                logLoadFailure('scan_events_load_failed', { userId: user.id }, cause);
                 return { events: [], loadFailed: true };
             }
         }
     };
-    return scanBff;
 }
-
-let scanBff: ScanBff | null = null;

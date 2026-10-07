@@ -1,3 +1,4 @@
+import { text } from '$lib/utils/form-fields';
 import { requireSessionUser } from '$lib/modules/sessions/require-user';
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
@@ -15,7 +16,7 @@ export const actions: Actions = {
         const user = requireSessionUser(locals.user, url.pathname);
         if (user.role !== 'admin') return fail(403, { error: 'forbidden' });
         const form = await request.formData();
-        const userId = String(form.get('userId') ?? '');
+        const userId = text(form, 'userId');
         const token = await locals.container.authBff.mintImpersonation(user, userId);
         if (!token) return fail(404, { error: 'user not found' });
         return { token };

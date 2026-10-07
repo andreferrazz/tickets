@@ -4,9 +4,10 @@ import {
     parseBatchInput,
     parseEventInput,
     parseExtraInput,
-    parseSectionInput,
-    text
+    parseSectionInput
 } from '$lib/modules/events/management-forms';
+import { text } from '$lib/utils/form-fields';
+import { statusForFailure } from '$lib/forms/action-status';
 import type { ManagementResult } from '$lib/modules/events/management-types';
 import { requireSessionUser } from '$lib/modules/sessions/require-user';
 import type { SessionUser } from '$lib/modules/sessions/types';
@@ -36,7 +37,7 @@ function action(name: string, run: Run) {
         const user = requireSessionUser(locals.user, url.pathname);
         const result = await run(locals.container.eventManagement, user, await request.formData());
         if (!result.ok) {
-            return fail(statusFor(result.failure), {
+            return fail(statusForFailure(result.failure), {
                 action: name,
                 error: result.failure,
                 fieldErrors: result.fieldErrors ?? null
@@ -44,14 +45,6 @@ function action(name: string, run: Run) {
         }
         return { action: name, ok: true };
     };
-}
-
-function statusFor(failure: string): number {
-    if (failure === 'not_found') return 404;
-    if (failure === 'forbidden') return 403;
-    if (failure === 'abacate_unavailable') return 502;
-    if (failure === 'batch_has_sales' || failure === 'section_not_empty') return 409;
-    return 422;
 }
 
 export const actions: Actions = {
@@ -65,7 +58,7 @@ export const actions: Actions = {
             event.params.id
         );
         if (!result.ok)
-            return fail(statusFor(result.failure), {
+            return fail(statusForFailure(result.failure), {
                 action: 'deleteEvent',
                 error: result.failure,
                 fieldErrors: null

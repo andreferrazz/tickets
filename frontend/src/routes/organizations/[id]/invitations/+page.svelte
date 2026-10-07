@@ -1,6 +1,7 @@
 <script lang="ts">
     import { enhance } from '$app/forms';
     import { t, tStatus } from '$lib/i18n';
+    import { inviteFailureMessage } from '$lib/modules/invitations/invitation-messages';
     import { formatDateTime } from '$lib/utils/datetime';
     import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';
     import type { ActionData, PageData, SubmitFunction } from './$types';
@@ -9,7 +10,7 @@
 
     // Server-rendered: whoever reaches this component manages the organization;
     // the load function sends everyone else home.
-    const membership = $derived(data.organization);
+    const organization = $derived(data.organization);
     // Managers (leader + participant) see the member list and may change roles and
     // remove members. The leader row is protected; staff manage nothing.
     const isManager = $derived(data.managerRole === 'leader' || data.managerRole === 'participant');
@@ -20,9 +21,7 @@
         failed: { action?: string; error?: string } | null | undefined
     ): string | null {
         if (failed?.action !== 'invite' || !failed.error) return null;
-        if (failed.error === 'already_invited') return t('invitations.alreadyInvited');
-        if (failed.error === 'already_member') return t('invitations.alreadyMember');
-        return t('invitations.sendErrorFallback');
+        return inviteFailureMessage(failed.error);
     }
 
     function memberMessage(
@@ -71,8 +70,13 @@
     }
 </script>
 
-{#if membership}
-    <h1>{t('orgInvitations.title', { org: membership.name })}</h1>
+<!-- Outside the block below: a failed load has no organization to show. -->
+{#if data.loadFailed}
+    <div class="error">{t('invitations.errorFallback')}</div>
+{/if}
+
+{#if organization}
+    <h1>{t('orgInvitations.title', { org: organization.name })}</h1>
     <p class="muted">{t('orgInvitations.subtitle')}</p>
 
     <form
@@ -152,9 +156,7 @@
         {/if}
     {/if}
 
-    {#if data.loadFailed}
-        <div class="error">{t('invitations.errorFallback')}</div>
-    {:else if data.invitations.length === 0}
+    {#if data.invitations.length === 0}
         <p class="muted">{t('invitations.empty')}</p>
     {:else}
         <div class="stack">

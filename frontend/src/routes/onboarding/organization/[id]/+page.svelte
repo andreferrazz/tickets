@@ -9,15 +9,14 @@
     let name = $state(data.name);
     let busy = $state(false);
 
-    const error = $derived(
-        form?.error === 'validation'
-            ? t('onboarding.org.fieldRequired')
-            : form?.error === 'forbidden'
-              ? t('onboarding.org.errorForbidden')
-              : form?.error
-                ? t('onboarding.org.errorFallback')
-                : null
-    );
+    function failureMessage(code: string | undefined): string | null {
+        if (!code) return null;
+        if (code === 'validation') return t('onboarding.org.fieldRequired');
+        if (code === 'forbidden') return t('onboarding.org.errorForbidden');
+        return t('onboarding.org.errorFallback');
+    }
+
+    const error = $derived(failureMessage(form?.error));
 </script>
 
 <div class="onboarding-wrap">

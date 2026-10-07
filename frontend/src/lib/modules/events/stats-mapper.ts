@@ -25,7 +25,7 @@ export interface EventStatsMapper {
 }
 
 export function getEventStatsMapper(): EventStatsMapper {
-    statsMapper ??= {
+    return {
         toDto(view) {
             return {
                 eventId: view.event.id,
@@ -45,7 +45,6 @@ export function getEventStatsMapper(): EventStatsMapper {
             return { name: row.name, taxId: row.tax_id, email: row.email, quantity: row.quantity };
         }
     };
-    return statsMapper;
 }
 
 function totalsDto({ totals }: EventStatsView): StatsTotalsDto {
@@ -111,5 +110,3 @@ function recentOrderDto(row: RecentOrderRow): RecentOrderDto {
         itemCount: row.item_count
     };
 }
-
-let statsMapper: EventStatsMapper | null = null;

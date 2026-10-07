@@ -1,3 +1,4 @@
+import { logLoadFailure } from './load-failure';
 import type { EventDetailMapper } from '$lib/modules/events/detail-mapper';
 import type { EventDetailService } from '$lib/modules/events/detail-service';
 import type { ManagedEventFinder } from '$lib/modules/events/managed-event';
@@ -22,7 +23,7 @@ export interface EventManagementBffDeps {
 }
 
 export function getEventManagementBff(deps: EventManagementBffDeps): EventManagementBff {
-    eventManagementBff ??= {
+    return {
         async editPage(user, eventId) {
             try {
                 const event = await deps.managedEvents.find(user, eventId);
@@ -30,18 +31,9 @@ export function getEventManagementBff(deps: EventManagementBffDeps): EventManage
                 const rows = await deps.details.loadRows(event.id);
                 return { event: deps.detailMapper.toDto(event, rows), loadFailed: false };
             } catch (cause) {
-                console.error(
-                    JSON.stringify({
-                        event: 'event_edit_load_failed',
-                        eventId,
-                        error: String(cause)
-                    })
-                );
+                logLoadFailure('event_edit_load_failed', { eventId }, cause);
                 return { event: null, loadFailed: true };
             }
         }
     };
-    return eventManagementBff;
 }
-
-let eventManagementBff: EventManagementBff | null = null;

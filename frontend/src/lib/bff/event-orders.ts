@@ -1,3 +1,4 @@
+import { logLoadFailure } from './load-failure';
 import type { EventOrderService } from '$lib/modules/orders/manager-service';
 import type { OrderMapper } from '$lib/modules/orders/mapper';
 import type { EventOrderDto } from '$lib/modules/orders/types';
@@ -14,7 +15,7 @@ export interface EventOrdersBff {
 }
 
 export function getEventOrdersBff(service: EventOrderService, mapper: OrderMapper): EventOrdersBff {
-    eventOrdersBff ??= {
+    return {
         async index(user, eventId) {
             try {
                 const views = await service.listForEvent(user, eventId);
@@ -24,18 +25,9 @@ export function getEventOrdersBff(service: EventOrderService, mapper: OrderMappe
                     loadFailed: false
                 };
             } catch (cause) {
-                console.error(
-                    JSON.stringify({
-                        event: 'event_orders_load_failed',
-                        eventId,
-                        error: String(cause)
-                    })
-                );
+                logLoadFailure('event_orders_load_failed', { eventId }, cause);
                 return { orders: null, loadFailed: true };
             }
         }
     };
-    return eventOrdersBff;
 }
-
-let eventOrdersBff: EventOrdersBff | null = null;

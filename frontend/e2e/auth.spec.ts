@@ -61,7 +61,7 @@ test('a wrong code is refused', async ({ page }) => {
     await page.getByLabel('Código de 6 dígitos').fill('000000');
     await page.getByRole('button', { name: 'Verificar' }).click();
 
-    await expect(page.getByText('invalid or expired code')).toBeVisible();
+    await expect(page.getByText('Código inválido ou expirado.')).toBeVisible();
 });
 
 // Logging in with the email a pending invitation names consumes it: the buyer
@@ -176,5 +176,7 @@ test('guesses at a login code are cut off', async ({ page }) => {
     await page.getByLabel('Código de 6 dígitos').fill('000000');
     await page.getByRole('button', { name: 'Verificar' }).click();
 
-    await expect(page.getByText(/too many attempts/)).toBeVisible();
+    await expect(
+        page.getByText('Muitas tentativas. Solicite um novo código em alguns minutos.')
+    ).toBeVisible();
 });

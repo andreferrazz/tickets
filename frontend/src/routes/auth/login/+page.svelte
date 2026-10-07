@@ -2,6 +2,7 @@
     import { enhance } from '$app/forms';
     import { page } from '$app/state';
     import { t } from '$lib/i18n';
+    import { loginFailureMessage } from '$lib/modules/accounts/auth-messages';
     import { safeNext } from '$lib/utils/next';
     import type { ActionData } from './$types';
 
@@ -40,7 +41,7 @@
                 autocomplete="email"
             />
             {#if form?.error}
-                <div class="error">{form.error}</div>
+                <div class="error">{loginFailureMessage(form.error)}</div>
             {/if}
             <button type="submit" disabled={busy || !email}>
                 {busy ? t('auth.login.sending') : t('auth.login.sendCode')}

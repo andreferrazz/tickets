@@ -1,6 +1,7 @@
 <script lang="ts">
     import { enhance } from '$app/forms';
     import { t, tStatus } from '$lib/i18n';
+    import { inviteFailureMessage } from '$lib/modules/invitations/invitation-messages';
     import { formatDateTime } from '$lib/utils/datetime';
     import type { ActionData, PageData } from './$types';
 
@@ -8,15 +9,7 @@
 
     let busy = $state(false);
 
-    const sendError = $derived(
-        form?.error === 'already_invited'
-            ? t('invitations.alreadyInvited')
-            : form?.error === 'already_member'
-              ? t('invitations.alreadyMember')
-              : form?.error
-                ? t('invitations.sendErrorFallback')
-                : null
-    );
+    const sendError = $derived(form?.error ? inviteFailureMessage(form.error) : null);
 </script>
 
 <h1>{t('invitations.title')}</h1>

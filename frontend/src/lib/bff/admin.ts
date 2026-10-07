@@ -1,3 +1,4 @@
+import { logLoadFailure } from './load-failure';
 import type { UserMapper } from '$lib/modules/accounts/mapper';
 import type { UserRepository } from '$lib/modules/accounts/repository';
 import type { UserDto } from '$lib/modules/accounts/types';
@@ -30,7 +31,7 @@ export interface AdminBffDeps {
 }
 
 export function getAdminBff(deps: AdminBffDeps): AdminBff {
-    adminBff ??= {
+    return {
         async invitations(user) {
             try {
                 const rows = await deps.invitations.listVisible(user);
@@ -39,9 +40,7 @@ export function getAdminBff(deps: AdminBffDeps): AdminBff {
                     loadFailed: false
                 };
             } catch (cause) {
-                console.error(
-                    JSON.stringify({ event: 'admin_invitations_load_failed', error: String(cause) })
-                );
+                logLoadFailure('admin_invitations_load_failed', {}, cause);
                 return { invitations: [], loadFailed: true };
             }
         },
@@ -51,14 +50,9 @@ export function getAdminBff(deps: AdminBffDeps): AdminBff {
                 const rows = await deps.users.listUsers();
                 return { users: rows.map((row) => deps.userMapper.toDto(row)), loadFailed: false };
             } catch (cause) {
-                console.error(
-                    JSON.stringify({ event: 'admin_users_load_failed', error: String(cause) })
-                );
+                logLoadFailure('admin_users_load_failed', {}, cause);
                 return { users: [], loadFailed: true };
             }
         }
     };
-    return adminBff;
 }
-
-let adminBff: AdminBff | null = null;

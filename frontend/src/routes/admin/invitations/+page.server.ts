@@ -1,6 +1,7 @@
 import { requireSessionUser } from '$lib/modules/sessions/require-user';
 import { fail, redirect } from '@sveltejs/kit';
-import { text } from '$lib/modules/events/management-forms';
+import { statusForFailure } from '$lib/forms/action-status';
+import { text } from '$lib/utils/form-fields';
 import type { Actions, PageServerLoad } from './$types';
 
 /** The invitations an admin sent. Non-admins are sent home, as before. */
@@ -26,8 +27,7 @@ export const actions: Actions = {
             },
             url.origin
         );
-        if (!result.ok)
-            return fail(result.failure === 'forbidden' ? 403 : 422, { error: result.failure });
+        if (!result.ok) return fail(statusForFailure(result.failure), { error: result.failure });
         return { ok: true };
     }
 };

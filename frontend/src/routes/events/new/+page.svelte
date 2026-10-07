@@ -7,13 +7,13 @@
 
     // An admin reaches this page but belongs to no organization, so the server
     // cannot place the event; the message says so rather than a generic failure.
-    const error = $derived(
-        form?.error === 'organization_id_required'
-            ? t('eventNew.noOrganization')
-            : form?.error
-              ? t('eventForm.saveFailed')
-              : null
-    );
+    function failureMessage(code: string | undefined): string | null {
+        if (!code) return null;
+        if (code === 'organization_id_required') return t('eventNew.noOrganization');
+        return t('eventForm.saveFailed');
+    }
+
+    const error = $derived(failureMessage(form?.error));
 </script>
 
 <h1>{t('eventNew.title')}</h1>
