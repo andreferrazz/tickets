@@ -3,7 +3,7 @@
     import { resolve } from '$app/paths';
     import { invalidateAll } from '$app/navigation';
     import { page } from '$app/state';
-    import { formatBRL } from '$lib/api';
+    import { formatBRL } from '$lib/utils/currency';
     import { cancellationFailureMessage } from '$lib/modules/orders/checkout-messages';
     import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';
     import { formatDateTime } from '$lib/utils/datetime';

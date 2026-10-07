@@ -6,8 +6,7 @@ import type { ExtraItemRow, ExtraSectionRow, TicketBatchRow, TicketTypeRow } fro
  * {@link EventRepository}, which owns the `events` table itself.
  *
  * Every ordering and soft-delete filter here mirrors `Backend.Events.get_event/1`,
- * because the same event is still served by Phoenix to the pages that have not
- * been migrated yet.
+ * the Phoenix query these pages were first served from.
  *
  * @example
  * const rows = await detailRepository.listTicketTypes(event.id);

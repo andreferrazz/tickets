@@ -2,11 +2,11 @@ import { env } from '$env/dynamic/private';
 import pg from 'pg';
 import { getQueryable, type Queryable } from './queryable';
 
-// Ecto maps `:utc_datetime` to Postgres `timestamp` WITHOUT time zone (see
-// priv/repo/migrations/20260513020000_create_events.exs), so Phoenix writes UTC
-// into a column that carries no zone. node-postgres would parse those strings in
+// Ecto mapped `:utc_datetime` to Postgres `timestamp` WITHOUT time zone (the
+// columns are in db/migrations/0001_baseline.sql), so every row holds UTC in a
+// column that carries no zone, and this app writes them the same way. node-postgres would parse those strings in
 // the server's local zone and silently shift every value. Appending `Z` restores
-// the UTC that Ecto intended. Must run before any pool is created.
+// the UTC that was intended. Must run before any pool is created.
 const TIMESTAMP_WITHOUT_TIME_ZONE_OID = 1114;
 pg.types.setTypeParser(TIMESTAMP_WITHOUT_TIME_ZONE_OID, (value) => new Date(`${value}Z`));
 

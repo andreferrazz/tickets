@@ -2,7 +2,7 @@
     import { enhance } from '$app/forms';
     import { invalidateAll } from '$app/navigation';
     import { page } from '$app/state';
-    import { formatBRL } from '$lib/api';
+    import { formatBRL } from '$lib/utils/currency';
     import { t } from '$lib/i18n';
     import type { TranslationKey } from '$lib/i18n/pt';
     import type { EventStatsDto } from '$lib/modules/events/stats-types';

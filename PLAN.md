@@ -1,5 +1,6 @@
 > **Historical.** This is the original design, written when Phoenix served every
-> request. The app has since moved most of it into SvelteKit; `CLAUDE.md`, `E2E.md`
+> request. The app has since moved all of it into SvelteKit (the Phoenix source
+> was last in the repository at commit `140e83d`); `CLAUDE.md`, `E2E.md`
 > and `frontend/README.md` describe how things work now. Kept for the domain
 > rules it records (roles, payment flow, schema intent).
 

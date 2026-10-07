@@ -29,8 +29,8 @@
         document.documentElement.dataset.hydrated = 'true';
         const { registerSW } = await import('virtual:pwa-register');
         registerSW({ immediate: true });
-        // Keeps the server's view of the session in step with localStorage, which
-        // is still the source of truth while Phoenix serves most endpoints.
+        // Gives a browser signed in before the cutover its session cookie from
+        // the token it holds in localStorage; a no-op for everyone else.
         auth.restoreSessionCookie();
     });
 
