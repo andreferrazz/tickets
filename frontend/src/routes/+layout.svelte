@@ -13,7 +13,7 @@
     import LoginModal from '$lib/components/LoginModal.svelte';
     import { loginModalStore } from '$lib/stores/loginModal.svelte';
 
-    let { children } = $props();
+    let { data, children } = $props();
 
     let menuOpen = $state(false);
 
@@ -29,8 +29,6 @@
         document.documentElement.dataset.hydrated = 'true';
         const { registerSW } = await import('virtual:pwa-register');
         registerSW({ immediate: true });
-        // Needed so the nav can decide whether to show the staff "Scan" entry.
-        if (auth.isAuthed) auth.loadMemberships().catch(() => {});
         // Keeps the server's view of the session in step with localStorage, which
         // is still the source of truth while Phoenix serves most endpoints.
         auth.restoreSessionCookie();
@@ -80,7 +78,7 @@
                 {#if auth.user?.role === 'creator'}
                     <a href={resolve('/events/new')}>{t('nav.newEvent')}</a>
                 {/if}
-                {#if auth.hasStaffMembership}
+                {#if data.scanStaff}
                     <a href={resolve('/scan')} class:active={page.url.pathname.startsWith('/scan')}
                         >{t('nav.scan')}</a
                     >

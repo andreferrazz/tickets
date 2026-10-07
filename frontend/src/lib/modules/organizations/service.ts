@@ -30,6 +30,8 @@ export interface OrganizationService {
     listMembers(organizationId: string): Promise<MemberRow[]>;
     listManagedOrganizationIds(user: SessionUser): Promise<string[]>;
     listMemberOrganizationIds(user: SessionUser): Promise<string[]>;
+    /** Whether `user` is scan-only staff anywhere: what puts "Scan" in the navigation. */
+    isStaffAnywhere(user: SessionUser): Promise<boolean>;
 
     /** Leader-only (admins bypass): the post-invite rename and any later one. */
     rename(user: SessionUser, organizationId: string, name: string): Promise<OrganizationResult>;
@@ -74,6 +76,11 @@ export function getOrganizationService(repository: OrganizationRepository): Orga
         listMembers: (organizationId) => repository.listMembers(organizationId),
         listManagedOrganizationIds: (user) => repository.listManagedOrganizationIds(user.id),
         listMemberOrganizationIds: (user) => repository.listMemberOrganizationIds(user.id),
+
+        async isStaffAnywhere(user) {
+            const memberships = await repository.listMembershipsForUser(user.id);
+            return memberships.some((membership) => membership.role === 'staff');
+        },
 
         async rename(user, organizationId, rawName) {
             const name = rawName.trim();

@@ -5,8 +5,6 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-ARG PUBLIC_API_URL
-ENV PUBLIC_API_URL=${PUBLIC_API_URL}
 RUN npm run build
 
 FROM node:24-alpine AS runner
@@ -15,6 +13,11 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/build ./build
+# The SQL migrations and their runner: plain TypeScript that Node runs as is.
+COPY db ./db
 ENV PORT=3000
 EXPOSE 3000
-CMD ["node", "build/index.js"]
+# Migrate before booting, as the Phoenix entrypoint did, so a deploy can never
+# serve code that is ahead of its schema. A migration that fails stops the
+# container instead of starting the server.
+CMD ["sh", "-c", "node db/cli.ts && exec node build/index.js"]

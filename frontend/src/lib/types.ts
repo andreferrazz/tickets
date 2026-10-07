@@ -28,12 +28,6 @@ export type PaymentMethod = 'PIX' | 'CARD' | 'BOLETO';
 
 export type OrgRole = 'leader' | 'participant' | 'staff';
 
-export interface OrganizationMembership {
-    id: string;
-    name: string;
-    role: OrgRole;
-}
-
 export type PixKeyType = 'cpf' | 'cnpj' | 'email' | 'phone' | 'evp';
 
 export type PayoutStatus = 'pending' | 'complete' | 'failed' | 'cancelled' | 'refunded' | 'expired';
