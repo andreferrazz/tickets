@@ -23,5 +23,6 @@ a container that is up is on its schema. Three things it cannot do for you:
   left the repository after commit `140e83d`: check that out to run it.
 - The environment is in `.env.example`. `INTEGRATIONS` must be `live` (or
   unset) in production, which makes the Abacate Pay and SMTP variables required.
-- `ORDER_RECONCILER=on` and the Abacate Pay webhook registration are part of
-  the environment, not the image: see the comments in `.env.example`.
+- `ORIGIN` and the Abacate Pay webhook registration are part of the
+  environment, not the image: see the comments in `.env.example`. Without
+  `ORIGIN` the server refuses to start.

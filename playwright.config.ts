@@ -33,6 +33,9 @@ export default defineConfig({
             INTEGRATIONS: 'fake',
             // What the webhook specs put in the URL; without it every delivery is refused.
             ABACATE_PAY_WEBHOOK_SECRET: E2E_WEBHOOK_SECRET,
+            // The specs run the sweep themselves (`/e2e-fakes/reconcile`); a timer
+            // firing mid-run would expire rows another spec is still setting up.
+            ORDER_RECONCILER: 'off',
             // A run requests more login codes in a minute than any person would.
             AUTH_CODE_RATE_LIMIT: '1000'
         }
