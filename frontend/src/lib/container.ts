@@ -38,9 +38,21 @@ import {
     getInvitationWriteService,
     type InvitationWriteService
 } from '$lib/modules/invitations/write-service';
+import {
+    getOrderCancellation,
+    type OrderCancellation
+} from '$lib/modules/orders/cancellation-service';
+import { getCartResolver } from '$lib/modules/orders/cart-resolution';
+import { getCompTicketIssuer, type CompTicketIssuer } from '$lib/modules/orders/comp-service';
+import { getFreeOrderSettlement } from '$lib/modules/orders/free-order';
+import { getOrderFulfilment } from '$lib/modules/orders/fulfilment-service';
 import { getEventOrderService } from '$lib/modules/orders/manager-service';
 import { getOrderMapper } from '$lib/modules/orders/mapper';
+import { getOrderStateRepository } from '$lib/modules/orders/order-state-repository';
+import { getOrderPlacement, type OrderPlacement } from '$lib/modules/orders/placement-service';
 import { getOrderRepository } from '$lib/modules/orders/repository';
+import { getReservationRepository } from '$lib/modules/orders/reservation-repository';
+import { getStockReservation } from '$lib/modules/orders/stock-reservation';
 import { getOrderService } from '$lib/modules/orders/service';
 import type { EventService } from '$lib/modules/events/service';
 import { getOrganizationMapper } from '$lib/modules/organizations/mapper';
@@ -105,6 +117,12 @@ export interface Container {
     invitationWrites: InvitationWriteService;
     /** Pass validation at the door; the scan page's load and action call it directly. */
     passCheckIn: PassCheckInService;
+    /** Checkout from the event page; its `buy` action calls it directly. */
+    orderPlacement: OrderPlacement;
+    /** Behind every `cancel` action: the buyer's order pages and the event's order list. */
+    orderCancellation: OrderCancellation;
+    /** Free tickets from the comp page's `send` action. */
+    compTickets: CompTicketIssuer;
     /** For the one load that signs a user in outside the auth BFF: the invite link. */
     userMapper: UserMapper;
 }
@@ -148,6 +166,8 @@ function createContainer(): Container {
     const impersonationRepository = getImpersonationRepository(queryable);
     const eventManagementRepository = getEventManagementRepository(queryable);
     const passRepository = getPassRepository(queryable);
+    const reservationRepository = getReservationRepository(queryable);
+    const orderStateRepository = getOrderStateRepository(queryable);
 
     // services
     const sessionService = getSessionService(sessionRepository);
@@ -200,6 +220,47 @@ function createContainer(): Container {
         managedEvents,
         organizations: organizationService,
         abacatePay
+    });
+    const cartResolver = getCartResolver(reservationRepository);
+    const stockReservation = getStockReservation({
+        queryable,
+        reservations: reservationRepository,
+        passes: passRepository
+    });
+    const orderFulfilment = getOrderFulfilment({
+        queryable,
+        orderStates: orderStateRepository,
+        orders: orderRepository,
+        passes: passRepository,
+        mailer
+    });
+    const freeOrders = getFreeOrderSettlement({
+        orderStates: orderStateRepository,
+        fulfilment: orderFulfilment,
+        stock: stockReservation
+    });
+    const orderPlacement = getOrderPlacement({
+        events: eventRepository,
+        users: userRepository,
+        cart: cartResolver,
+        stock: stockReservation,
+        freeOrders,
+        orderStates: orderStateRepository,
+        abacatePay
+    });
+    const orderCancellation = getOrderCancellation({
+        orderStates: orderStateRepository,
+        stock: stockReservation,
+        managedEvents,
+        abacatePay,
+        fulfilment: orderFulfilment
+    });
+    const compTickets = getCompTicketIssuer({
+        managedEvents,
+        users: userRepository,
+        cart: cartResolver,
+        stock: stockReservation,
+        freeOrders
     });
     // Process-local, like the ETS table it replaces: one instance per server.
     const rateLimiter = getFixedWindowRateLimiter();
@@ -275,6 +336,9 @@ function createContainer(): Container {
         organizations: organizationService,
         invitationWrites,
         passCheckIn,
+        orderPlacement,
+        orderCancellation,
+        compTickets,
         userMapper
     };
 }

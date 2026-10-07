@@ -1,5 +1,5 @@
 import type { Queryable } from '$lib/db/queryable';
-import type { ExtraLineRow, ScannedPassRow } from './types';
+import type { ExtraLineRow, IssuedPassRow, PassDraft, PassOwner, ScannedPassRow } from './types';
 
 export interface PassRepository {
     findByToken(token: string): Promise<ScannedPassRow | null>;
@@ -16,9 +16,20 @@ export interface PassRepository {
 
     /** The extra items of the order, in the order they were bought. */
     listExtraLines(orderId: string): Promise<ExtraLineRow[]>;
+
+    /** The passes `orderId` already has, inside the transaction that may add them. */
+    listIssued(db: Queryable, orderId: string): Promise<IssuedPassRow[]>;
+    insertIssued(db: Queryable, owner: PassOwner, draft: PassDraft): Promise<IssuedPassRow>;
+    /**
+     * Removes every pass of the order. `checkIn` resolves a pass by its token
+     * alone, so a cancelled free order's QR codes would otherwise keep working.
+     */
+    deleteForOrder(db: Queryable, orderId: string): Promise<void>;
 }
 
 const COLUMNS = 'id, kind, item_name, event_id, order_id, checked_in_at';
+const ISSUED_COLUMNS = 'id, kind, item_name, token';
+const NOW = "now() at time zone 'utc'";
 
 export function getPassRepository(queryable: Queryable): PassRepository {
     return {
@@ -49,6 +60,37 @@ export function getPassRepository(queryable: Queryable): PassRepository {
                 where order_id = $1 and item_type = 'extra'
                 order by inserted_at asc, id asc`;
             return queryable.query<ExtraLineRow>(sql, [orderId]);
+        },
+
+        listIssued(db, orderId) {
+            const sql = `
+                select ${ISSUED_COLUMNS} from passes where order_id = $1
+                order by inserted_at asc, id asc`;
+            return db.query<IssuedPassRow>(sql, [orderId]);
+        },
+
+        async insertIssued(db, owner, draft) {
+            const sql = `
+                insert into passes (token, kind, item_name, order_id, order_item_id, event_id, user_id,
+                                    inserted_at, updated_at)
+                values ($1, $2, $3, $4, $5, $6, $7, ${NOW}, ${NOW})
+                returning ${ISSUED_COLUMNS}`;
+            const params = [
+                draft.token,
+                draft.kind,
+                draft.itemName,
+                owner.orderId,
+                draft.orderItemId,
+                owner.eventId,
+                owner.userId
+            ];
+            const rows = await db.query<IssuedPassRow>(sql, params);
+            if (!rows[0]) throw new Error(`insert pass returned no row for order ${owner.orderId}`);
+            return rows[0];
+        },
+
+        async deleteForOrder(db, orderId) {
+            await db.query(`delete from passes where order_id = $1`, [orderId]);
         }
     };
 }

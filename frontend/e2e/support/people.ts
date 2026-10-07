@@ -11,6 +11,8 @@ export interface SeededPerson {
 export interface NewPerson {
     role: 'buyer' | 'creator';
     membership?: { organizationId: string; role: 'participant' | 'staff' };
+    /** A boleto is issued to a name and a tax id; only its buyers need one. */
+    taxId?: string;
 }
 
 /**
@@ -21,10 +23,10 @@ export interface NewPerson {
 export async function seedPerson(person: NewPerson): Promise<SeededPerson> {
     const email = uniqueEmail(person.role);
     const [{ id }] = await queryRows<{ id: string }>(
-        `insert into users (email, role, name, abacate_customer_id, inserted_at, updated_at)
-         values ($1, $2, 'E2E Seeded', 'cust_e2e_seeded', now() at time zone 'utc', now() at time zone 'utc')
+        `insert into users (email, role, name, tax_id, abacate_customer_id, inserted_at, updated_at)
+         values ($1, $2, 'E2E Seeded', $3, 'cust_e2e_seeded', now() at time zone 'utc', now() at time zone 'utc')
          returning id`,
-        [email, person.role]
+        [email, person.role, person.taxId ?? null]
     );
     if (person.membership) {
         await queryRows(

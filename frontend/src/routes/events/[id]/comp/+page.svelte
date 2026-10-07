@@ -1,109 +1,65 @@
 <script lang="ts">
+    import { enhance } from '$app/forms';
     import { resolve } from '$app/paths';
-    import { goto } from '$app/navigation';
     import { page } from '$app/state';
-    import { api, ApiError } from '$lib/api';
     import { t } from '$lib/i18n';
-    import { auth } from '$lib/stores/auth.svelte';
-    import type { CompRecipient, CompTicketsResult, EventDetail, TicketType } from '$lib/types';
-    import { onMount } from 'svelte';
+    import type { TranslationKey } from '$lib/i18n/pt';
+    import type { ActionData, PageData, SubmitFunction } from './$types';
+
+    let { data, form }: { data: PageData; form: ActionData } = $props();
 
     interface Row {
         email: string;
         quantity: number;
     }
 
-    let event = $state<EventDetail | null>(null);
-    let loading = $state(true);
-    let error = $state<string | null>(null);
+    const emptyRow = (): Row => ({ email: '', quantity: 1 });
 
-    let selectedTypeId = $state('');
-    let rows = $state<Row[]>([{ email: '', quantity: 1 }]);
+    let rows = $state<Row[]>([emptyRow()]);
     let sending = $state(false);
-    let formError = $state<string | null>(null);
-    let result = $state<CompTicketsResult | null>(null);
 
-    // Only ticket types with an open batch can be issued — the backend resolves
-    // the active batch and would otherwise reject them as out of stock.
+    // Server-rendered: an event this visitor may not manage never reaches this
+    // component. Only ticket types with an open batch can be given away; the
+    // server resolves the batch on sale and would refuse the rest as sold out.
     const availableTypes = $derived(
-        (event?.ticket_types ?? []).filter((tt: TicketType) => tt.active_batch)
+        (data.event?.ticketTypes ?? []).filter((ticketType) => ticketType.activeBatch)
     );
+    const hasRecipients = $derived(rows.some((row) => row.email.trim() !== ''));
+    const summary = $derived(form?.summary ?? null);
 
-    // Rows with a non-empty email, normalized into the API payload shape.
-    const recipients = $derived<CompRecipient[]>(
-        rows
-            .map((r) => ({
-                email: r.email.trim().toLowerCase(),
-                quantity: Math.max(1, r.quantity)
-            }))
-            .filter((r) => r.email !== '')
-    );
+    const REASONS: Record<string, TranslationKey> = {
+        invalid_email: 'comp.error.invalid_email',
+        invalid_quantity: 'comp.error.invalid_quantity',
+        out_of_stock: 'comp.error.out_of_stock',
+        invalid_item: 'comp.error.invalid_item',
+        event_not_available: 'comp.error.event_not_available',
+        not_found: 'comp.error.not_found',
+        no_recipients: 'comp.needRecipients'
+    };
 
-    // Maps the backend's short reason string to a localized label, falling back
-    // to a generic message for anything unmapped.
     function reasonLabel(reason: string): string {
-        if (reason.startsWith('invalid_email')) return t('comp.error.invalid_email');
-        if (reason.startsWith('invalid_quantity')) return t('comp.error.invalid_quantity');
-        if (reason.startsWith('out_of_stock')) return t('comp.error.out_of_stock');
-        if (reason.startsWith('event_not_available')) return t('comp.error.event_not_available');
-        if (reason.startsWith('not_found')) return t('comp.error.not_found');
-        return t('comp.error.generic');
+        return t(REASONS[reason] ?? 'comp.error.generic');
     }
 
     function addRow() {
-        rows = [...rows, { email: '', quantity: 1 }];
+        rows = [...rows, emptyRow()];
     }
 
     function removeRow(index: number) {
         rows = rows.filter((_, i) => i !== index);
-        if (rows.length === 0) rows = [{ email: '', quantity: 1 }];
+        if (rows.length === 0) rows = [emptyRow()];
     }
 
-    onMount(async () => {
-        if (!auth.isAuthed) {
-            await goto(
-                `${resolve('/auth/login')}?next=${resolve('/events/[id]/comp', { id: page.params.id! })}`
-            );
-            return;
-        }
-        try {
-            event = await api.getEvent(page.params.id!);
-            const first = (event.ticket_types ?? []).find((tt) => tt.active_batch);
-            if (first) selectedTypeId = first.id;
-        } catch (e) {
-            if (e instanceof ApiError && e.status === 404) {
-                error = t('comp.notAuthorized');
-            } else {
-                error = e instanceof ApiError ? e.message : t('comp.errorFallback');
-            }
-        } finally {
-            loading = false;
-        }
-    });
-
-    async function send() {
-        if (sending) return;
-        formError = null;
-        if (!selectedTypeId) {
-            formError = t('comp.needTicketType');
-            return;
-        }
-        if (recipients.length === 0) {
-            formError = t('comp.needRecipients');
-            return;
-        }
+    const submitSend: SubmitFunction = () => {
         sending = true;
-        result = null;
-        try {
-            result = await api.sendCompTickets(page.params.id!, selectedTypeId, recipients);
-            // On a fully successful send, reset the form to a single empty row.
-            if (result.failed.length === 0) rows = [{ email: '', quantity: 1 }];
-        } catch (e) {
-            formError = e instanceof ApiError ? e.message : t('comp.errorFallback');
-        } finally {
+        return async ({ result, update }) => {
             sending = false;
-        }
-    }
+            // The typed list survives a partial send so the failures can be fixed.
+            await update({ reset: false });
+            const sent = result.type === 'success' && result.data?.summary?.failed.length === 0;
+            if (sent) rows = [emptyRow()];
+        };
+    };
 </script>
 
 <header class="head">
@@ -113,20 +69,18 @@
     >
 </header>
 
-{#if loading}
-    <p class="muted">{t('common.loading')}</p>
-{:else if error}
-    <div class="error">{error}</div>
+{#if data.loadFailed}
+    <div class="error">{t('comp.errorFallback')}</div>
 {:else}
     <p class="muted subtitle">{t('comp.subtitle')}</p>
 
     {#if availableTypes.length === 0}
         <p class="muted">{t('comp.noTicketTypes')}</p>
     {:else}
-        <div class="card form">
+        <form method="POST" action="?/send" class="card form" use:enhance={submitSend}>
             <label class="field">
                 <span>{t('comp.ticketType')}</span>
-                <select bind:value={selectedTypeId}>
+                <select name="ticket_type_id">
                     {#each availableTypes as tt (tt.id)}
                         <option value={tt.id}>{tt.name}</option>
                     {/each}
@@ -140,12 +94,14 @@
                         <div class="row">
                             <input
                                 type="email"
+                                name="email"
                                 class="email"
                                 placeholder={t('comp.emailPlaceholder')}
                                 bind:value={row.email}
                             />
                             <input
                                 type="number"
+                                name="quantity"
                                 class="qty"
                                 min="1"
                                 step="1"
@@ -169,32 +125,32 @@
                 </button>
             </div>
 
-            {#if formError}
-                <div class="error">{formError}</div>
+            {#if form?.error}
+                <div class="error">{reasonLabel(form.error)}</div>
             {/if}
 
-            <button class="btn" onclick={send} disabled={sending || recipients.length === 0}>
+            <button class="btn" disabled={sending || !hasRecipients}>
                 {sending ? t('comp.sending') : t('comp.send')}
             </button>
-        </div>
+        </form>
     {/if}
 
-    {#if result}
+    {#if summary}
         <div class="card result">
-            {#if result.sent.length > 0}
-                <h3>{t('comp.sentTitle', { count: result.sent.length })}</h3>
+            {#if summary.sent.length > 0}
+                <h3>{t('comp.sentTitle', { count: summary.sent.length })}</h3>
                 <ul class="sent">
-                    {#each result.sent as email (email)}
+                    {#each summary.sent as email, i (i)}
                         <li>{email}</li>
                     {/each}
                 </ul>
             {/if}
-            {#if result.failed.length > 0}
-                <h3>{t('comp.failedTitle', { count: result.failed.length })}</h3>
+            {#if summary.failed.length > 0}
+                <h3>{t('comp.failedTitle', { count: summary.failed.length })}</h3>
                 <ul class="failed">
-                    {#each result.failed as row, i (i)}
+                    {#each summary.failed as row, i (i)}
                         <li>
-                            <span class="email">{row.email ?? '—'}</span> — {reasonLabel(row.error)}
+                            <span class="email">{row.email}</span> — {reasonLabel(row.error)}
                         </li>
                     {/each}
                 </ul>

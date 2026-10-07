@@ -1,18 +1,6 @@
 import { PUBLIC_API_URL } from '$env/static/public';
 import { auth } from '$lib/stores/auth.svelte';
-import type {
-    CartLine,
-    CompRecipient,
-    CompTicketsResult,
-    EventDetail,
-    EventOrder,
-    Order,
-    Organization,
-    OrganizationMembership,
-    PaymentMethod,
-    Payout,
-    PayoutSettings
-} from '$lib/types';
+import type { Organization, OrganizationMembership, Payout, PayoutSettings } from '$lib/types';
 
 const BASE = PUBLIC_API_URL;
 if (!BASE) {
@@ -76,8 +64,6 @@ async function request<T>(path: string, opts: FetchOptions = {}): Promise<T> {
 export const api = {
     myOrganizations: (fetcher?: typeof fetch) =>
         request<OrganizationMembership[]>('/me/organizations', { fetcher }),
-    getEvent: (id: string, fetcher?: typeof fetch) =>
-        request<EventDetail>(`/events/${id}`, { fetcher }),
     updatePayoutSettings: (orgId: string, body: PayoutSettings) =>
         request<Organization>(`/organizations/${orgId}/payout-settings`, {
             method: 'PATCH',
@@ -85,20 +71,7 @@ export const api = {
         }),
     createPayout: (eventId: string, body: { amount_cents: number }) =>
         request<Payout>(`/events/${eventId}/payouts`, { method: 'POST', body }),
-    listPayouts: (eventId: string) => request<Payout[]>(`/events/${eventId}/payouts`),
-    createOrder: (event_id: string, items: CartLine[], payment_method?: PaymentMethod) =>
-        request<Order>('/orders', {
-            method: 'POST',
-            body: { event_id, items, payment_method }
-        }),
-    cancelEventOrder: (eventId: string, orderId: string) =>
-        request<EventOrder>(`/events/${eventId}/orders/${orderId}/cancel`, { method: 'POST' }),
-    sendCompTickets: (eventId: string, itemId: string, recipients: CompRecipient[]) =>
-        request<CompTicketsResult>(`/events/${eventId}/comp-orders`, {
-            method: 'POST',
-            body: { item_id: itemId, recipients }
-        }),
-    cancelOrder: (id: string) => request<Order>(`/orders/${id}/cancel`, { method: 'POST' })
+    listPayouts: (eventId: string) => request<Payout[]>(`/events/${eventId}/payouts`)
 };
 
 export function formatBRL(cents: number): string {

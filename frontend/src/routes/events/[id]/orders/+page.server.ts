@@ -1,6 +1,8 @@
-import { error } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
+import { statusForFailure } from '$lib/forms/action-status';
 import { requireSessionUser } from '$lib/modules/sessions/require-user';
-import type { PageServerLoad } from './$types';
+import { text } from '$lib/utils/form-fields';
+import type { Actions, PageServerLoad } from './$types';
 
 /**
  * Every order on one event, for its managers. Status and name filters stay in
@@ -15,4 +17,16 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
     }
 
     return data;
+};
+
+/** A manager cancels a buyer's order on this event, under the buyer's own rules. */
+export const actions: Actions = {
+    cancel: async ({ request, locals, params, url }) => {
+        const user = requireSessionUser(locals.user, url.pathname);
+        const orderId = text(await request.formData(), 'order_id');
+        const cancellation = locals.container.orderCancellation;
+        const result = await cancellation.cancelForManager(user, params.id, orderId, url.origin);
+        if (!result.ok) return fail(statusForFailure(result.failure), { error: result.failure });
+        return { cancelled: true };
+    }
 };

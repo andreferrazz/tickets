@@ -1,6 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
-import { parse } from 'devalue';
 import { DRAFT_ORG, MEMBER, OTHER_ORG_DRAFT } from './support/fixtures';
+import { postFormAction, type ActionAnswer } from './support/form-action';
 import { waitForHydration } from './support/hydration';
 import { seedPerson } from './support/people';
 import { withoutScripts } from './support/html';
@@ -21,21 +21,13 @@ async function createEvent(page: Page, title: string): Promise<string> {
 }
 
 /** Posts one of the edit page's actions directly, as the row forms do. */
-async function postAction(
+function postAction(
     context: BrowserContext,
     eventId: string,
     action: string,
     form: Record<string, string>
-): Promise<{ type: string; data: Record<string, unknown> }> {
-    const response = await context.request.post(`/events/${eventId}/edit?/${action}`, {
-        form,
-        headers: { 'x-sveltekit-action': 'true' }
-    });
-    const body = (await response.json()) as { type: string; data?: string };
-    return {
-        type: body.type,
-        data: body.data ? (parse(body.data) as Record<string, unknown>) : {}
-    };
+): Promise<ActionAnswer> {
+    return postFormAction(context.request, `/events/${eventId}/edit?/${action}`, form);
 }
 
 test.beforeEach(async ({ context }) => signIn(context, MEMBER.token));
@@ -56,7 +48,7 @@ test('a creator builds an event: ticket type, priced and free batches, close, pu
     await batchForm.getByRole('button', { name: 'Adicionar lote' }).click();
     await expect(page.locator('form[action="?/updateBatch"]').getByText('Lote 1')).toBeVisible();
 
-    // A priced batch gets its Abacate product inside the same transaction.
+    // A priced batch is written together with its Abacate product id.
     const productId = await queryValue<string>(
         `select b.abacate_product_id from ticket_batches b join ticket_types t on t.id = b.ticket_type_id
          where t.event_id = $1 and b.sequence = 1`,
@@ -183,14 +175,14 @@ test('a buyer who manages an organization still cannot create an event', async (
     const context = await browser.newContext();
     await signIn(context, buyer.token);
 
-    const response = await context.request.post('/events/new?/create', {
-        form: { title: 'E2E Forbidden Show', starts_at: '2027-08-01T20:00:00Z', status: 'draft' },
-        headers: { 'x-sveltekit-action': 'true' }
+    const answer = await postFormAction(context.request, '/events/new?/create', {
+        title: 'E2E Forbidden Show',
+        starts_at: '2027-08-01T20:00:00Z',
+        status: 'draft'
     });
-    const body = (await response.json()) as { type: string; data: string };
 
-    expect(body.type).toBe('failure');
-    expect((parse(body.data) as { error: string }).error).toBe('forbidden');
+    expect(answer.type).toBe('failure');
+    expect(answer.data.error).toBe('forbidden');
     expect(
         await queryValue<string>(`select id from events where title = 'E2E Forbidden Show'`, [])
     ).toBeNull();

@@ -28,6 +28,8 @@ in-process fakes.
    the fake mailer through `/e2e-fakes/outbox` (`support/outbox.ts`), which
    exists only under `INTEGRATIONS=fake`. Database reads are for facts a page
    does not show.
+   Payments are played the same way: `support/fake-abacate.ts` tells the fake
+   Abacate Pay that a checkout was paid.
 7. "Server-rendered" is asserted on markup with the scripts removed
    (`support/html.ts`): SvelteKit serialises load data into a script tag, so the
    raw HTML proves nothing about rendering. Leak checks use the raw HTML.
@@ -57,9 +59,10 @@ the same files `npm run db:migrate` applies everywhere else.
 | `organization.spec.ts` | Leader invites a participant who joins from the emailed link; admin invites a new leader whose organization is born with the invitation and renamed on arrival; role change and removal from the team page | A GET of the link leaves it pending; used, expired and unknown links refused with their own messages; duplicate pending invitation refused; the leader row has no controls |
 | `login-modal.spec.ts` | The in-page login modal on the event page: email, code and profile steps through the same actions as the auth pages, ending signed in without leaving the event | "Change email" keeps the typed address |
 | `checkin.spec.ts` | The scanner for an event: a ticket is admitted once and the second scan shows when it was first used; an extras pass lists what to hand over; scan-only staff can validate | A pass of another event and an unknown code are refused and admit nothing; outsiders get a 404, not a 403; anonymous sent to login |
+| `checkout.spec.ts` | Buying from the event page through the `buy` action: a free order is paid on the spot with one QR per ticket and one for the extras, on the page and in two emails; a Pix order waits with its payment link and holds stock; a boleto sends the browser to the provider. Buyer cancel from the order and from the list, manager cancel from the event's orders, comp tickets to a guest list | A pending order paid behind our back (`/e2e-fakes/abacate-pay/settle`) is fulfilled, not cancelled; two buyers racing for the last ticket get one order; selling out closes the batch and a cancellation reopens it; a cancelled free order loses its passes; ten malformed carts refused with nothing reserved; a draft event sells nothing; anonymous sent to login; other buyers and another organization's manager get `not_found`; a guest past the stock is skipped, the rest still sent; a comp is free on a priced batch; outsiders get a 404 on the comp page |
 
 ## Planned
 
 One spec per remaining migration step, added by the PR that ports the flow:
-`checkout` (11), `webhook` and `order-expiry` (12), `payout` (13).
+`webhook` and `order-expiry` (12), `payout` (13).
 The step numbers are those of the migration plan, not of `PLAN.md`.

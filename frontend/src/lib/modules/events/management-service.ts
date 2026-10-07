@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { Queryable } from '$lib/db/queryable';
 import { describeAbacateFailure } from '$lib/integrations/abacate-pay/errors';
 import type { AbacatePayGateway } from '$lib/integrations/abacate-pay/gateway';
@@ -29,8 +30,8 @@ import type { ExtraItemRow, ExtraSectionRow, TicketTypeRow } from './types';
 /**
  * Event management as `Backend.Events` ruled it: every write is scoped to an
  * event the caller manages, deletes are logical, and a priced batch or extra
- * gets its Abacate Pay product inside the same transaction as its row, so
- * neither exists without the other.
+ * is only written once its Abacate Pay product exists, so no priced row is
+ * ever on sale without one.
  */
 export interface EventManagementService {
     createEvent(user: SessionUser, input: EventInput): Promise<ManagementResult<CreatedEvent>>;
@@ -102,9 +103,6 @@ const failed = <T>(failure: ManagementFailure, fieldErrors?: FieldErrors): Manag
     fieldErrors ? { ok: false, failure, fieldErrors } : { ok: false, failure };
 const invalid = <T>(fieldErrors: FieldErrors): ManagementResult<T> | null =>
     Object.keys(fieldErrors).length > 0 ? failed('validation', fieldErrors) : null;
-
-/** Thrown inside a transaction so the row rolls back when Abacate refuses the product. */
-class ProductSyncError extends Error {}
 
 export function getEventManagementService(
     deps: EventManagementServiceDeps
@@ -208,19 +206,16 @@ export function getEventManagementService(
             const errors = invalid<void>(validateBatch(input));
             if (errors) return errors;
             const sequence = await repo.nextBatchSequence(ticketType.id);
-            return withProduct(deps, async (tx) => {
-                const batch = await repo.insertBatch(tx, {
-                    ...input,
-                    ticketTypeId: ticketType.id,
-                    sequence
-                });
-                const product = await createProductUnlessFree(deps, {
-                    name: `${ticketType.name} - Lote ${sequence}`,
-                    priceCents: batch.price_cents,
-                    externalId: `batch_${batch.id}`
-                });
-                if (product) await repo.setBatchProduct(tx, batch.id, product);
+            const id = randomUUID();
+            const product = await createProductUnlessFree(deps, {
+                name: `${ticketType.name} - Lote ${sequence}`,
+                priceCents: input.priceCents,
+                externalId: `batch_${id}`
             });
+            if (product === 'unavailable') return failed('abacate_unavailable');
+            const row = { ...input, id, ticketTypeId: ticketType.id, sequence, productId: product };
+            await repo.insertBatch(row);
+            return ok(undefined);
         },
 
         async updateBatch(user, id, input) {
@@ -256,19 +251,16 @@ export function getEventManagementService(
             if (errors) return errors;
             const sectionId = await resolveSection(repo, event.id, input.sectionId);
             if (!sectionId) return failed('section_not_found');
-            return withProduct(deps, async (tx) => {
-                const extra = await repo.insertExtra(tx, event.id, {
-                    ...input,
-                    sectionId,
-                    name: input.name.trim()
-                });
-                const product = await createProductUnlessFree(deps, {
-                    name: extra.name,
-                    priceCents: extra.price_cents,
-                    externalId: `extra_${extra.id}`
-                });
-                if (product) await repo.setExtraProduct(tx, extra.id, product);
+            const id = randomUUID();
+            const name = input.name.trim();
+            const product = await createProductUnlessFree(deps, {
+                name,
+                priceCents: input.priceCents,
+                externalId: `extra_${id}`
             });
+            if (product === 'unavailable') return failed('abacate_unavailable');
+            await repo.insertExtra(event.id, { ...input, id, sectionId, name, productId: product });
+            return ok(undefined);
         },
 
         async updateExtra(user, id, input) {
@@ -362,35 +354,23 @@ async function resolveSection(
     return section?.event_id === eventId ? section.id : null;
 }
 
+// The row's id is chosen before the row exists so the product can carry it,
+// which lets the Abacate call run first and outside any transaction: a slow
+// provider then holds no pooled connection. If the insert that follows fails,
+// an unused product is left at Abacate, which costs nothing.
+//
 // Zero-priced records get no product: Abacate rejects them and the checkout
 // payload leaves free lines out anyway.
 async function createProductUnlessFree(
     deps: EventManagementServiceDeps,
     product: { name: string; priceCents: number; externalId: string }
-): Promise<string | null> {
+): Promise<string | null | 'unavailable'> {
     if (product.priceCents === 0) return null;
     try {
         return await deps.abacatePay.createProduct(product);
     } catch (cause) {
-        throw new ProductSyncError(`abacate product for ${product.externalId} failed`, { cause });
-    }
-}
-
-async function withProduct(
-    deps: EventManagementServiceDeps,
-    work: (tx: Queryable) => Promise<void>
-): Promise<ManagementResult<void>> {
-    try {
-        await deps.queryable.transaction(work);
-        return ok(undefined);
-    } catch (cause) {
-        if (!(cause instanceof ProductSyncError)) throw cause;
-        console.warn(
-            JSON.stringify({
-                event: 'abacate_product_create_failed',
-                ...describeAbacateFailure(cause.cause)
-            })
-        );
-        return failed('abacate_unavailable');
+        const event = 'abacate_product_create_failed';
+        console.warn(JSON.stringify({ event, ...describeAbacateFailure(cause) }));
+        return 'unavailable';
     }
 }

@@ -105,6 +105,14 @@ export const pt = {
     'event.errorExtraExceedsTickets':
         'Você pediu mais desse complemento do que ingressos no pedido.',
     'event.buy': 'Comprar',
+    'checkout.error.noItems': 'Nenhum item selecionado.',
+    'checkout.error.invalidItem': 'Um dos itens não está mais disponível. Atualize a página.',
+    'checkout.error.outOfStock': 'Esgotado',
+    'checkout.error.paymentMethod': 'Escolha uma forma de pagamento.',
+    'checkout.error.profileIncomplete': 'Complete seu cadastro para pagar com boleto.',
+    'checkout.error.unavailable':
+        'Não foi possível iniciar o pagamento. Tente novamente em instantes.',
+    'checkout.error.fallback': 'Não foi possível criar o pedido.',
     'event.buying': 'Criando pedido...',
     'payment.choose': 'Como você quer pagar?',
     'payment.pix': 'Pix',
@@ -181,6 +189,7 @@ export const pt = {
     'comp.error.not_found': 'Evento indisponível',
     'comp.error.event_not_available': 'Evento não publicado',
     'comp.error.generic': 'Não foi possível enviar',
+    'comp.error.invalid_item': 'Tipo de ingresso indisponível',
     'dashboard.ordersPending': 'Pedidos pendentes',
     'dashboard.byTicketType': 'Por tipo de ingresso',
     'dashboard.byExtra': 'Por complemento',
@@ -355,6 +364,11 @@ export const pt = {
         'Tem certeza que deseja cancelar este pedido? Esta ação não pode ser desfeita.',
     'order.cancelling': 'Cancelando…',
     'order.cancelError': 'Falha ao cancelar o pedido',
+    'order.cancelNotFound': 'Pedido não encontrado.',
+    'order.cancelNotCancellable': 'Este pedido não pode mais ser cancelado.',
+    'order.cancelAlreadyPaid': 'Este pedido já foi pago e não pode ser cancelado.',
+    'order.cancelCheckFailed':
+        'Não foi possível confirmar o pagamento agora. Tente novamente em instantes.',
 
     // Invitations
     'invitations.title': 'Convites',
