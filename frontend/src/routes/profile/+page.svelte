@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { resolve } from '$app/paths';
     import { enhance } from '$app/forms';
     import { t, tStatus } from '$lib/i18n';
     import { auth } from '$lib/stores/auth.svelte';
@@ -40,8 +41,11 @@
                                     >{roleLabel(m.role)}</span
                                 >
                                 {#if m.role === 'leader' || m.role === 'participant'}
-                                    <a class="manage" href="/organizations/{m.id}/invitations"
-                                        >{t('profile.orgs.manageInvites')}</a
+                                    <a
+                                        class="manage"
+                                        href={resolve('/organizations/[id]/invitations', {
+                                            id: m.id
+                                        })}>{t('profile.orgs.manageInvites')}</a
                                     >
                                 {/if}
                             </span>

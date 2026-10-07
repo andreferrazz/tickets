@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { resolve } from '$app/paths';
     import { invalidateAll } from '$app/navigation';
     import { page } from '$app/state';
     import { api, ApiError, formatBRL } from '$lib/api';
@@ -102,7 +103,9 @@
 
 <header class="head">
     <h1>{t('eventOrders.title')}</h1>
-    <a href="/events/{page.params.id}/dashboard" class="btn secondary small">←</a>
+    <a href={resolve('/events/[id]/dashboard', { id: page.params.id! })} class="btn secondary small"
+        >←</a
+    >
 </header>
 
 {#if data.loadFailed}

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { resolve } from '$app/paths';
     import { goto } from '$app/navigation';
     import { t } from '$lib/i18n';
     import { auth } from '$lib/stores/auth.svelte';
@@ -12,7 +13,7 @@
     onMount(async () => {
         if (!data.token || !data.user) return;
         await auth.set(data.token, data.user);
-        await goto('/');
+        await goto(resolve('/'));
     });
 </script>
 
@@ -21,7 +22,7 @@
         {#if !data.user}
             <h1>{t('impersonate.errorTitle')}</h1>
             <p class="error">{t('impersonate.errorFallback')}</p>
-            <a href="/auth/login">{t('impersonate.goLogin')}</a>
+            <a href={resolve('/auth/login')}>{t('impersonate.goLogin')}</a>
         {:else}
             <p>{t('impersonate.loading')}</p>
         {/if}

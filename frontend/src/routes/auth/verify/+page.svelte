@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { resolve } from '$app/paths';
     import { enhance } from '$app/forms';
     import { goto } from '$app/navigation';
     import { t } from '$lib/i18n';
@@ -18,7 +19,7 @@
     // complete, carrying `next` along so it is honoured afterwards.
     function destination(profileComplete: boolean, next: string): string {
         if (profileComplete) return next;
-        return `/auth/profile?next=${encodeURIComponent(next)}`;
+        return `${resolve('/auth/profile')}?next=${encodeURIComponent(next)}`;
     }
 </script>
 
@@ -75,7 +76,7 @@
             <button type="submit" disabled={busy || code.length !== 6}>
                 {busy ? t('auth.verify.verifying') : t('auth.verify.verify')}
             </button>
-            <a href="/auth/login" class="muted">{t('auth.verify.changeEmail')}</a>
+            <a href={resolve('/auth/login')} class="muted">{t('auth.verify.changeEmail')}</a>
         </form>
     </div>
 </div>

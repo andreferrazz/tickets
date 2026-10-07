@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { resolve } from '$app/paths';
     import { page } from '$app/state';
     import { t } from '$lib/i18n';
 
@@ -9,4 +10,4 @@
 
 <div class="error">{message}</div>
 
-<p><a class="btn secondary" href="/">{t('nav.events')}</a></p>
+<p><a class="btn secondary" href={resolve('/')}>{t('nav.events')}</a></p>

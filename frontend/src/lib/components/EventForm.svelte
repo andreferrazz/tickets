@@ -28,8 +28,8 @@
     let starts_at = $state(initial.startsAt ? toLocalInputValue(initial.startsAt) : '');
     // svelte-ignore state_referenced_locally
     let cover_image_url = $state(initial.coverImageUrl ?? '');
+    // svelte-ignore state_referenced_locally
     let status = $state<'draft' | 'published' | 'closed'>(
-        // svelte-ignore state_referenced_locally
         initial.status === 'published' || initial.status === 'closed' ? initial.status : 'draft'
     );
     let busy = $state(false);
@@ -97,12 +97,4 @@
 </form>
 
 <style>
-    .check {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-    .small {
-        font-size: 0.85rem;
-    }
 </style>

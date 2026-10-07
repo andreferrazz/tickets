@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { resolve } from '$app/paths';
     import { invalidateAll } from '$app/navigation';
     import { api, ApiError, formatBRL } from '$lib/api';
     import { t, tStatus } from '$lib/i18n';
@@ -46,12 +47,12 @@
 {#if data.loadFailed}
     <div class="error">{t('orders.errorFallback')}</div>
 {:else if data.orders.length === 0}
-    <p class="muted">{t('orders.empty')} <a href="/">{t('orders.browseEvents')}</a>.</p>
+    <p class="muted">{t('orders.empty')} <a href={resolve('/')}>{t('orders.browseEvents')}</a>.</p>
 {:else}
     <div class="stack">
         {#each data.orders as o (o.id)}
             <div class="order-row">
-                <a href="/orders/{o.id}" class="order">
+                <a href={resolve('/orders/[id]', { id: o.id })} class="order">
                     <div>
                         <strong>{o.eventTitle}</strong>
                         <div class="muted small">{formatDateTime(o.createdAt)}</div>

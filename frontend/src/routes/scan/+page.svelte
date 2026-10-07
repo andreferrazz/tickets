@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { resolve } from '$app/paths';
     import { formatDateTime } from '$lib/utils/datetime';
     import { t } from '$lib/i18n';
     import type { PageData } from './$types';
@@ -18,7 +19,7 @@
 {:else}
     <div class="stack">
         {#each data.events as ev (ev.id)}
-            <a href="/events/{ev.id}/scan" class="line card">
+            <a href={resolve('/events/[id]/scan', { id: ev.id })} class="line card">
                 <div>
                     <strong>{ev.title}</strong>
                     <div class="muted small">{formatDateTime(ev.startsAt)} · {ev.location}</div>

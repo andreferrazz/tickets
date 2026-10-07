@@ -486,14 +486,6 @@
 {/if}
 
 <style>
-    .row-line {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.5rem 0.75rem;
-        background: var(--surface-2);
-        border-radius: var(--radius);
-    }
     .small {
         font-size: 0.85rem;
     }

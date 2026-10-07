@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { resolve } from '$app/paths';
     import { formatDateTime } from '$lib/utils/datetime';
     import { t, tStatus } from '$lib/i18n';
     import type { PageData } from './$types';
@@ -39,7 +40,7 @@
 {:else}
     <div class="grid">
         {#each data.events as ev (ev.id)}
-            <a href="/events/{ev.id}" class="event-card">
+            <a href={resolve('/events/[id]', { id: ev.id })} class="event-card">
                 {#if ev.coverImageUrl}
                     <img src={ev.coverImageUrl} alt="" loading="lazy" />
                 {:else}
