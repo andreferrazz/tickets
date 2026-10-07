@@ -1,3 +1,4 @@
+import { logLoadFailure } from './load-failure';
 import type { InvitationMapper } from '$lib/modules/invitations/mapper';
 import type { InvitationService } from '$lib/modules/invitations/service';
 import type { InvitationDto } from '$lib/modules/invitations/types';
@@ -29,7 +30,7 @@ export interface OrganizationsBffDeps {
 }
 
 export function getOrganizationsBff(deps: OrganizationsBffDeps): OrganizationsBff {
-    organizationsBff ??= {
+    return {
         async team(user, organizationId) {
             try {
                 const managerRole = await deps.organizations.managerRoleFor(user, organizationId);
@@ -51,18 +52,11 @@ export function getOrganizationsBff(deps: OrganizationsBffDeps): OrganizationsBf
                     loadFailed: false
                 };
             } catch (cause) {
-                console.error(
-                    JSON.stringify({
-                        event: 'organization_team_load_failed',
-                        organizationId,
-                        error: String(cause)
-                    })
-                );
+                logLoadFailure('organization_team_load_failed', { organizationId }, cause);
                 return { ...denied(), loadFailed: true };
             }
         }
     };
-    return organizationsBff;
 }
 
 function denied(): OrganizationTeamData {
@@ -74,5 +68,3 @@ function denied(): OrganizationTeamData {
         loadFailed: false
     };
 }
-
-let organizationsBff: OrganizationsBff | null = null;

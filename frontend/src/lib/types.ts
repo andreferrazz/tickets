@@ -13,12 +13,6 @@ export interface User {
     created_at: string;
 }
 
-export interface ProfileUpdate {
-    name: string;
-    cellphone: string;
-    tax_id: string;
-}
-
 export interface Event {
     id: string;
     organization_id: string;
@@ -155,16 +149,6 @@ export interface EventOrder {
     validated_count: number;
 }
 
-export interface Invitation {
-    id: string;
-    inviter_id: string;
-    organization_id: string;
-    role: OrgRole;
-    email: string;
-    status: 'pending' | 'accepted';
-    created_at: string;
-}
-
 export interface Organization {
     id: string;
     name: string;
@@ -176,29 +160,10 @@ export interface Organization {
 
 export type OrgRole = 'leader' | 'participant' | 'staff';
 
-export interface OrgMember {
-    user_id: string;
-    email: string;
-    role: OrgRole;
-}
-
-export interface InvitedOrganization {
-    id: string;
-    name: string;
-    role: OrgRole;
-}
-
 export interface OrganizationMembership {
     id: string;
     name: string;
     role: OrgRole;
-}
-
-export interface AuthResponse {
-    token: string;
-    user: User;
-    /** Present only when this auth response came from accepting an invitation. */
-    organization?: InvitedOrganization;
 }
 
 export interface CartLine {
@@ -217,22 +182,6 @@ export interface CompTicketsResult {
     sent: string[];
     /** Recipients that were skipped, each with a short reason string. */
     failed: { email: string | null; error: string }[];
-}
-
-export interface EventStatsTotals {
-    orders_paid: number;
-    orders_pending: number;
-    revenue_cents: number;
-    gross_revenue_cents: number;
-    fees_cents: number;
-    net_revenue_cents: number;
-    available_to_withdraw_cents: number;
-    last_payout_at: string | null;
-    tickets_sold: number;
-    tickets_capacity: number;
-    extras_sold: number;
-    passes_issued: number;
-    passes_checked_in: number;
 }
 
 export type PixKeyType = 'cpf' | 'cnpj' | 'email' | 'phone' | 'evp';
@@ -255,34 +204,6 @@ export interface Payout {
     created_at: string;
 }
 
-export interface BatchStats {
-    id: string;
-    sequence: number;
-    label: string;
-    sold: number;
-    capacity: number;
-    price_cents: number;
-    closed_at: string | null;
-}
-
-export interface TicketTypeStats {
-    id: string;
-    name: string;
-    sold: number;
-    capacity: number;
-    revenue_cents: number;
-    batches: BatchStats[];
-}
-
-export interface ExtraStats {
-    id: string;
-    name: string;
-    section_title: string;
-    sold: number;
-    capacity: number | null;
-    revenue_cents: number;
-}
-
 export interface RecentOrderRow {
     id: string;
     buyer_email: string;
@@ -291,25 +212,4 @@ export interface RecentOrderRow {
     paid_at: string | null;
     created_at: string;
     item_count: number;
-}
-
-export interface EventStats {
-    event_id: string;
-    totals: EventStatsTotals;
-    ticket_types: TicketTypeStats[];
-    extras: ExtraStats[];
-    recent_orders: RecentOrderRow[];
-    can_withdraw: boolean;
-    organization: {
-        id: string;
-        pix_key: string | null;
-        pix_key_type: PixKeyType | null;
-    };
-}
-
-export interface ExtraBuyer {
-    name: string | null;
-    tax_id: string | null;
-    email: string;
-    quantity: number;
 }

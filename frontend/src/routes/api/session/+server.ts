@@ -11,15 +11,15 @@ import { error, json, type RequestHandler } from '@sveltejs/kit';
  * sites from posting one on a visitor's behalf.
  */
 export const POST: RequestHandler = async ({ request, cookies }) => {
-	const { token } = (await request.json()) as { token?: unknown };
-	if (typeof token !== 'string' || token === '') {
-		error(422, `expected body { token: string }, got token: ${JSON.stringify(token)}`);
-	}
-	cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
-	return json({ stored: true });
+    const { token } = (await request.json()) as { token?: unknown };
+    if (typeof token !== 'string' || token === '') {
+        error(422, `expected body { token: string }, got token: ${JSON.stringify(token)}`);
+    }
+    cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
+    return json({ stored: true });
 };
 
 export const DELETE: RequestHandler = ({ cookies }) => {
-	cookies.delete(SESSION_COOKIE, { path: SESSION_COOKIE_OPTIONS.path });
-	return json({ cleared: true });
+    cookies.delete(SESSION_COOKIE, { path: SESSION_COOKIE_OPTIONS.path });
+    return json({ cleared: true });
 };

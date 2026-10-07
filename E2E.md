@@ -49,7 +49,6 @@ the same files `npm run db:migrate` applies everywhere else.
 
 ## Planned
 
-One spec per migration step, added by the PR that ports the flow:
-`event-management` (8),
-`checkin` (10), `checkout` (11), `webhook` and
-`order-expiry` (12), `payout` (13).
+One spec per remaining migration step, added by the PR that ports the flow:
+`checkin` (10), `checkout` (11), `webhook` and `order-expiry` (12), `payout` (13).
+The step numbers are those of the migration plan, not of `PLAN.md`.

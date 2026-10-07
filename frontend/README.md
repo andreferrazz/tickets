@@ -1,42 +1,13 @@
-# sv
+# Tickets frontend
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+The SvelteKit app: pages, form actions and the server modules behind them.
+Conventions are in `../CLAUDE.md`; the test catalog is `../E2E.md`.
 
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project
-npx sv create my-app
 ```
-
-To recreate this project with the same configuration:
-
-```sh
-# recreate this project
-npx sv@0.15.3 create --template minimal --types ts --install npm frontend
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
+cp .env.example .env         # then set DATABASE_URL; INTEGRATIONS=fake needs no secrets
+npm ci
+npm run db:migrate           # applies db/migrations to DATABASE_URL
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+npm test                     # Playwright; PGPORT/PGHOST point it at another Postgres
+npm run check                # svelte-check over src, db and e2e
 ```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.

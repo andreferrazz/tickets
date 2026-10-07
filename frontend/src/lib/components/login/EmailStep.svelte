@@ -2,7 +2,8 @@
     import { enhance } from '$app/forms';
     import { t } from '$lib/i18n';
     import { loginModalStore } from '$lib/stores/loginModal.svelte';
-    import { failureText, type LoginActionResult } from './failure-text';
+    import { loginFailureMessage } from '$lib/modules/accounts/auth-messages';
+    import { failureCode, type LoginActionResult } from './failure-text';
 
     // Posts to the login page's own action and intercepts the result to stay in
     // the modal, so there is one login flow on the server and this is only
@@ -23,7 +24,7 @@
                 loginModalStore.toCode(email);
                 return;
             }
-            error = failureText(result.data, t('auth.login.errorFallback'));
+            error = loginFailureMessage(failureCode(result.data));
         };
     };
 </script>

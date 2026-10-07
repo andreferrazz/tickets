@@ -1,3 +1,4 @@
+import { logLoadFailure } from './load-failure';
 import type { EventMapper } from '$lib/modules/events/mapper';
 import type { EventService } from '$lib/modules/events/service';
 import type { EventDto } from '$lib/modules/events/types';
@@ -19,7 +20,7 @@ export interface HomeBff {
 }
 
 export function getHomeBff(service: EventService, mapper: EventMapper): HomeBff {
-    homeBff ??= {
+    return {
         async index(user, filters): Promise<HomeData> {
             try {
                 const rows = await service.listVisible(user);
@@ -29,18 +30,12 @@ export function getHomeBff(service: EventService, mapper: EventMapper): HomeBff 
                     .filter(searchFilter(filters.search));
                 return { events, filters, loadFailed: false };
             } catch (cause) {
-                console.error(
-                    JSON.stringify({ event: 'home_events_load_failed', error: String(cause) })
-                );
+                logLoadFailure('home_events_load_failed', {}, cause);
                 return { events: [], filters, loadFailed: true };
             }
         }
     };
-
-    return homeBff;
 }
-
-let homeBff: HomeBff | null = null;
 
 function closedFilter(closed: boolean) {
     return (event: EventDto) => closed || event.status !== 'closed';

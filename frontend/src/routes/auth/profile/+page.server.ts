@@ -1,3 +1,4 @@
+import { text } from '$lib/utils/form-fields';
 import { fail, redirect } from '@sveltejs/kit';
 import { requireSessionUser } from '$lib/modules/sessions/require-user';
 import { safeNext } from '$lib/utils/next';
@@ -22,9 +23,9 @@ export const actions: Actions = {
         const sessionUser = requireSessionUser(locals.user, url.pathname);
         const form = await request.formData();
         const input = {
-            name: String(form.get('name') ?? ''),
-            cellphone: String(form.get('cellphone') ?? ''),
-            taxId: String(form.get('tax_id') ?? '')
+            name: text(form, 'name'),
+            cellphone: text(form, 'cellphone'),
+            taxId: text(form, 'tax_id')
         };
 
         const outcome = await locals.container.authBff.completeProfile(sessionUser, input);

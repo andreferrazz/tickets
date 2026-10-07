@@ -1,3 +1,8 @@
+> **Historical.** This is the original design, written when Phoenix served every
+> request. The app has since moved most of it into SvelteKit; `CLAUDE.md`, `E2E.md`
+> and `frontend/README.md` describe how things work now. Kept for the domain
+> rules it records (roles, payment flow, schema intent).
+
 # PLAN.md — Tickets: Event Ticketing Platform
 
 ## Project Overview

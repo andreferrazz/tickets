@@ -1,40 +1,19 @@
 import { PUBLIC_API_URL } from '$env/static/public';
-import { canBuyerCancel } from '$lib/modules/orders/policy';
 import { auth } from '$lib/stores/auth.svelte';
 import type {
-    AuthResponse,
-    Batch,
+    CartLine,
     CompRecipient,
     CompTicketsResult,
-    Event,
     EventDetail,
     EventOrder,
-    EventStats,
-    ExtraBuyer,
-    ExtraItem,
-    ExtraSection,
-    Invitation,
     Order,
-    OrderStatus,
-    PaymentMethod,
     Organization,
     OrganizationMembership,
-    OrgMember,
-    OrgRole,
-    Pass,
+    PaymentMethod,
     Payout,
     PayoutSettings,
-    ProfileUpdate,
-    TicketType,
-    User,
-    CartLine,
     ValidateResult
 } from '$lib/types';
-
-/** The buyer cancellation rule for the snake_case API shape; see `canBuyerCancel`. */
-export function isCancellable(order: Pick<Order, 'status' | 'total_cents'>): boolean {
-    return canBuyerCancel({ status: order.status, totalCents: order.total_cents });
-}
 
 const BASE = PUBLIC_API_URL;
 if (!BASE) {

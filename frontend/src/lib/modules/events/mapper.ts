@@ -15,7 +15,7 @@ export interface EventMapper {
 }
 
 export function getEventMapper(): EventMapper {
-    eventMapper ??= {
+    return {
         toDto(row: EventRow): EventDto {
             return {
                 id: row.id,
@@ -34,8 +34,4 @@ export function getEventMapper(): EventMapper {
             };
         }
     };
-
-    return eventMapper;
 }
-
-let eventMapper: EventMapper | null = null;

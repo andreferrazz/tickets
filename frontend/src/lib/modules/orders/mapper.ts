@@ -31,7 +31,7 @@ export interface OrderMapper {
 }
 
 export function getOrderMapper(): OrderMapper {
-    orderMapper ??= {
+    return {
         toOrderDto(order, items) {
             return {
                 id: order.id,
@@ -76,7 +76,6 @@ export function getOrderMapper(): OrderMapper {
             };
         }
     };
-    return orderMapper;
 }
 
 function toItemDto(item: OrderItemRow): OrderItemDto {
@@ -94,5 +93,3 @@ function toItemDto(item: OrderItemRow): OrderItemDto {
 function toLineDto(item: OrderItemRow): EventOrderLineDto {
     return { name: item.item_name, quantity: item.quantity, unitPriceCents: item.unit_price_cents };
 }
-
-let orderMapper: OrderMapper | null = null;

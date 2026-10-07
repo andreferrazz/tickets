@@ -24,7 +24,7 @@
     }
 </script>
 
-<svelte:window on:keydown={onKeydown} />
+<svelte:window onkeydown={onKeydown} />
 
 {#if target}
     <div class="backdrop" onclick={onBackdropClick} role="presentation">
