@@ -132,22 +132,34 @@ test('two requests sent together make one payout', async ({ browser }) => {
 });
 
 test('a payout Abacate Pay could not take is marked failed and does not use up the day', async ({
-    browser
+    context,
+    page
 }) => {
     const { event, leader } = await seedPayingEvent();
-    const context = await contextFor(browser, leader);
+    await signIn(context, leader.token);
     // The fake fails payouts to keys that start with `outage+`.
     await saveKey(context, event, 'outage+caixa@e2e.test');
+    await openWithdraw(page, event);
+    const dialog = page.getByRole('dialog', { name: 'Sacar dinheiro' });
 
-    const refused = await withdraw(context, event, '5000');
+    await dialog.getByLabel('Valor a sacar').fill('50,00');
+    await dialog.getByRole('button', { name: 'Confirmar saque' }).click();
 
-    expect(refused.data.error).toBe('abacate_unavailable');
+    // The attempt is in the history at once, without a reload, and the balance is whole.
+    await expect(dialog.getByRole('listitem')).toContainText('Falhou');
+    await expect(dialog.getByText('Disponível: R$ 99,20')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Confirmar saque' })).toBeVisible();
     expect(await payoutRows(event)).toMatchObject([{ status: 'failed', abacate: null }]);
+    // Why it failed is kept on the row, for whoever has to find out.
+    expect(
+        await queryValue<string>('select error_message from payouts where event_id = $1', [
+            event.id
+        ])
+    ).toContain('upstream (503)');
     // Nothing left the balance, so the whole of it can still go, today.
     await saveKey(context, event, 'caixa@e2e.test');
     expect((await withdraw(context, event, '9920')).type).toBe('success');
     expect((await payoutRows(event)).map((row) => row.status)).toEqual(['failed', 'pending']);
-    await context.close();
 });
 
 test('requests that must not go through are refused, and write nothing', async ({ browser }) => {

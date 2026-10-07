@@ -1,5 +1,6 @@
 <script lang="ts">
     import { enhance } from '$app/forms';
+    import { invalidateAll } from '$app/navigation';
     import { page } from '$app/state';
     import { formatBRL } from '$lib/api';
     import { t } from '$lib/i18n';
@@ -100,9 +101,12 @@
         withdrawSubmitting = true;
         return async ({ result, update }) => {
             withdrawSubmitting = false;
-            // Re-reads the balance, the daily limit and the history.
+            // Re-reads the balance, the daily limit and the history. `update`
+            // only does that for a success, and a payout the provider refused
+            // has left a failed row the history must show too.
             await update({ reset: false });
             if (result.type === 'success') amountCents = 0;
+            else await invalidateAll();
         };
     };
 
