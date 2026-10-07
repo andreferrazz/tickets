@@ -30,6 +30,15 @@ export interface OrganizationDto {
     updatedAt: string;
 }
 
+/** One of the caller's memberships with the organization's name, for the profile page. */
+export interface MembershipSummaryRow {
+    id: string;
+    name: string;
+    role: OrgRole;
+}
+
+export type AddMemberOutcome = 'added' | 'already_member' | 'leader_exists';
+
 export interface OrgMemberDto {
     userId: string;
     email: string;

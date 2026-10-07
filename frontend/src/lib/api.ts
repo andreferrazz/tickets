@@ -96,18 +96,8 @@ async function request<T>(path: string, opts: FetchOptions = {}): Promise<T> {
 }
 
 export const api = {
-    requestCode: (email: string) =>
-        request<{ sent: boolean }>('/auth/request-code', {
-            method: 'POST',
-            body: { email }
-        }),
-    verifyCode: (email: string, code: string) =>
-        request<AuthResponse>('/auth/verify-code', { method: 'POST', body: { email, code } }),
-    logout: () => request<{ logged_out: boolean }>('/auth/logout', { method: 'DELETE' }),
-    me: (fetcher?: typeof fetch) => request<User>('/me', { fetcher }),
     myOrganizations: (fetcher?: typeof fetch) =>
         request<OrganizationMembership[]>('/me/organizations', { fetcher }),
-    updateProfile: (body: ProfileUpdate) => request<User>('/me/profile', { method: 'PATCH', body }),
     getEvent: (id: string, fetcher?: typeof fetch) =>
         request<EventDetail>(`/events/${id}`, { fetcher }),
     createEvent: (body: Partial<Event>) => request<Event>('/events', { method: 'POST', body }),
@@ -182,8 +172,6 @@ export const api = {
         request<void>(`/organizations/${orgId}/members/${userId}`, { method: 'DELETE' }),
     acceptInvitation: (token: string) =>
         request<AuthResponse>('/invitations/accept', { method: 'POST', body: { token } }),
-    impersonateUser: (id: string) =>
-        request<{ token: string }>(`/admin/users/${id}/impersonate`, { method: 'POST', body: {} }),
     updateOrganization: (id: string, body: { name: string }) =>
         request<Organization>(`/organizations/${id}`, { method: 'PATCH', body }),
     deleteOrganization: (id: string) =>

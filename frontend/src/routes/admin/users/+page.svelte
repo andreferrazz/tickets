@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { api, ApiError } from '$lib/api';
+    import { deserialize } from '$app/forms';
     import { t } from '$lib/i18n';
     import type { UserDto } from '$lib/modules/accounts/types';
     import type { PageData } from './$types';
@@ -22,21 +22,37 @@
         })
     );
 
-    // Impersonation still goes through Phoenix until the auth step of the migration.
+    // Posts the page's own action by hand: the button is not a form, and the
+    // token must be read back to build the link rather than navigate anywhere.
+    async function mintToken(userId: string): Promise<string> {
+        const body = new FormData();
+        body.set('userId', userId);
+        const response = await fetch('?/impersonate', {
+            method: 'POST',
+            body,
+            headers: { 'x-sveltekit-action': 'true' }
+        });
+        const result = deserialize(await response.text());
+        if (result.type !== 'success' || typeof result.data?.token !== 'string') {
+            throw new Error(`impersonation failed: ${result.type}`);
+        }
+        return result.data.token;
+    }
+
     async function copyLoginLink(user: UserDto) {
         if (busyId) return;
         busyId = user.id;
         copyError = null;
         try {
-            const { token } = await api.impersonateUser(user.id);
+            const token = await mintToken(user.id);
             const link = `${window.location.origin}/auth/impersonate?token=${token}`;
             await navigator.clipboard.writeText(link);
             copiedId = user.id;
             setTimeout(() => {
                 if (copiedId === user.id) copiedId = null;
             }, 2000);
-        } catch (e) {
-            copyError = e instanceof ApiError ? e.message : t('adminUsers.copyErrorFallback');
+        } catch {
+            copyError = t('adminUsers.copyErrorFallback');
         } finally {
             busyId = null;
         }

@@ -106,10 +106,10 @@ async function insertUsers(client: pg.Client): Promise<void> {
         // No profile_complete column: Phoenix derives that flag from name/cellphone/
         // tax_id when it serialises a user.
         await client.query(
-            `insert into users (id, email, role, name, cellphone, tax_id, inserted_at, updated_at)
-			 values ($1, $2, $3, 'E2E User', '11999999999', '39053344705',
+            `insert into users (id, email, role, name, cellphone, tax_id, abacate_customer_id, inserted_at, updated_at)
+			 values ($1, $2, $3, 'E2E User', '11999999999', '39053344705', $4,
 			         now() at time zone 'utc', now() at time zone 'utc')`,
-            [user.id, user.email, user.role]
+            [user.id, user.email, user.role, `cust_e2e_${user.role}`]
         );
     }
     // Only MEMBER belongs to an org; ADMIN deliberately belongs to none, so the

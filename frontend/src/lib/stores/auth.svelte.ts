@@ -1,23 +1,26 @@
 import { browser } from '$app/environment';
+import { fromApiUser } from '$lib/modules/accounts/legacy';
+import type { UserDto } from '$lib/modules/accounts/types';
 import type { OrganizationMembership, User } from '$lib/types';
 
 const STORAGE_KEY = 'tickets.auth';
 const SESSION_ENDPOINT = '/api/session';
 
 interface Persisted {
-	token: string;
-	user: User;
+    token: string;
+    user: UserDto;
 }
 
 function load(): Persisted | null {
-	if (!browser) return null;
-	const raw = localStorage.getItem(STORAGE_KEY);
-	if (!raw) return null;
-	try {
-		return JSON.parse(raw) as Persisted;
-	} catch {
-		return null;
-	}
+    if (!browser) return null;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    try {
+        const persisted = JSON.parse(raw) as { token: string; user: UserDto | User };
+        return { token: persisted.token, user: migrateUser(persisted.user) };
+    } catch {
+        return null;
+    }
 }
 
 /**
@@ -26,134 +29,140 @@ function load(): Persisted | null {
  * header, which every Phoenix-served endpoint still needs.
  */
 async function storeSessionCookie(token: string): Promise<void> {
-	await fetch(SESSION_ENDPOINT, {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ token })
-	});
+    await fetch(SESSION_ENDPOINT, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token })
+    });
 }
 
 async function dropSessionCookie(): Promise<void> {
-	await fetch(SESSION_ENDPOINT, { method: 'DELETE' });
+    await fetch(SESSION_ENDPOINT, { method: 'DELETE' });
+}
+
+// Sessions stored before the login flow moved here hold the Phoenix shape of the
+// user. Converting on read keeps those visitors signed in across the change.
+function migrateUser(user: UserDto | User): UserDto {
+    return 'profile_complete' in user ? fromApiUser(user) : user;
 }
 
 class AuthStore {
-	token = $state<string | null>(null);
-	user = $state<User | null>(null);
-	memberships = $state<OrganizationMembership[] | null>(null);
+    token = $state<string | null>(null);
+    user = $state<UserDto | null>(null);
+    memberships = $state<OrganizationMembership[] | null>(null);
 
-	#inflight: Promise<OrganizationMembership[]> | null = null;
+    #inflight: Promise<OrganizationMembership[]> | null = null;
 
-	constructor() {
-		const p = load();
-		if (p) {
-			this.token = p.token;
-			this.user = p.user;
-		}
-	}
+    constructor() {
+        const p = load();
+        if (p) {
+            this.token = p.token;
+            this.user = p.user;
+        }
+    }
 
-	/**
-	 * Await this before navigating: the server reads the session cookie while
-	 * rendering, so a navigation that races the cookie write renders as anonymous.
-	 */
-	async set(token: string, user: User): Promise<void> {
-		this.token = token;
-		this.user = user;
-		this.memberships = null;
-		this.#inflight = null;
-		if (!browser) return;
-		localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user }));
-		await storeSessionCookie(token);
-	}
+    /**
+     * Await this before navigating: the server reads the session cookie while
+     * rendering, so a navigation that races the cookie write renders as anonymous.
+     */
+    async set(token: string, user: UserDto): Promise<void> {
+        this.token = token;
+        this.user = user;
+        this.memberships = null;
+        this.#inflight = null;
+        if (!browser) return;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user }));
+        await storeSessionCookie(token);
+    }
 
-	setUser(user: User): void {
-		this.user = user;
-		if (browser && this.token) {
-			localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: this.token, user }));
-		}
-	}
+    setUser(user: UserDto): void {
+        this.user = user;
+        if (browser && this.token) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: this.token, user }));
+        }
+    }
 
-	/**
-	 * Re-issues the session cookie from the token held in localStorage. Covers
-	 * sessions that predate the cookie and cookies that expired before the token
-	 * did; without it those visitors would be server-rendered as anonymous.
-	 */
-	async restoreSessionCookie(): Promise<void> {
-		if (!browser || !this.token) return;
-		await storeSessionCookie(this.token);
-	}
+    /**
+     * Re-issues the session cookie from the token held in localStorage. Covers
+     * sessions that predate the cookie and cookies that expired before the token
+     * did; without it those visitors would be server-rendered as anonymous.
+     */
+    async restoreSessionCookie(): Promise<void> {
+        if (!browser || !this.token) return;
+        await storeSessionCookie(this.token);
+    }
 
-	/** Await this before navigating, for the same reason as {@link AuthStore.set}. */
-	async clear(): Promise<void> {
-		this.token = null;
-		this.user = null;
-		this.memberships = null;
-		this.#inflight = null;
-		if (!browser) return;
-		localStorage.removeItem(STORAGE_KEY);
-		await dropSessionCookie();
-	}
+    /** Await this before navigating, for the same reason as {@link AuthStore.set}. */
+    async clear(): Promise<void> {
+        this.token = null;
+        this.user = null;
+        this.memberships = null;
+        this.#inflight = null;
+        if (!browser) return;
+        localStorage.removeItem(STORAGE_KEY);
+        await dropSessionCookie();
+    }
 
-	/**
-	 * Lazily fetches the user's org memberships once per session, deduping
-	 * concurrent callers. Pass `force: true` after an event that should
-	 * invalidate the cache (e.g. accepting another invitation).
-	 */
-	async loadMemberships(force = false): Promise<OrganizationMembership[]> {
-		if (!this.token) return [];
-		if (!force && this.memberships) return this.memberships;
-		if (!force && this.#inflight) return this.#inflight;
+    /**
+     * Lazily fetches the user's org memberships once per session, deduping
+     * concurrent callers. Pass `force: true` after an event that should
+     * invalidate the cache (e.g. accepting another invitation).
+     */
+    async loadMemberships(force = false): Promise<OrganizationMembership[]> {
+        if (!this.token) return [];
+        if (!force && this.memberships) return this.memberships;
+        if (!force && this.#inflight) return this.#inflight;
 
-		// Import lazily to avoid the api ↔ auth cycle at module-load time.
-		const { api } = await import('$lib/api');
-		this.#inflight = api
-			.myOrganizations()
-			.then((rows) => {
-				this.memberships = rows;
-				return rows;
-			})
-			.finally(() => {
-				this.#inflight = null;
-			});
+        // Import lazily to avoid the api ↔ auth cycle at module-load time.
+        const { api } = await import('$lib/api');
+        this.#inflight = api
+            .myOrganizations()
+            .then((rows) => {
+                this.memberships = rows;
+                return rows;
+            })
+            .finally(() => {
+                this.#inflight = null;
+            });
 
-		return this.#inflight;
-	}
+        return this.#inflight;
+    }
 
-	/**
-	 * True when the user may manage `orgId`: an admin, or a `leader`/`participant`
-	 * member. `staff` members are scan-only and excluded here.
-	 */
-	canManageOrg(orgId: string | null | undefined): boolean {
-		if (!orgId) return false;
-		if (this.user?.role === 'admin') return true;
-		return !!this.memberships?.some(
-			(m) => m.id === orgId && (m.role === 'leader' || m.role === 'participant')
-		);
-	}
+    /**
+     * True when the user may manage `orgId`: an admin, or a `leader`/`participant`
+     * member. `staff` members are scan-only and excluded here.
+     */
+    canManageOrg(orgId: string | null | undefined): boolean {
+        if (!orgId) return false;
+        if (this.user?.role === 'admin') return true;
+        return !!this.memberships?.some(
+            (m) => m.id === orgId && (m.role === 'leader' || m.role === 'participant')
+        );
+    }
 
-	/** True when the user may scan `orgId`'s tickets: an admin or any member (incl. staff). */
-	canScan(orgId: string | null | undefined): boolean {
-		if (!orgId) return false;
-		if (this.user?.role === 'admin') return true;
-		return !!this.memberships?.some((m) => m.id === orgId);
-	}
+    /** True when the user may scan `orgId`'s tickets: an admin or any member (incl. staff). */
+    canScan(orgId: string | null | undefined): boolean {
+        if (!orgId) return false;
+        if (this.user?.role === 'admin') return true;
+        return !!this.memberships?.some((m) => m.id === orgId);
+    }
 
-	/** True when the user holds a scan-only `staff` membership in any org. */
-	get hasStaffMembership(): boolean {
-		return !!this.memberships?.some((m) => m.role === 'staff');
-	}
+    /** True when the user holds a scan-only `staff` membership in any org. */
+    get hasStaffMembership(): boolean {
+        return !!this.memberships?.some((m) => m.role === 'staff');
+    }
 
-	get isAuthed(): boolean {
-		return !!this.token;
-	}
+    get isAuthed(): boolean {
+        return !!this.token;
+    }
 
-	get isCreator(): boolean {
-		return this.user?.role === 'creator' || this.user?.role === 'admin';
-	}
+    get isCreator(): boolean {
+        return this.user?.role === 'creator' || this.user?.role === 'admin';
+    }
 
-	get isAdmin(): boolean {
-		return this.user?.role === 'admin';
-	}
+    get isAdmin(): boolean {
+        return this.user?.role === 'admin';
+    }
 }
 
 export const auth = new AuthStore();

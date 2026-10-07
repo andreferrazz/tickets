@@ -42,10 +42,11 @@ the same files `npm run db:migrate` applies everywhere else.
 | `orders.spec.ts` | Buyer's order list and order detail server-rendered: items, total, one QR per pass, payment link while pending; anonymous sent to login with `next` | Another buyer's order, missing and malformed ids are 404, never 403 |
 | `dashboard.spec.ts` | Creator dashboard and event orders server-rendered: revenue, stock, recent orders, buyers of an item from the `buyers` query parameter, validated counts | Another organization's event is 404 for a manager, 200 for an admin; anonymous sent to login with `next` |
 | `management.spec.ts` | Organization team page (members, invitations), admin users, admin invitations, scan landing | Non-managers and non-admins sent home with a 303; another inviter's invitation never shows on the admin page |
+| `auth.spec.ts` | Passwordless login end to end: code by email (read back from `auth_codes`), profile step with the fake Abacate customer, `next` carried through, logout, admin impersonation link | Wrong code refused; invalid CPF refused before any customer call; pending invitation accepted on first login |
 
 ## Planned
 
 One spec per migration step, added by the PR that ports the flow:
-`auth` (7), `event-management` (8),
+`event-management` (8),
 `organization` (9), `checkin` (10), `checkout` (11), `webhook` and
 `order-expiry` (12), `payout` (13).

@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { api, ApiError } from '$lib/api';
 	import { t } from '$lib/i18n';
+	import { fromApiUser } from '$lib/modules/accounts/legacy';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { onMount } from 'svelte';
 
@@ -15,7 +16,7 @@
 		const token = page.params.token!;
 		try {
 			const res = await api.acceptInvitation(token);
-			await auth.set(res.token, res.user);
+			await auth.set(res.token, fromApiUser(res.user));
 			// Admin-invited leaders land on the rename form; their org was
 			// auto-named "<email-local-part>'s Org" and they should set it
 			// before doing anything else. Participants skip straight home.
