@@ -1,7 +1,10 @@
 import { expect, test } from '@playwright/test';
+import { MEMBER } from './support/fixtures';
+import { postFormAction } from './support/form-action';
 import { orderColumn, passCount, placeOrder, sold } from './support/orders';
 import { emailsTo } from './support/outbox';
 import { seedSellableEvent } from './support/sellable-event';
+import { signIn } from './support/session';
 import { queryValue } from './support/sql';
 import { checkoutCompleted, checkoutRefunded, deliverWebhook } from './support/webhook';
 
@@ -64,22 +67,33 @@ test('a boleto is confirmed by its own event', async () => {
     expect(await passCount(order.id)).toBe(1);
 });
 
-test('a refund gives the stock back once', async () => {
+test('a refund gives the stock back once and its passes stop working', async ({ context }) => {
     const event = await seedSellableEvent(PRICED);
     const order = await placeOrder(event, { quantity: 2, paymentMethod: 'PIX' });
     await deliverWebhook(checkoutCompleted(order.checkoutId));
     expect(await sold(event)).toBe(2);
+    const token = await queryValue<string>('select token from passes where order_id = $1 limit 1', [
+        order.id
+    ]);
 
     expect(await deliverWebhook(checkoutRefunded(order.checkoutId))).toBe(200);
 
     expect(await orderColumn(order.id, 'status')).toBe('refunded');
     expect(await sold(event)).toBe(0);
+    expect(await passCount(order.id)).toBe(0);
+    // At the door, the refunded ticket is just an unknown code.
+    await signIn(context, MEMBER.token);
+    const scan = await postFormAction(context.request, `/events/${event.id}/scan?/checkin`, {
+        token: token as string
+    });
+    expect(scan.data.error).toBe('not_found');
     // A redelivered refund must not release the stock a second time, and a
-    // replayed payment must not un-refund the order.
+    // replayed payment must neither un-refund the order nor reissue its passes.
     expect(await deliverWebhook(checkoutRefunded(order.checkoutId))).toBe(200);
     expect(await deliverWebhook(checkoutCompleted(order.checkoutId))).toBe(200);
     expect(await sold(event)).toBe(0);
     expect(await orderColumn(order.id, 'status')).toBe('refunded');
+    expect(await passCount(order.id)).toBe(0);
 });
 
 test('a delivery that cannot prove itself is refused, and neither logged nor acted on', async () => {

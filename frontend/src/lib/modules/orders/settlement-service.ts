@@ -17,7 +17,7 @@ export type SettlementOutcome = 'settled' | 'not_found';
 export interface OrderSettlement {
     /** Marks the order of `checkoutId` paid, issues its passes and mails them. */
     paid(checkoutId: string, payment: SettledPayment, origin: string): Promise<SettlementOutcome>;
-    /** Marks a paid order refunded and gives its stock back. */
+    /** Marks a paid order refunded, gives its stock back and invalidates its passes. */
     refunded(checkoutId: string): Promise<SettlementOutcome>;
 }
 
@@ -46,8 +46,10 @@ export function getOrderSettlement(deps: OrderSettlementDeps): OrderSettlement {
             return 'settled';
         },
 
-        // Passes are left in place, as Phoenix left them. Only an order that
-        // is paid is refunded, so a redelivery cannot release its stock twice.
+        // The passes go with the money: a pass is validated by its token
+        // alone, so a refunded ticket would otherwise still open the door, as it
+        // did under Phoenix. Only an order that is paid is refunded, so a
+        // redelivery cannot release its stock twice.
         async refunded(checkoutId) {
             const order = await deps.orderStates.findByCheckout(checkoutId);
             if (!order) return 'not_found';
@@ -55,7 +57,7 @@ export function getOrderSettlement(deps: OrderSettlementDeps): OrderSettlement {
                 orderId: order.id,
                 from: ['paid'],
                 to: 'refunded',
-                deletePasses: false
+                deletePasses: true
             });
             return 'settled';
         }
