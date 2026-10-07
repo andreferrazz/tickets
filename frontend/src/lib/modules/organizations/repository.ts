@@ -1,6 +1,12 @@
 import type { Queryable } from '$lib/db/queryable';
 import type { OrgRole } from '$lib/types';
-import type { AddMemberOutcome, MembershipSummaryRow, MemberRow, OrganizationRow } from './types';
+import type {
+    AddMemberOutcome,
+    MemberChangeOutcome,
+    MembershipSummaryRow,
+    MemberRow,
+    OrganizationRow
+} from './types';
 
 export interface OrganizationRepository {
     findById(id: string): Promise<OrganizationRow | null>;
@@ -31,6 +37,18 @@ export interface OrganizationRepository {
         userId: string,
         role: OrgRole
     ): Promise<AddMemberOutcome>;
+
+    insert(name: string): Promise<OrganizationRow>;
+    rename(id: string, name: string): Promise<void>;
+    /** Whether the user behind `email` already belongs to `organizationId`. */
+    isEmailMember(email: string, organizationId: string): Promise<boolean>;
+    /** Never touches the leader row: that is a transfer, not a role change. */
+    setMemberRole(
+        organizationId: string,
+        userId: string,
+        role: 'participant' | 'staff'
+    ): Promise<MemberChangeOutcome>;
+    removeMember(organizationId: string, userId: string): Promise<MemberChangeOutcome>;
 }
 
 export function getOrganizationRepository(queryable: Queryable): OrganizationRepository {
@@ -81,6 +99,50 @@ export function getOrganizationRepository(queryable: Queryable): OrganizationRep
             return queryable.query<MembershipSummaryRow>(sql, [userId]);
         },
 
+        async insert(name) {
+            const sql = `
+                insert into organizations (name, inserted_at, updated_at)
+                values ($1, now() at time zone 'utc', now() at time zone 'utc')
+                returning id, name, pix_key, pix_key_type, inserted_at, updated_at`;
+            const rows = await queryable.query<OrganizationRow>(sql, [name]);
+            if (!rows[0]) throw new Error('insert organization returned no row');
+            return rows[0];
+        },
+
+        async rename(id, name) {
+            const sql = `update organizations set name = $2, updated_at = now() at time zone 'utc' where id = $1`;
+            await queryable.query(sql, [id, name]);
+        },
+
+        async isEmailMember(email, organizationId) {
+            const sql = `
+                select 1 from organization_memberships m join users u on u.id = m.user_id
+                where u.email = $1 and m.organization_id = $2 limit 1`;
+            return (await queryable.query(sql, [email, organizationId])).length > 0;
+        },
+
+        async setMemberRole(organizationId, userId, role) {
+            const current = await memberRole(queryable, organizationId, userId);
+            if (current === null) return 'not_found';
+            if (current === 'leader') return 'leader';
+            const sql = `
+                update organization_memberships set role = $3, updated_at = now() at time zone 'utc'
+                where organization_id = $1 and user_id = $2`;
+            await queryable.query(sql, [organizationId, userId, role]);
+            return 'changed';
+        },
+
+        async removeMember(organizationId, userId) {
+            const current = await memberRole(queryable, organizationId, userId);
+            if (current === null) return 'not_found';
+            if (current === 'leader') return 'leader';
+            await queryable.query(
+                `delete from organization_memberships where organization_id = $1 and user_id = $2`,
+                [organizationId, userId]
+            );
+            return 'changed';
+        },
+
         async addMember(db, organizationId, userId, role) {
             const sql = `
                 insert into organization_memberships (organization_id, user_id, role, inserted_at, updated_at)
@@ -104,6 +166,15 @@ function uniqueViolationOutcome(cause: unknown): AddMemberOutcome | null {
     if (error.code !== '23505') return null;
     if (error.constraint === 'organization_memberships_one_leader_index') return 'leader_exists';
     return 'already_member';
+}
+
+async function memberRole(
+    db: Queryable,
+    organizationId: string,
+    userId: string
+): Promise<OrgRole | null> {
+    const sql = `select role from organization_memberships where organization_id = $1 and user_id = $2`;
+    return (await db.query<{ role: OrgRole }>(sql, [organizationId, userId]))[0]?.role ?? null;
 }
 
 function idsOf(rows: { organization_id: string }[]): string[] {

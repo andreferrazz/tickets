@@ -13,6 +13,21 @@ export interface InvitationRow {
     inserted_at: Date;
 }
 
+/** The row with the parts only the accept link and the email see. */
+export interface InvitationSecretRow extends InvitationRow {
+    token: string;
+    expires_at: Date;
+}
+
+export interface NewInvitationRow {
+    inviterId: string;
+    organizationId: string;
+    role: OrgRole;
+    email: string;
+    token: string;
+    ttlHours: number;
+}
+
 /** The wire shape of Phoenix's `invitation_json/1`, in camelCase. */
 export interface InvitationDto {
     id: string;
