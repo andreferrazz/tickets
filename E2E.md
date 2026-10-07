@@ -43,6 +43,7 @@ the same files `npm run db:migrate` applies everywhere else.
 | `dashboard.spec.ts` | Creator dashboard and event orders server-rendered: revenue, stock, recent orders, buyers of an item from the `buyers` query parameter, validated counts | Another organization's event is 404 for a manager, 200 for an admin; anonymous sent to login with `next` |
 | `management.spec.ts` | Organization team page (members, invitations), admin users, admin invitations, scan landing | Non-managers and non-admins sent home with a 303; another inviter's invitation never shows on the admin page |
 | `auth.spec.ts` | Passwordless login end to end: code by email (read back from `auth_codes`), profile step with the fake Abacate customer, `next` carried through, logout, admin impersonation link | Wrong code refused; invalid CPF refused before any customer call; pending invitation accepted on first login |
+| `event-management.spec.ts` | Creator builds an event through the real forms: ticket type, priced and free batches (product only for the priced one), close a batch, publish; extras and sections through the page actions | Section with extras refused; batch with sales refused; another organization's event is 404 |
 
 ## Planned
 

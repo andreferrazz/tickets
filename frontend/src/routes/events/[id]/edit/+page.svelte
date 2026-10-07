@@ -1,215 +1,92 @@
 <script lang="ts">
-    import { goto } from '$app/navigation';
-    import { page } from '$app/state';
-    import { api, ApiError, formatBRL } from '$lib/api';
-    import { formatCentsInput, parseCentsInput } from '$lib/utils/currency';
+    import { enhance } from '$app/forms';
     import EventForm from '$lib/components/EventForm.svelte';
     import FloatingField from '$lib/components/FloatingField.svelte';
-    import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';
-    import { prompt as promptDialog } from '$lib/stores/prompt.svelte';
     import { t } from '$lib/i18n';
     import type { TranslationKey } from '$lib/i18n/pt';
-    import { auth } from '$lib/stores/auth.svelte';
-    import type {
-        Batch,
-        Event,
-        EventDetail,
-        ExtraItem,
-        ExtraSection,
-        TicketType
-    } from '$lib/types';
-    import { onMount } from 'svelte';
+    import { confirm as confirmDialog } from '$lib/stores/confirm.svelte';
+    import { prompt as promptDialog } from '$lib/stores/prompt.svelte';
+    import { formatCentsInput } from '$lib/utils/currency';
+    import type { ActionData, PageData, SubmitFunction } from './$types';
 
-    let event = $state<EventDetail | null>(null);
-    let loading = $state(true);
-    let error = $state<string | null>(null);
+    let { data, form }: { data: PageData; form: ActionData } = $props();
 
-    let newTicket = $state({ name: '' });
+    // Server-rendered: an event this visitor may not manage never reaches this
+    // component; the load function answers 404 instead.
+    const event = $derived(data.event);
 
-    type NewBatchForm = { price_cents: number; quantity_total: number | undefined };
-    let newBatches = $state<Record<string, NewBatchForm>>({});
+    // What each action says when it fails for a reason other than the two
+    // business rules below, as the old page reported them.
+    const FALLBACKS: Record<string, TranslationKey> = {
+        updateEvent: 'eventForm.saveFailed',
+        deleteEvent: 'eventEdit.deleteEventError',
+        addTicketType: 'eventEdit.saveTicketError',
+        updateTicketType: 'eventEdit.saveTicketError',
+        deleteTicketType: 'eventEdit.deleteTicketError',
+        addBatch: 'eventEdit.saveBatchError',
+        updateBatch: 'eventEdit.saveBatchError',
+        closeBatch: 'eventEdit.closeBatchError',
+        deleteBatch: 'eventEdit.deleteBatchError',
+        addExtra: 'eventEdit.saveSectionError',
+        updateExtra: 'eventEdit.saveExtraError',
+        deleteExtra: 'eventEdit.deleteExtraError',
+        addSection: 'eventEdit.saveSectionError',
+        updateSection: 'eventEdit.saveSectionError',
+        deleteSection: 'eventEdit.deleteSectionError',
+        reorderSections: 'eventEdit.saveSectionError'
+    };
 
-    function blankBatch(): NewBatchForm {
-        return { price_cents: 0, quantity_total: undefined };
+    function failureMessage(
+        failed: { action?: string; error?: string } | null | undefined
+    ): string | null {
+        if (!failed?.error) return null;
+        if (failed.error === 'batch_has_sales') return t('eventEdit.batchHasSales');
+        if (failed.error === 'section_not_empty') return t('eventEdit.sectionNotEmpty');
+        return t(FALLBACKS[failed.action ?? ''] ?? 'eventEdit.errorFallback');
     }
 
-    function ensureBatchForms(ticketTypes: { id: string }[]) {
-        for (const tk of ticketTypes) {
-            if (!newBatches[tk.id]) newBatches[tk.id] = blankBatch();
-        }
+    const actionError = $derived(failureMessage(form));
+    const eventFormError = $derived(form?.action === 'updateEvent' ? actionError : null);
+
+    // Every row is its own form. Saving on change keeps the old feel of the page:
+    // the input submits the row it sits in, and the page re-reads itself.
+    const submitRow: SubmitFunction = () => {
+        return async ({ update }) => {
+            await update({ reset: false });
+        };
+    };
+    const submitNewRow: SubmitFunction = () => {
+        return async ({ update }) => {
+            await update();
+        };
+    };
+
+    function saveOnChange(e: Event) {
+        (e.currentTarget as HTMLInputElement | HTMLTextAreaElement).form?.requestSubmit();
     }
 
-    type NewExtraForm = { name: string; price_cents: number; quantity_total: number | undefined };
-    let newExtras = $state<Record<string, NewExtraForm>>({});
-
-    function blankExtra(): NewExtraForm {
-        return { name: '', price_cents: 0, quantity_total: undefined };
+    // The button is a submit button so `requestSubmit(button)` uses its own
+    // `formaction`; the click itself is cancelled until the dialog agrees.
+    async function confirmThenSubmit(e: MouseEvent, message: string, confirmText: string) {
+        e.preventDefault();
+        const button = e.currentTarget as HTMLButtonElement;
+        const ok = await confirmDialog({ message, confirmText, danger: true });
+        if (ok) button.form?.requestSubmit(button);
     }
 
-    function ensureForms(sections: { id: string }[]) {
-        for (const s of sections) {
-            if (!newExtras[s.id]) newExtras[s.id] = blankExtra();
-        }
-    }
-
-    let actionError = $state<string | null>(null);
-
-    function reportError(e: unknown, fallbackKey: TranslationKey) {
-        actionError = e instanceof ApiError ? e.message : t(fallbackKey);
-    }
-
-    async function reload() {
-        event = await api.getEvent(page.params.id!);
-        if (event) {
-            ensureForms(event.extra_sections);
-            ensureBatchForms(event.ticket_types);
-        }
-    }
-
-    onMount(async () => {
-        if (!auth.isAuthed) {
-            await goto('/auth/login');
-            return;
-        }
-        try {
-            await Promise.all([reload(), auth.loadMemberships()]);
-            if (event && !auth.canManageOrg(event.organization_id)) {
-                await goto(`/events/${event.id}`);
-                return;
-            }
-        } catch (e) {
-            error = e instanceof ApiError ? e.message : t('eventEdit.errorFallback');
-        } finally {
-            loading = false;
-        }
-    });
-
-    async function saveEvent(data: Partial<Event>) {
-        if (!event) return;
-        await api.updateEvent(event.id, data);
-        await reload();
-    }
-
-    async function addTicket() {
-        if (!event || !newTicket.name) return;
-        await api.createTicketType(event.id, newTicket);
-        newTicket = { name: '' };
-        await reload();
-    }
-
-    async function addBatch(tk: TicketType) {
-        const form = newBatches[tk.id];
-        if (!form || !form.quantity_total || form.quantity_total <= 0) return;
-        actionError = null;
-        try {
-            await api.createBatch(tk.id, {
-                price_cents: form.price_cents,
-                quantity_total: form.quantity_total
-            });
-            newBatches[tk.id] = blankBatch();
-            await reload();
-        } catch (e) {
-            reportError(e, 'eventEdit.saveBatchError');
-        }
-    }
-
-    async function saveBatch(b: Batch, patch: Partial<Batch>) {
-        actionError = null;
-        try {
-            await api.updateBatch(b.id, patch);
-            await reload();
-        } catch (e) {
-            reportError(e, 'eventEdit.saveBatchError');
-        }
-    }
-
-    async function closeBatch(b: Batch) {
-        const ok = await confirmDialog({
-            message: t('eventEdit.confirmCloseBatch', { label: b.label }),
-            confirmText: t('eventEdit.closeBatch'),
-            danger: true
-        });
-        if (!ok) return;
-        actionError = null;
-        try {
-            await api.closeBatch(b.id);
-            await reload();
-        } catch (e) {
-            reportError(e, 'eventEdit.closeBatchError');
-        }
-    }
-
-    async function delBatch(b: Batch) {
-        const ok = await confirmDialog({
-            message: t('eventEdit.confirmDeleteBatch', { label: b.label }),
-            confirmText: t('common.delete'),
-            danger: true
-        });
-        if (!ok) return;
-        actionError = null;
-        try {
-            await api.deleteBatch(b.id);
-            await reload();
-        } catch (e) {
-            if (e instanceof ApiError && e.message === 'batch_has_sales') {
-                actionError = t('eventEdit.batchHasSales');
-            } else {
-                reportError(e, 'eventEdit.deleteBatchError');
-            }
-        }
-    }
-
-    async function saveTicket(tk: TicketType, patch: Partial<TicketType>) {
-        actionError = null;
-        try {
-            await api.updateTicketType(tk.id, patch);
-            await reload();
-        } catch (e) {
-            reportError(e, 'eventEdit.saveTicketError');
-        }
-    }
-
-    async function delTicket(tk: TicketType) {
-        const ok = await confirmDialog({
-            message: t('eventEdit.confirmDeleteTicket', { name: tk.name }),
-            confirmText: t('common.delete'),
-            danger: true
-        });
-        if (!ok) return;
-        actionError = null;
-        try {
-            await api.deleteTicketType(tk.id);
-            await reload();
-        } catch (e) {
-            reportError(e, 'eventEdit.deleteTicketError');
-        }
-    }
+    let newSectionTitle = $state('');
+    let newSectionForm = $state<HTMLFormElement | null>(null);
 
     async function addSection() {
-        if (!event) return;
         const title = await promptDialog({
             message: t('eventEdit.newSectionPrompt'),
             placeholder: t('eventEdit.newSectionPlaceholder'),
             confirmText: t('eventEdit.create')
         });
         if (!title) return;
-        actionError = null;
-        try {
-            await api.createExtraSection(event.id, { title });
-            await reload();
-        } catch (e) {
-            reportError(e, 'eventEdit.saveSectionError');
-        }
-    }
-
-    async function saveSection(s: ExtraSection, patch: Partial<ExtraSection>) {
-        actionError = null;
-        try {
-            await api.updateExtraSection(s.id, patch);
-            await reload();
-        } catch (e) {
-            reportError(e, 'eventEdit.saveSectionError');
-        }
+        newSectionTitle = title;
+        await Promise.resolve();
+        newSectionForm?.requestSubmit();
     }
 
     // Drag-and-drop reorder state. `armedHandleId` lets HTML5 DnD start only when
@@ -217,6 +94,8 @@
     let armedHandleId = $state<string | null>(null);
     let draggingSectionId = $state<string | null>(null);
     let dragOverSectionId = $state<string | null>(null);
+    let sectionOrder = $state('');
+    let reorderForm = $state<HTMLFormElement | null>(null);
 
     function onSectionDragStart(e: DragEvent, sectionId: string) {
         if (armedHandleId !== sectionId) {
@@ -256,243 +135,192 @@
         armedHandleId = null;
     }
 
+    // One request carries the whole new order; the server renumbers positions.
     async function reorderSections(fromId: string, targetId: string) {
         if (!event) return;
-        const sections = [...event.extra_sections];
-        const fromIdx = sections.findIndex((s) => s.id === fromId);
-        const toIdx = sections.findIndex((s) => s.id === targetId);
+        const ids = event.extraSections.map((s) => s.id);
+        const fromIdx = ids.indexOf(fromId);
+        const toIdx = ids.indexOf(targetId);
         if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
-        const [moved] = sections.splice(fromIdx, 1);
-        sections.splice(toIdx, 0, moved);
-        event.extra_sections = sections;
-        actionError = null;
-        try {
-            const writes = sections.flatMap((s, i) =>
-                s.position === i ? [] : [api.updateExtraSection(s.id, { position: i })]
-            );
-            await Promise.all(writes);
-            await reload();
-        } catch (e) {
-            await reload();
-            reportError(e, 'eventEdit.saveSectionError');
-        }
-    }
-
-    async function delSection(s: ExtraSection) {
-        const ok = await confirmDialog({
-            message: t('eventEdit.confirmDeleteSection', { title: s.title }),
-            confirmText: t('common.delete'),
-            danger: true
-        });
-        if (!ok) return;
-        actionError = null;
-        try {
-            await api.deleteExtraSection(s.id);
-            await reload();
-        } catch (e) {
-            if (e instanceof ApiError && e.message === 'section_not_empty') {
-                actionError = t('eventEdit.sectionNotEmpty');
-            } else {
-                reportError(e, 'eventEdit.deleteSectionError');
-            }
-        }
-    }
-
-    async function saveExtra(x: ExtraItem, patch: Partial<ExtraItem>) {
-        actionError = null;
-        try {
-            await api.updateExtra(x.id, patch);
-            await reload();
-        } catch (e) {
-            reportError(e, 'eventEdit.saveExtraError');
-        }
-    }
-
-    async function addExtra(sectionId: string) {
-        if (!event) return;
-        const form = newExtras[sectionId];
-        if (!form || !form.name) return;
-        actionError = null;
-        try {
-            await api.createExtra(event.id, { ...form, section_id: sectionId });
-            newExtras[sectionId] = blankExtra();
-            await reload();
-        } catch (e) {
-            reportError(e, 'eventEdit.saveSectionError');
-        }
-    }
-
-    async function delExtra(x: ExtraItem) {
-        const ok = await confirmDialog({
-            message: t('eventEdit.confirmDeleteExtra', { name: x.name }),
-            confirmText: t('common.delete'),
-            danger: true
-        });
-        if (!ok) return;
-        actionError = null;
-        try {
-            await api.deleteExtra(x.id);
-            await reload();
-        } catch (e) {
-            reportError(e, 'eventEdit.deleteExtraError');
-        }
-    }
-
-    async function deleteEvent() {
-        if (!event) return;
-        const ok = await confirmDialog({
-            message: t('eventEdit.confirmDeleteEvent', { title: event.title }),
-            confirmText: t('common.delete'),
-            danger: true
-        });
-        if (!ok) return;
-        actionError = null;
-        try {
-            await api.deleteEvent(event.id);
-            await goto('/');
-        } catch (e) {
-            reportError(e, 'eventEdit.deleteEventError');
-        }
+        const [moved] = ids.splice(fromIdx, 1);
+        ids.splice(toIdx, 0, moved);
+        sectionOrder = ids.join(',');
+        await Promise.resolve();
+        reorderForm?.requestSubmit();
     }
 </script>
 
-{#if loading}
-    <p class="muted">{t('common.loading')}</p>
-{:else if error || !event}
-    <div class="error">{error ?? t('eventEdit.notFound')}</div>
+{#if !event}
+    <div class="error">{t('eventEdit.errorFallback')}</div>
 {:else}
     <h1>{t('eventEdit.title')}</h1>
     <div class="card" style="margin: 1rem 0;">
-        <EventForm initial={event} submitLabel={t('eventEdit.saveEvent')} onSubmit={saveEvent} />
+        <EventForm
+            initial={event}
+            submitLabel={t('eventEdit.saveEvent')}
+            action="?/updateEvent"
+            error={eventFormError}
+        />
     </div>
 
     <div class="card stack" style="margin: 1rem 0;">
         <h2>{t('eventEdit.ticketTypes')}</h2>
-        {#each event.ticket_types as tk (tk.id)}
-            {@const batchForm = newBatches[tk.id]}
+        {#each event.ticketTypes as tk (tk.id)}
             <div class="ticket-type">
-                <div class="add">
+                <form method="POST" action="?/updateTicketType" class="add" use:enhance={submitRow}>
+                    <input type="hidden" name="id" value={tk.id} />
                     <FloatingField label={t('common.name')}>
                         <input
+                            name="name"
                             placeholder=" "
                             value={tk.name}
-                            onchange={(e) => saveTicket(tk, { name: e.currentTarget.value })}
+                            onchange={saveOnChange}
                         />
                     </FloatingField>
-                    <button class="danger small" onclick={() => delTicket(tk)}>
-                        {t('common.delete')}
-                    </button>
-                </div>
+                    <button
+                        type="submit"
+                        class="danger small"
+                        formaction="?/deleteTicketType"
+                        onclick={(e) =>
+                            confirmThenSubmit(
+                                e,
+                                t('eventEdit.confirmDeleteTicket', { name: tk.name }),
+                                t('common.delete')
+                            )}>{t('common.delete')}</button
+                    >
+                </form>
 
                 <h3 class="batches-head">{t('eventEdit.batches')}</h3>
                 {#each tk.batches as b (b.id)}
-                    {@const isActive = tk.active_batch?.id === b.id}
-                    {@const status = b.closed_at
+                    {@const isActive = tk.activeBatch?.id === b.id}
+                    {@const status = b.closedAt
                         ? t('eventEdit.batchClosed')
                         : isActive
                           ? t('eventEdit.batchActive')
                           : t('eventEdit.batchUpcoming')}
-                    <div class="add batch-row">
+                    <form
+                        method="POST"
+                        action="?/updateBatch"
+                        class="add batch-row"
+                        use:enhance={submitRow}
+                    >
+                        <input type="hidden" name="id" value={b.id} />
                         <div class="batch-label">
                             <strong>{b.label}</strong>
                             <span class="muted small">{status}</span>
                         </div>
                         <FloatingField label={t('eventEdit.priceCents')}>
                             <input
+                                name="price"
                                 type="text"
                                 inputmode="numeric"
                                 placeholder=" "
-                                disabled={!!b.closed_at}
-                                value={formatCentsInput(b.price_cents)}
-                                onchange={(e) =>
-                                    saveBatch(b, {
-                                        price_cents: parseCentsInput(e.currentTarget.value)
-                                    })}
+                                disabled={!!b.closedAt}
+                                value={formatCentsInput(b.priceCents)}
+                                onchange={saveOnChange}
                             />
                         </FloatingField>
                         <FloatingField label={t('eventEdit.qty')}>
                             <input
+                                name="quantity_total"
                                 type="number"
                                 placeholder=" "
-                                disabled={!!b.closed_at}
-                                value={b.quantity_total}
-                                onchange={(e) =>
-                                    saveBatch(b, { quantity_total: Number(e.currentTarget.value) })}
+                                disabled={!!b.closedAt}
+                                value={b.quantityTotal}
+                                onchange={saveOnChange}
                             />
                         </FloatingField>
                         <div class="muted small">
-                            {b.quantity_sold}/{b.quantity_total}
+                            {b.quantitySold}/{b.quantityTotal}
                             {t('eventEdit.sold')}
                         </div>
                         {#if isActive}
-                            <button class="secondary small" onclick={() => closeBatch(b)}>
-                                {t('eventEdit.closeBatch')}
-                            </button>
-                        {:else if b.quantity_sold === 0}
-                            <button class="danger small" onclick={() => delBatch(b)}>
-                                {t('common.delete')}
-                            </button>
+                            <button
+                                type="submit"
+                                class="secondary small"
+                                formaction="?/closeBatch"
+                                onclick={(e) =>
+                                    confirmThenSubmit(
+                                        e,
+                                        t('eventEdit.confirmCloseBatch', { label: b.label }),
+                                        t('eventEdit.closeBatch')
+                                    )}>{t('eventEdit.closeBatch')}</button
+                            >
+                        {:else if b.quantitySold === 0}
+                            <button
+                                type="submit"
+                                class="danger small"
+                                formaction="?/deleteBatch"
+                                onclick={(e) =>
+                                    confirmThenSubmit(
+                                        e,
+                                        t('eventEdit.confirmDeleteBatch', { label: b.label }),
+                                        t('common.delete')
+                                    )}>{t('common.delete')}</button
+                            >
                         {/if}
-                    </div>
+                    </form>
                 {/each}
-                {#if batchForm}
-                    <div class="add batch-row">
-                        <div class="batch-label">
-                            <strong>Lote {tk.batches.length + 1}</strong>
-                        </div>
-                        <FloatingField label={t('eventEdit.priceCents')}>
-                            <input
-                                type="text"
-                                inputmode="numeric"
-                                placeholder=" "
-                                value={formatCentsInput(batchForm.price_cents)}
-                                oninput={(e) =>
-                                    (batchForm.price_cents = parseCentsInput(
-                                        e.currentTarget.value
-                                    ))}
-                            />
-                        </FloatingField>
-                        <FloatingField label={t('eventEdit.qty')}>
-                            <input
-                                type="number"
-                                placeholder=" "
-                                bind:value={batchForm.quantity_total}
-                            />
-                        </FloatingField>
-                        <div></div>
-                        <button class="small" onclick={() => addBatch(tk)}
-                            >{t('eventEdit.addBatch')}</button
-                        >
+                <form
+                    method="POST"
+                    action="?/addBatch"
+                    class="add batch-row"
+                    use:enhance={submitNewRow}
+                >
+                    <input type="hidden" name="ticket_type_id" value={tk.id} />
+                    <div class="batch-label">
+                        <strong>Lote {tk.batches.length + 1}</strong>
                     </div>
-                {/if}
+                    <FloatingField label={t('eventEdit.priceCents')}>
+                        <input
+                            name="price"
+                            type="text"
+                            inputmode="numeric"
+                            placeholder=" "
+                            value="0,00"
+                        />
+                    </FloatingField>
+                    <FloatingField label={t('eventEdit.qty')}>
+                        <input
+                            name="quantity_total"
+                            type="number"
+                            placeholder=" "
+                            min="1"
+                            required
+                        />
+                    </FloatingField>
+                    <div></div>
+                    <button class="small" type="submit">{t('eventEdit.addBatch')}</button>
+                </form>
             </div>
         {/each}
-        <div class="add">
+        <form method="POST" action="?/addTicketType" class="add" use:enhance={submitNewRow}>
+            <input type="hidden" name="event_id" value={event.id} />
             <FloatingField label={t('common.name')}>
-                <input placeholder=" " bind:value={newTicket.name} />
+                <input name="name" placeholder=" " required />
             </FloatingField>
-            <button class="small" onclick={addTicket}>{t('eventEdit.add')}</button>
-        </div>
+            <button class="small" type="submit">{t('eventEdit.add')}</button>
+        </form>
     </div>
 
     <h2 style="margin: 1.5rem 0 0.5rem;">{t('eventEdit.addons')}</h2>
 
-    {#each event.extra_sections as s (s.id)}
-        {@const form = newExtras[s.id]}
-        {#if form}
-            <div
-                class="card stack section-card"
-                class:dragging={draggingSectionId === s.id}
-                class:drag-over={dragOverSectionId === s.id && draggingSectionId !== s.id}
-                style="margin: 1rem 0;"
-                role="group"
-                draggable={armedHandleId === s.id}
-                ondragstart={(e) => onSectionDragStart(e, s.id)}
-                ondragover={(e) => onSectionDragOver(e, s.id)}
-                ondragleave={() => onSectionDragLeave(s.id)}
-                ondrop={(e) => onSectionDrop(e, s.id)}
-                ondragend={onSectionDragEnd}
-            >
+    {#each event.extraSections as s (s.id)}
+        <div
+            class="card stack section-card"
+            class:dragging={draggingSectionId === s.id}
+            class:drag-over={dragOverSectionId === s.id && draggingSectionId !== s.id}
+            style="margin: 1rem 0;"
+            role="group"
+            draggable={armedHandleId === s.id}
+            ondragstart={(e) => onSectionDragStart(e, s.id)}
+            ondragover={(e) => onSectionDragOver(e, s.id)}
+            ondragleave={() => onSectionDragLeave(s.id)}
+            ondrop={(e) => onSectionDrop(e, s.id)}
+            ondragend={onSectionDragEnd}
+        >
+            <form method="POST" action="?/updateSection" class="stack" use:enhance={submitRow}>
+                <input type="hidden" name="id" value={s.id} />
                 <div class="section-head">
                     <button
                         type="button"
@@ -507,115 +335,154 @@
                     >
                     <FloatingField label={t('eventEdit.sectionTitle')}>
                         <input
+                            name="title"
                             placeholder=" "
                             value={s.title}
-                            onchange={(e) => saveSection(s, { title: e.currentTarget.value })}
+                            onchange={saveOnChange}
                         />
                     </FloatingField>
-                    <button class="danger small" onclick={() => delSection(s)}>
-                        {t('eventEdit.deleteSection')}
-                    </button>
+                    <button
+                        type="submit"
+                        class="danger small"
+                        formaction="?/deleteSection"
+                        onclick={(e) =>
+                            confirmThenSubmit(
+                                e,
+                                t('eventEdit.confirmDeleteSection', { title: s.title }),
+                                t('common.delete')
+                            )}>{t('eventEdit.deleteSection')}</button
+                    >
                 </div>
                 <FloatingField label={t('eventEdit.sectionDescription')}>
                     <textarea
+                        name="description"
                         placeholder=" "
                         rows="2"
                         value={s.description ?? ''}
-                        onchange={(e) => saveSection(s, { description: e.currentTarget.value })}
-                    ></textarea>
+                        onchange={saveOnChange}></textarea>
                 </FloatingField>
+            </form>
 
-                {#each s.extras as x (x.id)}
-                    <div class="add">
-                        <FloatingField label={t('common.name')}>
-                            <input
-                                placeholder=" "
-                                value={x.name}
-                                onchange={(e) => saveExtra(x, { name: e.currentTarget.value })}
-                            />
-                        </FloatingField>
-                        <FloatingField label={t('eventEdit.priceCents')}>
-                            <input
-                                type="text"
-                                inputmode="numeric"
-                                placeholder=" "
-                                value={formatCentsInput(x.price_cents)}
-                                onchange={(e) =>
-                                    saveExtra(x, {
-                                        price_cents: parseCentsInput(e.currentTarget.value)
-                                    })}
-                            />
-                        </FloatingField>
-                        <FloatingField label={t('eventEdit.qtyUnlimited')}>
-                            <input
-                                type="number"
-                                placeholder=" "
-                                value={x.quantity_total ?? ''}
-                                onchange={(e) => {
-                                    const v = e.currentTarget.value;
-                                    saveExtra(x, { quantity_total: v === '' ? null : Number(v) });
-                                }}
-                            />
-                        </FloatingField>
-                        <label class="check">
-                            <input
-                                type="checkbox"
-                                checked={x.show_remaining}
-                                onchange={(e) =>
-                                    saveExtra(x, { show_remaining: e.currentTarget.checked })}
-                            />
-                            {t('eventEdit.showRemaining')}
-                        </label>
-                        <label class="check">
-                            <input
-                                type="checkbox"
-                                checked={x.limit_to_ticket_count}
-                                onchange={(e) =>
-                                    saveExtra(x, {
-                                        limit_to_ticket_count: e.currentTarget.checked
-                                    })}
-                            />
-                            {t('eventEdit.limitToTicketCount')}
-                        </label>
-                        <button class="danger small" onclick={() => delExtra(x)}
-                            >{t('common.delete')}</button
-                        >
-                    </div>
-                {/each}
-                <div class="add">
+            {#each s.extras as x (x.id)}
+                <form method="POST" action="?/updateExtra" class="add" use:enhance={submitRow}>
+                    <input type="hidden" name="id" value={x.id} />
+                    <input type="hidden" name="section_id" value={x.sectionId} />
+                    <input type="hidden" name="description" value={x.description ?? ''} />
                     <FloatingField label={t('common.name')}>
-                        <input placeholder=" " bind:value={form.name} />
+                        <input name="name" placeholder=" " value={x.name} onchange={saveOnChange} />
                     </FloatingField>
                     <FloatingField label={t('eventEdit.priceCents')}>
                         <input
+                            name="price"
                             type="text"
                             inputmode="numeric"
                             placeholder=" "
-                            value={formatCentsInput(form.price_cents)}
-                            oninput={(e) =>
-                                (form.price_cents = parseCentsInput(e.currentTarget.value))}
+                            value={formatCentsInput(x.priceCents)}
+                            onchange={saveOnChange}
                         />
                     </FloatingField>
                     <FloatingField label={t('eventEdit.qtyUnlimited')}>
-                        <input type="number" placeholder=" " bind:value={form.quantity_total} />
+                        <input
+                            name="quantity_total"
+                            type="number"
+                            placeholder=" "
+                            value={x.quantityTotal ?? ''}
+                            onchange={saveOnChange}
+                        />
                     </FloatingField>
-                    <button class="small" onclick={() => addExtra(s.id)}
-                        >{t('eventEdit.add')}</button
+                    <label class="check">
+                        <input
+                            name="show_remaining"
+                            type="checkbox"
+                            checked={x.showRemaining}
+                            onchange={saveOnChange}
+                        />
+                        {t('eventEdit.showRemaining')}
+                    </label>
+                    <label class="check">
+                        <input
+                            name="limit_to_ticket_count"
+                            type="checkbox"
+                            checked={x.limitToTicketCount}
+                            onchange={saveOnChange}
+                        />
+                        {t('eventEdit.limitToTicketCount')}
+                    </label>
+                    <button
+                        type="submit"
+                        class="danger small"
+                        formaction="?/deleteExtra"
+                        onclick={(e) =>
+                            confirmThenSubmit(
+                                e,
+                                t('eventEdit.confirmDeleteExtra', { name: x.name }),
+                                t('common.delete')
+                            )}>{t('common.delete')}</button
                     >
-                </div>
-            </div>
-        {/if}
+                </form>
+            {/each}
+            <form method="POST" action="?/addExtra" class="add" use:enhance={submitNewRow}>
+                <input type="hidden" name="event_id" value={event.id} />
+                <input type="hidden" name="section_id" value={s.id} />
+                <FloatingField label={t('common.name')}>
+                    <input name="name" placeholder=" " required />
+                </FloatingField>
+                <FloatingField label={t('eventEdit.priceCents')}>
+                    <input
+                        name="price"
+                        type="text"
+                        inputmode="numeric"
+                        placeholder=" "
+                        value="0,00"
+                    />
+                </FloatingField>
+                <FloatingField label={t('eventEdit.qtyUnlimited')}>
+                    <input name="quantity_total" type="number" placeholder=" " />
+                </FloatingField>
+                <button class="small" type="submit">{t('eventEdit.add')}</button>
+            </form>
+        </div>
     {/each}
 
-    <button class="secondary" onclick={addSection}>{t('eventEdit.addSection')}</button>
+    <form
+        method="POST"
+        action="?/addSection"
+        bind:this={newSectionForm}
+        use:enhance={submitNewRow}
+        hidden
+    >
+        <input type="hidden" name="event_id" value={event.id} />
+        <input type="hidden" name="title" value={newSectionTitle} />
+    </form>
+    <form
+        method="POST"
+        action="?/reorderSections"
+        bind:this={reorderForm}
+        use:enhance={submitRow}
+        hidden
+    >
+        <input type="hidden" name="event_id" value={event.id} />
+        <input type="hidden" name="order" value={sectionOrder} />
+    </form>
+    <button class="secondary" type="button" onclick={addSection}>{t('eventEdit.addSection')}</button
+    >
 
-    {#if actionError}
+    {#if actionError && form?.action !== 'updateEvent'}
         <div class="error" style="margin: 1rem 0;">{actionError}</div>
     {/if}
 
-    <button class="danger" style="margin-top: 1.5rem;" onclick={deleteEvent}>
-        {t('eventEdit.deleteEvent')}
-    </button>
+    <form method="POST" action="?/deleteEvent" use:enhance={submitRow} style="margin-top: 1.5rem;">
+        <button
+            type="submit"
+            class="danger"
+            onclick={(e) =>
+                confirmThenSubmit(
+                    e,
+                    t('eventEdit.confirmDeleteEvent', { title: event.title }),
+                    t('common.delete')
+                )}>{t('eventEdit.deleteEvent')}</button
+        >
+    </form>
 {/if}
 
 <style>
