@@ -7,6 +7,10 @@ export default defineConfig({
         sveltekit(),
         SvelteKitPWA({
             registerType: 'autoUpdate',
+            // SvelteKit builds with a relative base, which made every page but
+            // the home page register `sw.js` next to itself (`/auth/sw.js`,
+            // `/events/<id>/sw.js`) and get a 404. The worker lives at the root.
+            base: '/',
             manifest: {
                 name: 'Tickets',
                 short_name: 'Tickets',

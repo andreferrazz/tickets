@@ -160,8 +160,9 @@ async function send(
 }
 
 // A failed payout took nothing: it stops counting against the balance and the
-// daily limit. Only the kind of failure is kept; Abacate's message can echo
-// the Pix key.
+// daily limit. Abacate's own words go on the row, as Phoenix kept them, since
+// "refused" alone does not say whether the key, the amount or the account is
+// at fault; the log line stays without them.
 async function markFailed(
     deps: PayoutServiceDeps,
     row: NewPayoutRow,
@@ -169,7 +170,7 @@ async function markFailed(
 ): Promise<PayoutOutcome<PayoutFailure>> {
     if (!(cause instanceof AbacatePayError)) throw cause;
     const described = describeAbacateFailure(cause);
-    const errorMessage = `${described.failure} (${described.status ?? 'no response'})`;
+    const errorMessage = `${described.failure} (${described.status ?? 'no response'}): ${cause.message}`;
     const failed = { status: 'failed' as const, abacatePayoutId: null, receiptUrl: null };
     await deps.payouts.settle(row.id, { ...failed, errorMessage });
     console.warn(JSON.stringify({ event: 'payout_failed', payoutId: row.id, ...described }));
