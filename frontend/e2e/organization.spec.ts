@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { ADMIN, DRAFT_ORG, MEMBER } from './support/fixtures';
+import { waitForHydration } from './support/hydration';
 import { signIn } from './support/session';
 import { execute, queryValue } from './support/sql';
 
@@ -148,8 +149,7 @@ test('a manager demotes a member to staff and removes them; the leader row is un
     );
 
     await page.goto(TEAM_PAGE);
-    // The select submits its row on change, which needs the page hydrated first.
-    await page.waitForLoadState('networkidle');
+    await waitForHydration(page);
     const row = page.locator('form[action="?/setRole"]', { hasText: 'crew@e2e.test' });
     await row.getByRole('combobox').selectOption('staff');
     await expect

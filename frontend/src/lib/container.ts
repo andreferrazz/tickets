@@ -1,4 +1,5 @@
 import { readAbacatePayConfig } from '$lib/config/abacate-pay';
+import { readRateLimitConfig } from '$lib/config/rate-limit';
 import { resolveIntegrationMode, type IntegrationMode } from '$lib/config/integrations';
 import { readSmtpConfig } from '$lib/config/smtp';
 import { getQueryableInstance } from '$lib/db/pool';
@@ -222,7 +223,8 @@ function createContainer(): Container {
         users: userRepository,
         organizations: organizationRepository,
         userMapper,
-        rateLimiter
+        rateLimiter,
+        requestCodeLimit: readRateLimitConfig().requestCodePerMinute
     });
 
     return {

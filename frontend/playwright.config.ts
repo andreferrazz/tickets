@@ -27,6 +27,8 @@ export default defineConfig({
 		env: {
 			DATABASE_URL: E2E_DATABASE_URL,
 			INTEGRATIONS: 'fake',
+			// A run requests more login codes in a minute than any person would.
+			AUTH_CODE_RATE_LIMIT: '1000',
 			PUBLIC_API_URL: process.env.PUBLIC_API_URL ?? 'http://localhost:4000/api/v1'
 		}
 	}
