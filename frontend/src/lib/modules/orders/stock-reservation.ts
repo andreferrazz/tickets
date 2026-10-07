@@ -8,8 +8,8 @@ export interface StockRelease {
     orderId: string;
     /** The statuses the order may be leaving; anything else and nothing happens. */
     from: readonly OrderStatus[];
-    to: 'cancelled' | 'expired';
-    /** Free orders were fulfilled when placed, so their passes go with them. */
+    to: 'cancelled' | 'expired' | 'refunded';
+    /** For orders that were fulfilled: a cancelled free order and a refund lose their passes. */
     deletePasses: boolean;
 }
 

@@ -3,8 +3,9 @@ import { payAtFakeAbacate } from './support/fake-abacate';
 import { MEMBER, OTHER_ORG, OWN_ORG_DRAFT, PUBLISHED_TICKET_TYPE } from './support/fixtures';
 import { postFormAction, type ActionAnswer } from './support/form-action';
 import { waitForHydration } from './support/hydration';
+import { orderColumn, passCount, placeOrder, sold } from './support/orders';
 import { emailsTo } from './support/outbox';
-import { seedPerson, type SeededPerson } from './support/people';
+import { seedPerson } from './support/people';
 import { VALID_CPF } from './support/profile';
 import { seedSellableEvent, type SellableEvent } from './support/sellable-event';
 import { signIn } from './support/session';
@@ -12,16 +13,6 @@ import { queryValue } from './support/sql';
 import { uniqueEmail } from './support/unique';
 
 const QR_CODES = 'img[src^="data:image/png"]';
-
-function sold(event: SellableEvent): Promise<number | null> {
-    return queryValue<number>('select quantity_sold from ticket_batches where id = $1', [
-        event.batchId
-    ]);
-}
-
-function orderColumn(orderId: string, column: string): Promise<string | null> {
-    return queryValue<string>(`select ${column}::text from orders where id = $1`, [orderId]);
-}
 
 function orderIdFrom(page: Page): string {
     return new URL(page.url()).pathname.split('/').at(-1) as string;
@@ -56,22 +47,6 @@ function buy(
     form: Record<string, string>
 ): Promise<ActionAnswer> {
     return postFormAction(context.request, `/events/${eventId}?/buy`, form);
-}
-
-/** A free order placed straight through the action; returns its id. */
-async function placeFreeOrder(
-    browser: Browser,
-    buyer: SeededPerson,
-    event: SellableEvent,
-    quantity = 1
-): Promise<string> {
-    const context = await contextFor(browser, buyer);
-    const answer = await buy(context, event.id, {
-        [`ticket:${event.ticketTypeId}`]: `${quantity}`
-    });
-    await context.close();
-    expect(answer.type).toBe('redirect');
-    return (answer.location as string).split('/').at(-1) as string;
 }
 
 test('a free order is paid on the spot, with its passes on the page and in the mail', async ({
@@ -121,9 +96,7 @@ test('cancelling a free order gives the stock back and kills its passes', async 
     await expect(page.locator(QR_CODES)).toHaveCount(0);
     expect(await sold(event)).toBe(0);
     // A pass is validated by its token alone, so the rows themselves must go.
-    expect(
-        await queryValue<number>('select count(*)::int from passes where order_id = $1', [orderId])
-    ).toBe(0);
+    expect(await passCount(orderId)).toBe(0);
 });
 
 test('a paid order waits for payment, and one paid behind our back is fulfilled, not cancelled', async ({
@@ -287,8 +260,7 @@ test('a manager cancels a buyer’s order from the event’s list; nobody else c
     page
 }) => {
     const event = await seedSellableEvent({ ticketPriceCents: 0, ticketStock: 5 });
-    const buyer = await seedPerson({ role: 'buyer' });
-    const orderId = await placeFreeOrder(browser, buyer, event, 2);
+    const { id: orderId } = await placeOrder(event, { quantity: 2 });
     const outsiders = [
         await seedPerson({ role: 'buyer' }),
         await seedPerson({
