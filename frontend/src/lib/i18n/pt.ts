@@ -215,6 +215,7 @@ export const pt = {
     'scan.noCamera': 'Nenhuma câmera encontrada neste dispositivo.',
     'scan.cameraDenied': 'Não foi possível acessar a câmera. Verifique as permissões.',
     'scan.errorFallback': 'Falha ao validar o ingresso.',
+    'scan.landingError': 'Falha ao carregar os eventos.',
     'scan.landingTitle': 'Validar ingressos',
     'scan.landingSubtitle': 'Escolha um evento para começar a validar ingressos.',
     'scan.landingEmpty': 'Nenhum evento disponível para validação.',

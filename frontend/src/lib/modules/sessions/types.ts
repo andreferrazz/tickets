@@ -6,6 +6,6 @@ import type { Role } from '$lib/types';
  * still comes from the client-side auth store.
  */
 export interface SessionUser {
-	id: string;
-	role: Role;
+    id: string;
+    role: Role;
 }

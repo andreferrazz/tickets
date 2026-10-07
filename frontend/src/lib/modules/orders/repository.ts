@@ -1,5 +1,5 @@
 import type { Queryable } from '$lib/db/queryable';
-import type { OrderItemRow, OrderRow, PassRow } from './types';
+import type { EventOrderRow, OrderItemRow, OrderRow, PassRow, ValidatedCountRow } from './types';
 
 export interface OrderRepository {
     /** Every order `userId` placed, newest first. */
@@ -13,6 +13,12 @@ export interface OrderRepository {
 
     /** The passes issued for `orderId`, in issue order. */
     listPasses(orderId: string): Promise<PassRow[]>;
+
+    /** Every order on `eventId` with its buyer, newest first. */
+    listForEvent(eventId: string): Promise<EventOrderRow[]>;
+
+    /** How many ticket passes of each order were scanned; orders with none are absent. */
+    countValidatedTickets(orderIds: readonly string[]): Promise<ValidatedCountRow[]>;
 }
 
 export function getOrderRepository(queryable: Queryable): OrderRepository {
@@ -43,6 +49,26 @@ export function getOrderRepository(queryable: Queryable): OrderRepository {
                 where order_id = any($1::uuid[])
                 order by inserted_at asc, id asc`;
             return queryable.query<OrderItemRow>(sql, [orderIds]);
+        },
+
+        listForEvent(eventId) {
+            const sql = `
+                select o.id, u.name as buyer_name, u.email as buyer_email, u.cellphone as buyer_phone,
+                       o.status, o.total_cents, o.payment_method, o.paid_at, o.inserted_at
+                from orders o join users u on u.id = o.user_id
+                where o.event_id = $1
+                order by o.inserted_at desc`;
+            return queryable.query<EventOrderRow>(sql, [eventId]);
+        },
+
+        countValidatedTickets(orderIds) {
+            if (orderIds.length === 0) return Promise.resolve([]);
+            const sql = `
+                select order_id, count(*)::int as validated
+                from passes
+                where order_id = any($1::uuid[]) and kind = 'ticket' and checked_in_at is not null
+                group by order_id`;
+            return queryable.query<ValidatedCountRow>(sql, [orderIds]);
         },
 
         listPasses(orderId) {
