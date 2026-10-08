@@ -31,7 +31,7 @@ const COLUMNS = 'id, kind, item_name, event_id, order_id, checked_in_at';
 const ISSUED_COLUMNS = 'id, kind, item_name, token';
 const NOW = "now() at time zone 'utc'";
 
-export function getPassRepository(queryable: Queryable): PassRepository {
+export function getPassRepository({ queryable }: { queryable: Queryable }): PassRepository {
     return {
         async findByToken(token) {
             const sql = `select ${COLUMNS} from passes where token = $1`;

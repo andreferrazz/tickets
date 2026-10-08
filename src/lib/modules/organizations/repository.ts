@@ -53,7 +53,11 @@ export interface OrganizationRepository {
     removeMember(organizationId: string, userId: string): Promise<MemberChangeOutcome>;
 }
 
-export function getOrganizationRepository(queryable: Queryable): OrganizationRepository {
+export function getOrganizationRepository({
+    queryable
+}: {
+    queryable: Queryable;
+}): OrganizationRepository {
     return {
         async findById(id) {
             const sql = `

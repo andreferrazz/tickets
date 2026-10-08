@@ -12,7 +12,7 @@ export interface AuthCodeRepository {
     claim(email: string, code: string): Promise<boolean>;
 }
 
-export function getAuthCodeRepository(queryable: Queryable): AuthCodeRepository {
+export function getAuthCodeRepository({ queryable }: { queryable: Queryable }): AuthCodeRepository {
     return {
         replacePending(email, code, ttlMinutes) {
             return queryable.transaction(async (tx) => {

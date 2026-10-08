@@ -90,7 +90,11 @@ const EXTRA_COLUMNS = `
 const SECTION_COLUMNS = 'id, event_id, title, description, position';
 const NOW = "now() at time zone 'utc'";
 
-export function getEventManagementRepository(queryable: Queryable): EventManagementRepository {
+export function getEventManagementRepository({
+    queryable
+}: {
+    queryable: Queryable;
+}): EventManagementRepository {
     return {
         async insertEvent(db, row) {
             const sql = `

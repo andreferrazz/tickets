@@ -27,7 +27,7 @@ export interface EventDetailMapper {
     toDto(event: EventRow, rows: EventDetailRows): EventDetailDto;
 }
 
-export function getEventDetailMapper(mapper: EventMapper): EventDetailMapper {
+export function getEventDetailMapper({ mapper }: { mapper: EventMapper }): EventDetailMapper {
     return {
         toDto(event: EventRow, rows: EventDetailRows): EventDetailDto {
             return {

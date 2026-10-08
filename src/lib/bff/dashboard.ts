@@ -21,10 +21,13 @@ export interface DashboardBff {
     show(user: SessionUser, eventId: string, buyers: BuyersTarget | null): Promise<DashboardData>;
 }
 
-export function getDashboardBff(
-    service: EventStatsService,
-    mapper: EventStatsMapper
-): DashboardBff {
+export function getDashboardBff({
+    service,
+    mapper
+}: {
+    service: EventStatsService;
+    mapper: EventStatsMapper;
+}): DashboardBff {
     return {
         async show(user, eventId, target) {
             try {

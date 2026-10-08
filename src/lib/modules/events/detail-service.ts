@@ -12,7 +12,11 @@ export interface EventDetailService {
     loadRows(eventId: string): Promise<EventDetailRows>;
 }
 
-export function getEventDetailService(repository: EventDetailRepository): EventDetailService {
+export function getEventDetailService({
+    repository
+}: {
+    repository: EventDetailRepository;
+}): EventDetailService {
     return {
         async loadRows(eventId: string): Promise<EventDetailRows> {
             // Independent queries against the same pool: serialising them would

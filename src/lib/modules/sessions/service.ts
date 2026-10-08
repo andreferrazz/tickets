@@ -11,7 +11,11 @@ export interface SessionService {
     resolveUser(token: string | undefined): Promise<SessionUser | null>;
 }
 
-export function getSessionService(repository: SessionRepository): SessionService {
+export function getSessionService({
+    repository
+}: {
+    repository: SessionRepository;
+}): SessionService {
     return {
         async resolveUser(token: string | undefined): Promise<SessionUser | null> {
             if (!token) return null;

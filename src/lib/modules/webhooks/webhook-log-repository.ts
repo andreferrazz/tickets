@@ -15,7 +15,11 @@ export interface WebhookLogRepository {
 // The width of `webhook_events.event_type`; a longer name must not lose the row.
 const EVENT_TYPE_MAX = 50;
 
-export function getWebhookLogRepository(queryable: Queryable): WebhookLogRepository {
+export function getWebhookLogRepository({
+    queryable
+}: {
+    queryable: Queryable;
+}): WebhookLogRepository {
     return {
         async record(eventType, payload) {
             const sql = `

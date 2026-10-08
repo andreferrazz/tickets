@@ -21,7 +21,13 @@ export interface OrdersBff {
     show(user: SessionUser, id: string): Promise<OrderData>;
 }
 
-export function getOrdersBff(service: OrderService, mapper: OrderMapper): OrdersBff {
+export function getOrdersBff({
+    service,
+    mapper
+}: {
+    service: OrderService;
+    mapper: OrderMapper;
+}): OrdersBff {
     return {
         async index(user) {
             try {

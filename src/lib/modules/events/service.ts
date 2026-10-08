@@ -24,7 +24,7 @@ export interface EventService {
     listForOrganizations(organizationIds: readonly string[]): Promise<EventRow[]>;
 }
 
-export function getEventService(repository: EventRepository): EventService {
+export function getEventService({ repository }: { repository: EventRepository }): EventService {
     return {
         listVisible(user: SessionUser | null): Promise<EventRow[]> {
             if (!user) {

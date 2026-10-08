@@ -19,7 +19,13 @@ export interface HomeBff {
     index(user: SessionUser | null, filters: HomeFilters): Promise<HomeData>;
 }
 
-export function getHomeBff(service: EventService, mapper: EventMapper): HomeBff {
+export function getHomeBff({
+    service,
+    mapper
+}: {
+    service: EventService;
+    mapper: EventMapper;
+}): HomeBff {
     return {
         async index(user, filters): Promise<HomeData> {
             try {

@@ -21,7 +21,7 @@ export interface OrderRepository {
     countValidatedTickets(orderIds: readonly string[]): Promise<ValidatedCountRow[]>;
 }
 
-export function getOrderRepository(queryable: Queryable): OrderRepository {
+export function getOrderRepository({ queryable }: { queryable: Queryable }): OrderRepository {
     return {
         listForBuyer(userId) {
             const sql = `

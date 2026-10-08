@@ -37,13 +37,16 @@ interface ApiResponse {
  * Every failure surfaces as an `AbacatePayError`.
  *
  * @example
- * const abacate = getLiveAbacatePay(readAbacatePayConfig());
+ * const abacate = getLiveAbacatePay({ config: readAbacatePayConfig() });
  * const { id, url } = await abacate.createCheckout({ items, returnUrl, completionUrl, customerId, totalCents, methods: ['PIX'] });
  */
-export function getLiveAbacatePay(
-    config: AbacatePayConfig,
-    fetcher: Fetcher = fetch
-): AbacatePayGateway {
+export function getLiveAbacatePay({
+    config,
+    fetcher = fetch
+}: {
+    config: AbacatePayConfig;
+    fetcher?: Fetcher;
+}): AbacatePayGateway {
     const api = apiClient(config, fetcher);
     return {
         async createProduct(product) {

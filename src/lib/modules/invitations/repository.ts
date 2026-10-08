@@ -20,7 +20,11 @@ export interface InvitationRepository {
     findByToken(token: string): Promise<InvitationSecretRow | null>;
 }
 
-export function getInvitationRepository(queryable: Queryable): InvitationRepository {
+export function getInvitationRepository({
+    queryable
+}: {
+    queryable: Queryable;
+}): InvitationRepository {
     return {
         listByInviter(userId) {
             const sql = `select ${COLUMNS} from invitations where inviter_id = $1 order by inserted_at desc`;

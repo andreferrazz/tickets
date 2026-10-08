@@ -26,7 +26,11 @@ export interface EventStatsRepository {
 // Payout statuses that hold or have taken money (Backend.Payouts @blocking_statuses).
 const BLOCKING_PAYOUT_STATUSES = ['pending', 'complete', 'refunded', 'expired'];
 
-export function getEventStatsRepository(queryable: Queryable): EventStatsRepository {
+export function getEventStatsRepository({
+    queryable
+}: {
+    queryable: Queryable;
+}): EventStatsRepository {
     return {
         async countPendingOrders(eventId) {
             const sql = `select count(*)::int as n from orders where event_id = $1 and status = 'pending'`;

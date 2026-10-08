@@ -19,7 +19,7 @@ export interface UserRepository {
 const COLUMNS =
     'id, email, role, invited_by, name, cellphone, tax_id, abacate_customer_id, inserted_at';
 
-export function getUserRepository(queryable: Queryable): UserRepository {
+export function getUserRepository({ queryable }: { queryable: Queryable }): UserRepository {
     return {
         listUsers() {
             const sql = `select ${COLUMNS} from users order by name asc, email asc`;

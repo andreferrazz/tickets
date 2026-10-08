@@ -77,7 +77,11 @@ export interface OrderStateRepository {
 
 const NOW = "now() at time zone 'utc'";
 
-export function getOrderStateRepository(queryable: Queryable): OrderStateRepository {
+export function getOrderStateRepository({
+    queryable
+}: {
+    queryable: Queryable;
+}): OrderStateRepository {
     return {
         async findCancellable(orderId) {
             const sql = `
