@@ -12,6 +12,7 @@
     import PromptDialog from '$lib/components/PromptDialog.svelte';
     import LoginModal from '$lib/components/LoginModal.svelte';
     import { loginModalStore } from '$lib/stores/loginModal.svelte';
+    import { isProfileGatedPath } from '$lib/modules/sessions/profile-gate';
 
     let { data, children } = $props();
 
@@ -21,6 +22,7 @@
     // over the new page. A navigation hook, not an effect: nothing is derived here.
     afterNavigate(() => {
         menuOpen = false;
+        sendToProfileStep();
     });
 
     onMount(async () => {
@@ -35,16 +37,20 @@
     });
 
     // Force authed users to complete their profile before navigating anywhere
-    // other than the auth flow. Keys off profile_complete (not abacate_customer_id)
-    // so an Abacate outage doesn't trap users in this redirect.
-    $effect(() => {
+    // other than the auth flow. The server does this for every page it renders
+    // (`profileGateTarget` in hooks.server.ts); this covers navigations inside
+    // the app, which the server cannot tell from the login modal refreshing the
+    // page under it. Runs after a navigation, not in an effect: it reacts to
+    // where the visitor went, not to state.
+    function sendToProfileStep() {
         if (!auth.isAuthed || !auth.user) return;
         if (auth.user.profileComplete === true) return;
-        if (page.url.pathname.startsWith('/auth/')) return;
+        if (!isProfileGatedPath(page.url.pathname)) return;
         // The login modal handles profile completion in-page; don't yank the user away.
         if (loginModalStore.open) return;
-        goto(resolve('/auth/profile'));
-    });
+        const next = encodeURIComponent(page.url.pathname + page.url.search);
+        goto(`${resolve('/auth/profile')}?next=${next}`);
+    }
 
     // The /profile logout action revokes the session and clears the cookie;
     // the browser's copy of the token is dropped before the redirect is followed.
