@@ -53,7 +53,7 @@ the same files `npm run db:migrate` applies everywhere else.
 
 | Spec | Flow covered | Edge cases |
 | --- | --- | --- |
-| `home.spec.ts` | Event list by role: anonymous sees published only, a member sees own-org drafts, an admin sees every draft. Closed filter and search applied server-side | Served HTML never leaks drafts |
+| `home.spec.ts` | Event list by role: anonymous sees published only, a member sees own-org drafts, an admin sees every draft. Closed filter and search narrow the list in the browser with no further request, and are applied to the served markup from the query string | Served HTML never leaks drafts; a search with no match names the search and clears in one click |
 | `event-detail.spec.ts` | Event page server-rendered with ticket type and batch; draft visibility by role; the dashboard and edit links are served to a manager or admin and to nobody else | Missing, malformed and other-org draft ids are 404, never 403 |
 | `orders.spec.ts` | Buyer's order list and order detail server-rendered: items, total, one QR per pass, payment link while pending; anonymous sent to login with `next` | Another buyer's order, missing and malformed ids are 404, never 403; a missing order shows the app's own error page |
 | `dashboard.spec.ts` | Creator dashboard and event orders server-rendered: revenue, stock, recent orders, buyers of an item from the `buyers` query parameter, validated counts | Another organization's event is 404 for a manager, 200 for an admin; anonymous sent to login with `next` |

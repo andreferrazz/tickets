@@ -88,9 +88,17 @@ export const pt = {
     // Home
     'home.title': 'Próximos eventos',
     'home.subtitle': 'Encontre ingressos e complementos para eventos perto de você.',
-    'home.searchPlaceholder': 'Buscar eventos...',
+    'home.searchPlaceholder': 'Buscar por nome ou local',
     'home.showClosed': 'Mostrar eventos encerrados',
     'home.noResults': 'Nenhum evento encontrado.',
+    'home.searchLabel': 'Buscar eventos por nome ou local',
+    'home.clearSearch': 'Limpar busca',
+    'home.countOne': '1 evento',
+    'home.countMany': '{count} eventos',
+    'home.noMatch': 'Nenhum evento encontrado para “{search}”.',
+    'home.noMatchHint': 'Confira a grafia ou tente outro nome ou cidade.',
+    'home.emptyHint': 'Novos eventos aparecem aqui assim que são publicados.',
+    'home.eventEnded': 'Já aconteceu',
     'home.errorFallback': 'Falha ao carregar eventos',
 
     // Event detail
