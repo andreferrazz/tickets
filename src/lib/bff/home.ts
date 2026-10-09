@@ -1,18 +1,18 @@
 import { logLoadFailure } from './load-failure';
+import type { HomeFilters } from '$lib/modules/events/home-filters';
 import type { EventMapper } from '$lib/modules/events/mapper';
 import type { EventService } from '$lib/modules/events/service';
 import type { EventDto } from '$lib/modules/events/types';
 import type { SessionUser } from '$lib/modules/sessions/types';
 
 export interface HomeData {
+    /**
+     * Every event the caller may see, closed ones included: the page narrows
+     * them with `filterHomeEvents`, so changing a filter costs no request.
+     */
     events: EventDto[];
     loadFailed: boolean;
     filters: HomeFilters;
-}
-
-export interface HomeFilters {
-    closed: boolean;
-    search: string;
 }
 
 export interface HomeBff {
@@ -24,33 +24,11 @@ export function getHomeBff(service: EventService, mapper: EventMapper): HomeBff 
         async index(user, filters): Promise<HomeData> {
             try {
                 const rows = await service.listVisible(user);
-                const events = rows
-                    .map(mapper.toDto)
-                    .filter(closedFilter(filters.closed))
-                    .filter(searchFilter(filters.search));
-                return { events, filters, loadFailed: false };
+                return { events: rows.map(mapper.toDto), filters, loadFailed: false };
             } catch (cause) {
                 logLoadFailure('home_events_load_failed', {}, cause);
                 return { events: [], filters, loadFailed: true };
             }
         }
-    };
-}
-
-function closedFilter(closed: boolean) {
-    return (event: EventDto) => closed || event.status !== 'closed';
-}
-
-function searchFilter(search: string) {
-    return (event: EventDto) => {
-        if (!search) {
-            return true;
-        }
-
-        const title = event.title.toLowerCase();
-        const location = (event.location ?? '').toLowerCase();
-        const needle = search.toLowerCase();
-
-        return title.includes(needle) || location.includes(needle);
     };
 }

@@ -1,14 +1,15 @@
-import type { HomeFilters } from '$lib/bff/home';
+import type { HomeFilters } from '$lib/modules/events/home-filters';
 import type { PageServerLoad } from './$types';
 
 /**
  * The event list for the home page. Drafts appear here for members of the
  * owning organization, so this depends on `locals.user` from the session cookie.
  *
- * The search text and the closed-events toggle live in the query string rather
- * than in component state: this page is server-rendered, so filtering here is
- * what makes a filtered view correct in the served HTML, survive a reload, and
- * be shareable as a link.
+ * The search text and the closed-events toggle are read from the query string
+ * so a filtered view is correct in the served HTML, survives a reload, and is
+ * shareable as a link. They are only parsed here: the page applies them to the
+ * full list, on the server render and again in the browser, so toggling one
+ * does not come back for another round trip to the database.
  *
  * Failures are returned rather than thrown: the page has its own error state,
  * and swapping the whole page for an error boundary would be a downgrade from
