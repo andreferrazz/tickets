@@ -78,8 +78,6 @@ import {
     type PassCheckInService
 } from '$lib/modules/passes/checkin-service';
 import { getPassRepository } from '$lib/modules/passes/repository';
-import { getPayoutRepository } from '$lib/modules/payouts/repository';
-import { getPayoutService, type PayoutService } from '$lib/modules/payouts/service';
 import { getSessionRepository } from '$lib/modules/sessions/repository';
 import { getSessionService } from '$lib/modules/sessions/service';
 import type { SessionService } from '$lib/modules/sessions/service';
@@ -137,8 +135,6 @@ export interface Container {
     orderCancellation: OrderCancellation;
     /** Free tickets from the comp page's `send` action. */
     compTickets: CompTicketIssuer;
-    /** Withdrawals behind the dashboard's withdraw dialog; its actions call it directly. */
-    payouts: PayoutService;
     /** Payment events from Abacate Pay; `/webhooks/abacate-pay` hands every delivery to it. */
     abacateWebhook: AbacateWebhook;
     /** The stale-order sweep; `hooks.server.ts` runs it on a timer when switched on. */
@@ -190,12 +186,7 @@ type Mappers = ReturnType<typeof buildMappers>;
 type CoreServices = ReturnType<typeof buildCoreServices>;
 type OrderServices = Pick<
     Container,
-    | 'orderPlacement'
-    | 'orderCancellation'
-    | 'compTickets'
-    | 'payouts'
-    | 'abacateWebhook'
-    | 'orderReconciler'
+    'orderPlacement' | 'orderCancellation' | 'compTickets' | 'abacateWebhook' | 'orderReconciler'
 >;
 type Bffs = Pick<
     Container,
@@ -237,8 +228,7 @@ function buildRepositories(queryable: Queryable) {
         passes: getPassRepository({ queryable }),
         reservations: getReservationRepository({ queryable }),
         orderStates: getOrderStateRepository({ queryable }),
-        webhookLog: getWebhookLogRepository({ queryable }),
-        payouts: getPayoutRepository({ queryable })
+        webhookLog: getWebhookLogRepository({ queryable })
     };
 }
 
@@ -291,8 +281,7 @@ function buildCoreServices({ queryable, repositories: repos, integrations }: Cor
         eventStatsService: getEventStatsService({
             managedEvents,
             details: eventDetailService,
-            stats: repos.eventStats,
-            organizations: organizationService
+            stats: repos.eventStats
         }),
         eventOrderService: getEventOrderService({ orders: repos.orders, managedEvents }),
         invitationService: getInvitationService({
@@ -328,7 +317,7 @@ interface OrderServiceDeps extends CoreServiceDeps {
     core: CoreServices;
 }
 
-// The money path: reserving stock, placing and settling orders, paying out.
+// The money path: reserving stock, placing and settling orders.
 function buildOrderServices(deps: OrderServiceDeps): OrderServices {
     const { queryable, repositories: repos, core } = deps;
     const { abacatePay, mailer } = deps.integrations;
@@ -378,14 +367,7 @@ function buildOrderServices(deps: OrderServiceDeps): OrderServices {
             log: repos.webhookLog,
             settlement
         }),
-        orderReconciler: getOrderReconciler({ orderStates, stock, fulfilment, abacatePay }),
-        payouts: getPayoutService({
-            queryable,
-            payouts: repos.payouts,
-            stats: core.eventStatsService,
-            organizations: repos.organizations,
-            abacatePay
-        })
+        orderReconciler: getOrderReconciler({ orderStates, stock, fulfilment, abacatePay })
     };
 }
 

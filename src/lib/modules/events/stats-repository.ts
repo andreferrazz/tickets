@@ -16,15 +16,9 @@ export interface EventStatsRepository {
     /** Paid revenue per item of `kind`: pending holds and refunds earn nothing. */
     paidRevenueByItem(eventId: string, kind: BuyersKind): Promise<ItemRevenueRow[]>;
     listRecentOrders(eventId: string, limit: number): Promise<RecentOrderRow[]>;
-    /** Payout amounts that reduce what can still be withdrawn. */
-    deductedPayoutCents(eventId: string): Promise<number>;
-    lastPayoutAt(eventId: string): Promise<Date | null>;
     /** One row per buyer of the item, pending and paid orders summed, largest first. */
     listItemBuyers(kind: BuyersKind, itemId: string): Promise<ItemBuyerRow[]>;
 }
-
-// Payout statuses that hold or have taken money (Backend.Payouts @blocking_statuses).
-const BLOCKING_PAYOUT_STATUSES = ['pending', 'complete', 'refunded', 'expired'];
 
 export function getEventStatsRepository({
     queryable
@@ -77,29 +71,6 @@ export function getEventStatsRepository({
                 order by o.inserted_at desc
                 limit $2`;
             return queryable.query<RecentOrderRow>(sql, [eventId, limit]);
-        },
-
-        async deductedPayoutCents(eventId) {
-            const sql = `
-                select coalesce(sum(amount_cents), 0)::int as n from payouts
-                where event_id = $1 and status = any($2)`;
-            const rows = await queryable.query<{ n: number }>(sql, [
-                eventId,
-                BLOCKING_PAYOUT_STATUSES
-            ]);
-            return rows[0]?.n ?? 0;
-        },
-
-        async lastPayoutAt(eventId) {
-            const sql = `
-                select inserted_at from payouts
-                where event_id = $1 and status = any($2)
-                order by inserted_at desc limit 1`;
-            const rows = await queryable.query<{ inserted_at: Date }>(sql, [
-                eventId,
-                BLOCKING_PAYOUT_STATUSES
-            ]);
-            return rows[0]?.inserted_at ?? null;
         },
 
         listItemBuyers(kind, itemId) {

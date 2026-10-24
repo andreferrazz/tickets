@@ -4,7 +4,6 @@
     import { page } from '$app/state';
     import { formatBRL } from '$lib/utils/currency';
     import BuyerModal, { type BuyerTarget } from '$lib/components/BuyerModal.svelte';
-    import WithdrawModal from '$lib/components/WithdrawModal.svelte';
     import { formatDateTime } from '$lib/utils/datetime';
     import { t, tStatus } from '$lib/i18n';
     import type { PageData } from './$types';
@@ -32,14 +31,6 @@
     function closeBuyers() {
         const url = new URL(page.url);
         url.searchParams.delete('buyers');
-        goto(url, { noScroll: true, keepFocus: true });
-    }
-
-    // The withdraw dialog is open while the URL says so, like the buyers list:
-    // the load only hands over `payouts` for a leader who asked for it.
-    function closeWithdraw() {
-        const url = new URL(page.url);
-        url.searchParams.delete('withdraw');
         goto(url, { noScroll: true, keepFocus: true });
     }
 
@@ -82,13 +73,6 @@
                 {t('dashboard.feesDeducted', { amount: formatBRL(stats.totals.feesCents) })}
             </div>
             <div class="muted small">{t('dashboard.netRevenueHint')}</div>
-            <!-- Withdraw ("Sacar dinheiro") button hidden for now. The dialog it
-                 opens works and is reachable at `?withdraw=1`; unhide this to offer it. -->
-            <!-- {#if stats.canWithdraw}
-				<a class="btn small withdraw-btn" href="?withdraw=1" data-sveltekit-noscroll>
-					{t('dashboard.withdraw')}
-				</a>
-			{/if} -->
         </div>
         <div class="card kpi">
             <div class="muted small">{t('dashboard.ticketsReserved')}</div>
@@ -253,9 +237,6 @@
     </section>
 {/if}
 
-{#if stats && data.payouts}
-    <WithdrawModal {stats} payouts={data.payouts} onClose={closeWithdraw} />
-{/if}
 <BuyerModal
     target={data.buyers?.target ?? null}
     buyers={data.buyers?.rows ?? null}
@@ -353,10 +334,6 @@
     .ticket-row:focus-visible {
         outline: 2px solid var(--accent);
         outline-offset: 2px;
-    }
-    .withdraw-btn {
-        margin-top: 0.5rem;
-        align-self: flex-start;
     }
     .view-orders-btn {
         margin-top: 0.5rem;

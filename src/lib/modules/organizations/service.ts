@@ -17,7 +17,7 @@ export interface OrganizationService {
     /** `Backend.Organizations.can_manage?/2` plus the admin bypass. */
     canManage(user: SessionUser, organizationId: string): Promise<boolean>;
 
-    /** Admin or leader: who may withdraw the organization's revenue. */
+    /** Admin or leader: who may rename the organization. */
     isLeader(user: SessionUser, organizationId: string): Promise<boolean>;
 
     /**

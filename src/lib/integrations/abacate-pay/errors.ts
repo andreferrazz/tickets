@@ -1,6 +1,6 @@
 /**
  * How an Abacate Pay call failed, so callers can decide what to do:
- * `invalid_data` is our input (surface it), `rate_limited` is a payout
+ * `invalid_data` is our input (surface it), `rate_limited` is Abacate's
  * throttle (tell the user to wait), `upstream` and `transport` are Abacate or
  * the network (retry later).
  */
