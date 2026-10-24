@@ -27,7 +27,7 @@ export function maxCardInstallments(totalCents: number): number {
 }
 
 /**
- * The Abacate fee, in cents, deducted from the organizer's payout for an order
+ * The Abacate fee, in cents, Abacate keeps from the organizer's revenue for an order
  * paid via `paymentMethod`. PIX is flat; CARD is a rate that grows with the
  * installment count plus a fixed part. Anything else, including null, is
  * treated as PIX: legacy paid orders predate payment-method tracking.

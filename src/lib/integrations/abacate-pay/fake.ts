@@ -1,11 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type {
-    AbacatePayGateway,
-    CreatedPayout,
-    NewPayout,
-    PaymentState,
-    SettledPaymentMethod
-} from './gateway';
+import type { AbacatePayGateway, PaymentState, SettledPaymentMethod } from './gateway';
 import { AbacatePayError } from './errors';
 
 /**
@@ -24,21 +18,12 @@ export interface FakeAbacatePay extends AbacatePayGateway {
     settle(id: string, state: Partial<PaymentState>): void;
     /** From now on, asking about `id` fails the way an Abacate outage does. */
     cutOff(id: string): void;
-    /** Every payout requested, newest last. */
-    readonly payouts: readonly (NewPayout & CreatedPayout)[];
 }
 
 const BOLETO_TTL_DAYS = 3;
-/**
- * A payout to a Pix key that starts with this fails as an Abacate outage does.
- * Keyed on the destination rather than a switch on the fake, so one spec's
- * outage is not another spec's.
- */
-export const PAYOUT_OUTAGE_PREFIX = 'outage+';
 
 export function getFakeAbacatePay(): FakeAbacatePay {
     const states = new Map<string, PaymentState>();
-    const payouts: (NewPayout & CreatedPayout)[] = [];
     const unreachable = new Set<string>();
     const stateOf = (id: string, method: SettledPaymentMethod | null): PaymentState => {
         if (unreachable.has(id))
@@ -53,7 +38,6 @@ export function getFakeAbacatePay(): FakeAbacatePay {
         `${prefix}_fake_${boot}_${String(++sequence).padStart(6, '0')}`;
 
     return {
-        payouts,
         async createProduct(product) {
             return `prod_fake_${product.externalId}`;
         },
@@ -79,17 +63,6 @@ export function getFakeAbacatePay(): FakeAbacatePay {
         },
         async getTransparent(transparentId) {
             return stateOf(transparentId, 'BOLETO');
-        },
-        async createPayout(payout) {
-            if (payout.pixKey.startsWith(PAYOUT_OUTAGE_PREFIX))
-                throw new AbacatePayError('upstream', 503, 'fake payout outage');
-            const created: CreatedPayout = {
-                id: `pyt_fake_${payout.externalId}`,
-                status: 'pending',
-                receiptUrl: null
-            };
-            payouts.push({ ...payout, ...created });
-            return created;
         },
         settle(id, state) {
             states.set(id, { ...(states.get(id) ?? pending(null)), ...state });

@@ -33,12 +33,7 @@ export function getEventStatsMapper(): EventStatsMapper {
                 ticketTypes: view.ticketTypes.map(ticketTypeDto),
                 extras: view.extras.map(extraDto),
                 recentOrders: view.recentOrders.map(recentOrderDto),
-                canWithdraw: view.canWithdraw,
-                organization: {
-                    id: view.organization.id,
-                    pixKey: view.organization.pix_key,
-                    pixKeyType: view.organization.pix_key_type
-                }
+                organization: { id: view.event.organization_id }
             };
         },
         toBuyerDto(row) {
@@ -55,8 +50,6 @@ function totalsDto({ totals }: EventStatsView): StatsTotalsDto {
         grossRevenueCents: totals.revenueCents,
         feesCents: totals.feesCents,
         netRevenueCents: totals.revenueCents - totals.feesCents,
-        availableToWithdrawCents: totals.availableToWithdrawCents,
-        lastPayoutAt: toIso8601UtcOrNull(totals.lastPayoutAt),
         ticketsSold: totals.ticketsSold,
         ticketsCapacity: totals.ticketsCapacity,
         extrasSold: totals.extrasSold,

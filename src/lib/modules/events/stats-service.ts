@@ -1,5 +1,4 @@
 import { feeCents } from '$lib/integrations/abacate-pay/fees';
-import type { OrganizationService } from '$lib/modules/organizations/service';
 import type { SessionUser } from '$lib/modules/sessions/types';
 import type { EventDetailService } from './detail-service';
 import type { ManagedEventFinder } from './managed-event';
@@ -36,7 +35,6 @@ export interface EventStatsServiceDeps {
     managedEvents: ManagedEventFinder;
     details: EventDetailService;
     stats: EventStatsRepository;
-    organizations: OrganizationService;
 }
 
 export function getEventStatsService(deps: EventStatsServiceDeps): EventStatsService {
@@ -44,13 +42,10 @@ export function getEventStatsService(deps: EventStatsServiceDeps): EventStatsSer
         async getStats(user, eventId) {
             const event = await deps.managedEvents.find(user, eventId);
             if (!event) return null;
-            const [organization, rows, totals, canWithdraw] = await Promise.all([
-                deps.organizations.findById(event.organization_id),
+            const [rows, totals] = await Promise.all([
                 deps.details.loadRows(event.id),
-                loadTotals(deps.stats, event),
-                deps.organizations.isLeader(user, event.organization_id)
+                loadTotals(deps.stats, event)
             ]);
-            if (!organization) return null;
             const [ticketRevenue, extraRevenue, recentOrders] = await Promise.all([
                 deps.stats.paidRevenueByItem(event.id, 'ticket'),
                 deps.stats.paidRevenueByItem(event.id, 'extra'),
@@ -58,12 +53,10 @@ export function getEventStatsService(deps: EventStatsServiceDeps): EventStatsSer
             ]);
             return {
                 event,
-                organization,
                 totals: { ...totals, ...stockTotals(rows) },
                 ticketTypes: ticketTypeStats(rows, byItem(ticketRevenue)),
                 extras: extraStats(rows, byItem(extraRevenue)),
-                recentOrders,
-                canWithdraw
+                recentOrders
             };
         },
 
@@ -81,12 +74,10 @@ export function getEventStatsService(deps: EventStatsServiceDeps): EventStatsSer
 type MoneyTotals = Omit<StatsTotals, 'ticketsSold' | 'ticketsCapacity' | 'extrasSold'>;
 
 async function loadTotals(stats: EventStatsRepository, event: EventRow): Promise<MoneyTotals> {
-    const [pending, paid, passes, deducted, lastPayoutAt] = await Promise.all([
+    const [pending, paid, passes] = await Promise.all([
         stats.countPendingOrders(event.id),
         stats.listPaidOrders(event.id),
-        stats.passTotals(event.id),
-        stats.deductedPayoutCents(event.id),
-        stats.lastPayoutAt(event.id)
+        stats.passTotals(event.id)
     ]);
     const revenueCents = paid.reduce((sum, order) => sum + order.total_cents, 0);
     const feesCentsTotal = paid.reduce((sum, order) => sum + orderFeeCents(order), 0);
@@ -95,8 +86,6 @@ async function loadTotals(stats: EventStatsRepository, event: EventRow): Promise
         ordersPending: pending,
         revenueCents,
         feesCents: feesCentsTotal,
-        availableToWithdrawCents: Math.max(0, revenueCents - feesCentsTotal - deducted),
-        lastPayoutAt,
         passesIssued: passes.issued,
         passesCheckedIn: passes.checked_in
     };

@@ -1,5 +1,4 @@
-import type { OrderStatus, PixKeyType } from '$lib/types';
-import type { OrganizationRow } from '$lib/modules/organizations/types';
+import type { OrderStatus } from '$lib/types';
 import type { EventRow, ExtraItemRow, TicketBatchRow, TicketTypeRow } from './types';
 
 /** A paid order's money columns, as the fee rule needs them. */
@@ -49,8 +48,6 @@ export interface StatsTotals {
     ordersPending: number;
     revenueCents: number;
     feesCents: number;
-    availableToWithdrawCents: number;
-    lastPayoutAt: Date | null;
     ticketsSold: number;
     ticketsCapacity: number;
     extrasSold: number;
@@ -73,12 +70,10 @@ export interface ExtraStatsView {
 /** Everything the dashboard shows, before the mapper flattens it. */
 export interface EventStatsView {
     event: EventRow;
-    organization: OrganizationRow;
     totals: StatsTotals;
     ticketTypes: TicketTypeStatsView[];
     extras: ExtraStatsView[];
     recentOrders: RecentOrderRow[];
-    canWithdraw: boolean;
 }
 
 export interface BatchStatsDto {
@@ -126,8 +121,6 @@ export interface StatsTotalsDto {
     grossRevenueCents: number;
     feesCents: number;
     netRevenueCents: number;
-    availableToWithdrawCents: number;
-    lastPayoutAt: string | null;
     ticketsSold: number;
     ticketsCapacity: number;
     extrasSold: number;
@@ -142,8 +135,8 @@ export interface EventStatsDto {
     ticketTypes: TicketTypeStatsDto[];
     extras: ExtraStatsDto[];
     recentOrders: RecentOrderDto[];
-    canWithdraw: boolean;
-    organization: { id: string; pixKey: string | null; pixKeyType: PixKeyType | null };
+    /** Whose event it is, for the link to the team page. */
+    organization: { id: string };
 }
 
 export interface ItemBuyerDto {

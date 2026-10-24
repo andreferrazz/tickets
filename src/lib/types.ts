@@ -30,8 +30,6 @@ export type OrgRole = 'leader' | 'participant' | 'staff';
 
 export type PixKeyType = 'cpf' | 'cnpj' | 'email' | 'phone' | 'evp';
 
-export type PayoutStatus = 'pending' | 'complete' | 'failed' | 'cancelled' | 'refunded' | 'expired';
-
 export interface RecentOrderRow {
     id: string;
     buyer_email: string;

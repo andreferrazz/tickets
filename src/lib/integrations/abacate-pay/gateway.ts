@@ -4,11 +4,9 @@
  * speaks HTTP, `fake.ts` keeps everything in memory for e2e runs.
  */
 export type CheckoutStatus = 'paid' | 'pending' | 'cancelled' | 'expired' | 'refunded';
-export type PayoutStatus = 'pending' | 'complete' | 'failed' | 'cancelled' | 'refunded' | 'expired';
 /** Methods the hosted checkout page can offer. Boleto goes through `createBoleto`. */
 export type HostedCheckoutMethod = 'PIX' | 'CARD';
 export type SettledPaymentMethod = 'PIX' | 'CARD' | 'BOLETO';
-export type PixKeyType = 'cpf' | 'cnpj' | 'email' | 'phone' | 'evp';
 
 export interface NewProduct {
     name: string;
@@ -66,21 +64,6 @@ export interface PaymentState {
     cardInstallments: number | null;
 }
 
-export interface NewPayout {
-    amountCents: number;
-    /** Our own UUID; Abacate uses it as the idempotency key. */
-    externalId: string;
-    description: string | null;
-    pixKey: string;
-    pixKeyType: PixKeyType;
-}
-
-export interface CreatedPayout {
-    id: string;
-    status: PayoutStatus;
-    receiptUrl: string | null;
-}
-
 export interface AbacatePayGateway {
     /** Returns the `prod_*` id. */
     createProduct(product: NewProduct): Promise<string>;
@@ -90,5 +73,4 @@ export interface AbacatePayGateway {
     createBoleto(boleto: NewBoleto): Promise<CreatedBoleto>;
     getCheckout(checkoutId: string): Promise<PaymentState>;
     getTransparent(transparentId: string): Promise<PaymentState>;
-    createPayout(payout: NewPayout): Promise<CreatedPayout>;
 }

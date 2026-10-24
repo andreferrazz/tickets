@@ -1,14 +1,8 @@
 import type { AbacatePayConfig } from '$lib/config/abacate-pay';
 import { AbacatePayError } from './errors';
 import { maxCardInstallments } from './fees';
-import type {
-    AbacatePayGateway,
-    NewCheckout,
-    NewPayout,
-    PaymentState,
-    PixKeyType
-} from './gateway';
-import { normalizeCheckoutStatus, normalizePayoutStatus } from './status';
+import type { AbacatePayGateway, NewCheckout, PaymentState } from './gateway';
+import { normalizeCheckoutStatus } from './status';
 
 type Fetcher = typeof fetch;
 
@@ -19,7 +13,6 @@ interface ApiData {
     status?: string;
     installmentsCount?: number;
     expiresAt?: string | null;
-    receiptUrl?: string | null;
 }
 
 interface ApiEnvelope {
@@ -101,14 +94,6 @@ export function getLiveAbacatePay({
                 paymentMethod: 'BOLETO',
                 cardInstallments: null
             };
-        },
-        async createPayout(payout) {
-            const data = await api.post('/payouts/create', payoutBody(payout));
-            return {
-                id: requireField(data, 'id', 'payout'),
-                status: normalizePayoutStatus(data.status),
-                receiptUrl: data.receiptUrl ?? null
-            };
         }
     };
 }
@@ -144,9 +129,9 @@ async function send(fetcher: Fetcher, url: string, init: RequestInit): Promise<A
     return { status: response.status, body };
 }
 
-// The same error classes the Phoenix client distinguished: 429 is a payout
-// throttle, a 4xx carrying `error` is our bad input, anything else non-2xx is
-// Abacate's problem.
+// The same error classes the Phoenix client distinguished: 429 is Abacate's
+// rate limit, a 4xx carrying `error` is our bad input, anything else non-2xx
+// is Abacate's problem.
 function unwrap({ status, body }: ApiResponse, path: string): ApiData {
     if (status >= 200 && status < 300 && body.data) return body.data;
     const detail = body.error ?? JSON.stringify(body);
@@ -195,30 +180,6 @@ function checkoutBody(checkout: NewCheckout) {
         ...(checkout.methods.includes('CARD')
             ? { card: { maxInstallments: maxCardInstallments(checkout.totalCents) } }
             : {})
-    };
-}
-
-const PIX_KEY_TYPES: Record<PixKeyType, string> = {
-    cpf: 'CPF',
-    cnpj: 'CNPJ',
-    email: 'EMAIL',
-    phone: 'PHONE',
-    evp: 'RANDOM'
-};
-
-function payoutBody(payout: NewPayout) {
-    if (!Number.isInteger(payout.amountCents) || payout.amountCents <= 0) {
-        throw new AbacatePayError(
-            'invalid_data',
-            null,
-            `payout amount must be a positive integer in cents, got: ${payout.amountCents}`
-        );
-    }
-    return {
-        amount: payout.amountCents,
-        externalId: payout.externalId,
-        pix: { key: payout.pixKey, type: PIX_KEY_TYPES[payout.pixKeyType] },
-        ...(payout.description ? { description: payout.description } : {})
     };
 }
 
