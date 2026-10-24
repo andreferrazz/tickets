@@ -2,16 +2,13 @@ import type { Queryable } from '$lib/db/queryable';
 import type { InvitationRow, InvitationSecretRow, NewInvitationRow } from './types';
 
 export interface InvitationRepository {
-    /** Invitations `userId` sent, newest first. */
-    listByInviter(userId: string): Promise<InvitationRow[]>;
-
-    /** Invitations `userId` sent or that target one of `organizationIds`, newest first. */
-    listForManager(userId: string, organizationIds: readonly string[]): Promise<InvitationRow[]>;
+    /** Every invitation ever sent, newest first. */
+    listAll(): Promise<InvitationRow[]>;
 
     /** A pending, unexpired invitation for `email`, if any. */
     findPendingByEmail(email: string): Promise<InvitationRow | null>;
 
-    /** Runs inside the caller's transaction, next to the promotion it belongs to. */
+    /** Runs inside the caller's transaction, next to the role change it belongs to. */
     markAccepted(db: Queryable, id: string): Promise<void>;
 
     insert(row: NewInvitationRow): Promise<InvitationSecretRow>;
@@ -26,17 +23,9 @@ export function getInvitationRepository({
     queryable: Queryable;
 }): InvitationRepository {
     return {
-        listByInviter(userId) {
-            const sql = `select ${COLUMNS} from invitations where inviter_id = $1 order by inserted_at desc`;
-            return queryable.query<InvitationRow>(sql, [userId]);
-        },
-
-        listForManager(userId, organizationIds) {
-            const sql = `
-                select ${COLUMNS} from invitations
-                where inviter_id = $1 or organization_id = any($2::uuid[])
-                order by inserted_at desc`;
-            return queryable.query<InvitationRow>(sql, [userId, organizationIds]);
+        listAll() {
+            const sql = `select ${COLUMNS} from invitations order by inserted_at desc`;
+            return queryable.query<InvitationRow>(sql);
         },
 
         async findPendingByEmail(email) {
@@ -54,18 +43,11 @@ export function getInvitationRepository({
 
         async insert(row) {
             const sql = `
-                insert into invitations (inviter_id, organization_id, role, email, status, token, expires_at, inserted_at)
-                values ($1, $2, $3, $4, 'pending', $5, (now() at time zone 'utc') + make_interval(hours => $6),
+                insert into invitations (inviter_id, role, email, status, token, expires_at, inserted_at)
+                values ($1, $2, $3, 'pending', $4, (now() at time zone 'utc') + make_interval(hours => $5),
                         now() at time zone 'utc')
                 returning ${COLUMNS}, token, expires_at`;
-            const params = [
-                row.inviterId,
-                row.organizationId,
-                row.role,
-                row.email,
-                row.token,
-                row.ttlHours
-            ];
+            const params = [row.inviterId, row.role, row.email, row.token, row.ttlHours];
             const rows = await queryable.query<InvitationSecretRow>(sql, params);
             if (!rows[0]) throw new Error('insert invitation returned no row');
             return rows[0];
@@ -78,4 +60,4 @@ export function getInvitationRepository({
     };
 }
 
-const COLUMNS = 'id, inviter_id, organization_id, role, email, status, inserted_at';
+const COLUMNS = 'id, inviter_id, role, email, status, inserted_at';

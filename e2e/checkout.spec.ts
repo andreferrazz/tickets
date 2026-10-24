@@ -1,6 +1,6 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { payAtFakeAbacate } from './support/fake-abacate';
-import { MEMBER, OTHER_ORG, OWN_ORG_DRAFT, PUBLISHED_TICKET_TYPE } from './support/fixtures';
+import { DRAFT_EVENT, MEMBER, PUBLISHED_TICKET_TYPE } from './support/fixtures';
 import { postFormAction, type ActionAnswer } from './support/form-action';
 import { waitForHydration } from './support/hydration';
 import { orderColumn, passCount, placeOrder, sold } from './support/orders';
@@ -238,7 +238,7 @@ test('carts the page would never send are refused, and reserve nothing', async (
         const answer = await buy(context, event.id, form);
         expect(answer.data.error, JSON.stringify(form)).toBe(error);
     }
-    expect((await buy(context, OWN_ORG_DRAFT.id, { [ticket]: '1' })).data.error).toBe(
+    expect((await buy(context, DRAFT_EVENT.id, { [ticket]: '1' })).data.error).toBe(
         'event_not_available'
     );
     // An anonymous buyer is sent to log in and brought back to the event.
@@ -261,13 +261,7 @@ test('a manager cancels a buyer’s order from the event’s list; nobody else c
 }) => {
     const event = await seedSellableEvent({ ticketPriceCents: 0, ticketStock: 5 });
     const { id: orderId } = await placeOrder(event, { quantity: 2 });
-    const outsiders = [
-        await seedPerson({ role: 'buyer' }),
-        await seedPerson({
-            role: 'creator',
-            membership: { organizationId: OTHER_ORG.id, role: 'participant' }
-        })
-    ];
+    const outsiders = [await seedPerson({ role: 'buyer' }), await seedPerson({ role: 'staff' })];
     for (const outsider of outsiders) {
         const theirs = await contextFor(browser, outsider);
         const asBuyer = await postFormAction(theirs.request, `/orders/${orderId}?/cancel`, {});

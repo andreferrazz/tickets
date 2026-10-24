@@ -1,12 +1,13 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { canManageEvents } from '$lib/modules/accounts/roles';
 import { parseEventInput } from '$lib/modules/events/management-forms';
 import { requireSessionUser } from '$lib/modules/sessions/require-user';
 import type { Actions, PageServerLoad } from './$types';
 
-/** Creators and admins only; everyone else is sent home, as the client page did. */
+/** Those who manage events only; everyone else is sent home, as the client page did. */
 export const load: PageServerLoad = ({ locals, url }) => {
     const user = requireSessionUser(locals.user, url.pathname);
-    if (user.role !== 'creator' && user.role !== 'admin') redirect(303, '/');
+    if (!canManageEvents(user.role)) redirect(303, '/');
     return {};
 };
 

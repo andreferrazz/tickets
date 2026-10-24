@@ -2,19 +2,14 @@
     import { enhance } from '$app/forms';
     import { goto } from '$app/navigation';
     import { resolve } from '$app/paths';
-    import { t } from '$lib/i18n';
+    import { t, tRole } from '$lib/i18n';
     import type { UserDto } from '$lib/modules/accounts/types';
     import { auth } from '$lib/stores/auth.svelte';
-    import type { OrgRole } from '$lib/types';
     import type { ActionData, PageData } from './$types';
 
     let { data, form }: { data: PageData; form: ActionData } = $props();
 
-    type Accepted = {
-        token: string;
-        user: UserDto;
-        organization: { id: string; name: string; role: OrgRole };
-    };
+    type Accepted = { token: string; user: UserDto };
 
     let busy = $state(false);
 
@@ -28,15 +23,11 @@
 
     const error = $derived(failureMessage(form?.failure ?? data.failure));
 
-    // Admin-invited leaders land on the rename form: their organization was
-    // auto-named and they should set it before anything else. The profile
-    // step comes first when theirs is incomplete, carrying that target along.
-    async function enter({ token, user, organization }: Accepted) {
+    // Home once signed in; the profile step comes first when theirs is
+    // incomplete, carrying that target along.
+    async function enter({ token, user }: Accepted) {
         await auth.set(token, user);
-        const target =
-            organization.role === 'leader'
-                ? resolve('/onboarding/organization/[id]', { id: organization.id })
-                : resolve('/');
+        const target = resolve('/');
         await goto(
             user.profileComplete
                 ? target
@@ -52,8 +43,13 @@
             <p class="error">{error ?? t('invite.errorFallback')}</p>
             <a href={resolve('/auth/login')}>{t('invite.goLogin')}</a>
         {:else}
-            <h1>{t('invite.title', { org: data.invitation.organizationName })}</h1>
-            <p class="muted">{t('invite.hint', { email: data.invitation.email })}</p>
+            <h1>{t('invite.title', { org: data.organizationName })}</h1>
+            <p class="muted">
+                {t('invite.hint', {
+                    email: data.invitation.email,
+                    role: tRole(data.invitation.role)
+                })}
+            </p>
             <form
                 method="POST"
                 action="?/accept"

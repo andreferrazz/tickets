@@ -3,15 +3,16 @@
  * it obvious the run is reading the seeded database and not a stray dev one.
  */
 
-export const DRAFT_ORG = { id: '00000000-0000-4000-8000-000000000001', name: 'E2E Org' };
-export const OTHER_ORG = { id: '00000000-0000-4000-8000-000000000002', name: 'E2E Other Org' };
+/** The organization every seeded row belongs to; the app reads it from ORG_NAME. */
+export const ORGANIZATION_NAME = 'E2E Org';
 
+/** Manages events, but not the team. */
 export const MEMBER = {
     id: '00000000-0000-4000-8000-000000000010',
     email: 'member@e2e.test',
     name: 'E2E Member',
     taxId: '52998224725',
-    role: 'creator',
+    role: 'member',
     token: 'e2e-session-member'
 };
 
@@ -24,16 +25,27 @@ export const ADMIN = {
     token: 'e2e-session-admin'
 };
 
-export const SESSIONS = [
-    { userId: MEMBER.id, token: MEMBER.token },
-    { userId: ADMIN.id, token: ADMIN.token }
-];
+/** Runs the team: invites, promotes, demotes, removes. */
+export const LEADER = {
+    id: '00000000-0000-4000-8000-000000000012',
+    email: 'leader@e2e.test',
+    name: 'E2E Leader',
+    taxId: '39053344705',
+    role: 'leader',
+    token: 'e2e-session-leader'
+};
+
+export const SEEDED_PEOPLE = [MEMBER, ADMIN, LEADER];
+
+export const SESSIONS = SEEDED_PEOPLE.map((person) => ({
+    userId: person.id,
+    token: person.token
+}));
 
 export const PUBLISHED_EVENT = {
     id: '00000000-0000-4000-8000-000000000100',
     title: 'E2E Published Show',
     status: 'published',
-    organizationId: DRAFT_ORG.id,
     startsAt: '2027-03-01 20:00:00'
 };
 
@@ -41,42 +53,25 @@ export const CLOSED_EVENT = {
     id: '00000000-0000-4000-8000-000000000101',
     title: 'E2E Closed Show',
     status: 'closed',
-    organizationId: DRAFT_ORG.id,
     startsAt: '2027-04-01 20:00:00'
 };
 
-/** Draft in the org MEMBER belongs to — visible to MEMBER, hidden from anonymous. */
-export const OWN_ORG_DRAFT = {
+/** Visible to those who manage events, hidden from anonymous visitors, buyers and staff. */
+export const DRAFT_EVENT = {
     id: '00000000-0000-4000-8000-000000000102',
-    title: 'E2E Own Org Draft',
+    title: 'E2E Draft Show',
     status: 'draft',
-    organizationId: DRAFT_ORG.id,
     startsAt: '2027-05-01 20:00:00'
-};
-
-/** Draft nobody is a member of — only an admin should ever see it. */
-export const OTHER_ORG_DRAFT = {
-    id: '00000000-0000-4000-8000-000000000103',
-    title: 'E2E Other Org Draft',
-    status: 'draft',
-    organizationId: OTHER_ORG.id,
-    startsAt: '2027-06-01 20:00:00'
 };
 
 export interface SeededEvent {
     id: string;
     title: string;
     status: string;
-    organizationId: string;
     startsAt: string;
 }
 
-export const SEEDED_EVENTS: SeededEvent[] = [
-    PUBLISHED_EVENT,
-    CLOSED_EVENT,
-    OWN_ORG_DRAFT,
-    OTHER_ORG_DRAFT
-];
+export const SEEDED_EVENTS: SeededEvent[] = [PUBLISHED_EVENT, CLOSED_EVENT, DRAFT_EVENT];
 
 /** The one thing PUBLISHED_EVENT sells, so the detail page has a price to render. */
 export const PUBLISHED_TICKET_TYPE = {
@@ -134,13 +129,12 @@ export const ADMIN_ORDER = {
 
 export const SEEDED_ORDERS = [MEMBER_PAID_ORDER, MEMBER_PENDING_ORDER, ADMIN_ORDER];
 
-/** A pending invitation MEMBER sent into their organization. Read-only: no spec accepts it. */
+/** A pending invitation LEADER sent. Read-only: no spec accepts it. */
 export const PENDING_INVITATION = {
     id: '00000000-0000-4000-8000-000000000700',
-    inviterId: MEMBER.id,
-    organizationId: DRAFT_ORG.id,
+    inviterId: LEADER.id,
     email: 'invited@e2e.test',
-    role: 'participant',
+    role: 'member',
     token: 'e2e-invite-token'
 };
 

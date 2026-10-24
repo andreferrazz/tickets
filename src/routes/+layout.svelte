@@ -62,9 +62,13 @@
     };
 </script>
 
+<svelte:head>
+    <title>{data.organizationName}</title>
+</svelte:head>
+
 <nav class="nav">
     <div class="nav-inner">
-        <a href={resolve('/')} class="brand">🎟 Tickets</a>
+        <a href={resolve('/')} class="brand">🎟 {data.organizationName}</a>
         <button
             class="secondary small nav-toggle"
             aria-expanded={menuOpen}
@@ -80,17 +84,20 @@
                 <a href={resolve('/orders')} class:active={page.url.pathname.startsWith('/orders')}
                     >{t('nav.myOrders')}</a
                 >
-                <!-- Not admins: an event needs an organization and they belong to none. -->
-                {#if auth.user?.role === 'creator'}
+                {#if data.canManageEvents}
                     <a href={resolve('/events/new')}>{t('nav.newEvent')}</a>
                 {/if}
-                {#if data.scanStaff}
+                {#if data.canScan}
                     <a href={resolve('/scan')} class:active={page.url.pathname.startsWith('/scan')}
                         >{t('nav.scan')}</a
                     >
                 {/if}
+                {#if data.canLeadTeam}
+                    <a href={resolve('/team')} class:active={page.url.pathname.startsWith('/team')}
+                        >{t('nav.team')}</a
+                    >
+                {/if}
                 {#if auth.isAdmin}
-                    <a href={resolve('/admin/invitations')}>{t('nav.invitations')}</a>
                     <a href={resolve('/admin/users')}>{t('nav.users')}</a>
                 {/if}
                 <a href={resolve('/profile')} class="who">{auth.user?.email}</a>

@@ -48,12 +48,11 @@
     <header class="head">
         <h1>{t('dashboard.title')}</h1>
         <div class="head-actions">
-            <a
-                href={resolve('/organizations/[id]/invitations', { id: stats.organization.id })}
-                class="btn secondary small"
-            >
-                {t('dashboard.manageInvitations')}
-            </a>
+            {#if data.canLeadTeam}
+                <a href={resolve('/team')} class="btn secondary small">
+                    {t('dashboard.manageTeam')}
+                </a>
+            {/if}
             <a href={resolve('/events/[id]', { id: stats.eventId })} class="btn secondary small"
                 >←</a
             >

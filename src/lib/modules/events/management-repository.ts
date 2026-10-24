@@ -15,7 +15,6 @@ export interface OwnedBatchRow extends TicketBatchRow {
 }
 
 export interface NewEventRow extends EventInput {
-    organizationId: string;
     createdById: string;
 }
 
@@ -79,7 +78,7 @@ export interface EventManagementRepository {
 }
 
 const EVENT_COLUMNS = `
-    id, organization_id, created_by_id, title, description, tickets_description,
+    id, created_by_id, title, description, tickets_description,
     location, starts_at, ends_at, cover_image_url, status, inserted_at, updated_at`;
 const TICKET_TYPE_COLUMNS = 'id, event_id, name, description, sales_start, sales_end';
 const BATCH_COLUMNS =
@@ -98,12 +97,11 @@ export function getEventManagementRepository({
     return {
         async insertEvent(db, row) {
             const sql = `
-                insert into events (organization_id, created_by_id, title, description, tickets_description,
+                insert into events (created_by_id, title, description, tickets_description,
                                     location, starts_at, cover_image_url, status, inserted_at, updated_at)
-                values ($1, $2, $3, $4, $5, $6, $7::timestamptz at time zone 'utc', $8, $9, ${NOW}, ${NOW})
+                values ($1, $2, $3, $4, $5, $6::timestamptz at time zone 'utc', $7, $8, ${NOW}, ${NOW})
                 returning ${EVENT_COLUMNS}`;
             const params = [
-                row.organizationId,
                 row.createdById,
                 row.title,
                 row.description,

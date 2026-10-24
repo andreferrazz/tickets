@@ -1,5 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
-import { DRAFT_ORG, MEMBER, OTHER_ORG_DRAFT } from './support/fixtures';
+import { DRAFT_EVENT, MEMBER } from './support/fixtures';
 import { postFormAction, type ActionAnswer } from './support/form-action';
 import { waitForHydration } from './support/hydration';
 import { seedPerson } from './support/people';
@@ -160,20 +160,15 @@ test('a batch with sales cannot be deleted', async ({ page, context }) => {
     expect(refused.data.error).toBe('batch_has_sales');
 });
 
-test('an event of another organization cannot be edited', async ({ page }) => {
-    const response = await page.request.get(`/events/${OTHER_ORG_DRAFT.id}/edit`);
-    expect(response.status()).toBe(404);
-});
-
-// Phoenix kept creation behind the creator role; managing an organization is
-// not enough for a member whose own role is still `buyer`.
-test('a buyer who manages an organization still cannot create an event', async ({ browser }) => {
-    const buyer = await seedPerson({
-        role: 'buyer',
-        membership: { organizationId: DRAFT_ORG.id, role: 'participant' }
-    });
+// 404, not 403: the page must not confirm the event exists to someone who may
+// not manage it. Scan-only staff are on the team and still get nothing here.
+test('scan-only staff cannot open the edit page or create an event', async ({ browser }) => {
+    const staff = await seedPerson({ role: 'staff' });
     const context = await browser.newContext();
-    await signIn(context, buyer.token);
+    await signIn(context, staff.token);
+
+    const response = await context.request.get(`/events/${DRAFT_EVENT.id}/edit`);
+    expect(response.status()).toBe(404);
 
     const answer = await postFormAction(context.request, '/events/new?/create', {
         title: 'E2E Forbidden Show',

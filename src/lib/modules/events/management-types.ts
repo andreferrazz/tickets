@@ -42,7 +42,6 @@ export interface SectionInput {
 export type ManagementFailure =
     | 'not_found'
     | 'forbidden'
-    | 'organization_id_required'
     | 'validation'
     | 'batch_has_sales'
     | 'section_not_empty'

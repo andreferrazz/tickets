@@ -1,10 +1,9 @@
 import { expect, test } from '@playwright/test';
 import {
     ADMIN,
+    DRAFT_EVENT,
     MEMBER,
     MISSING_EVENT_ID,
-    OTHER_ORG_DRAFT,
-    OWN_ORG_DRAFT,
     PUBLISHED_BATCH,
     PUBLISHED_EVENT,
     PUBLISHED_TICKET_TYPE
@@ -35,41 +34,41 @@ test('the event is server-rendered, before any JavaScript runs', async ({ reques
 });
 
 test('a draft is 404 for an anonymous visitor', async ({ request }) => {
-    const response = await request.get(`/events/${OWN_ORG_DRAFT.id}`);
+    const response = await request.get(`/events/${DRAFT_EVENT.id}`);
 
     expect(response.status()).toBe(404);
     // 404 rather than 403 on purpose: the response must not confirm the draft exists.
-    expect(await response.text()).not.toContain(OWN_ORG_DRAFT.title);
+    expect(await response.text()).not.toContain(DRAFT_EVENT.title);
 });
 
-test('a member opens their own organization draft', async ({ context, page }) => {
+test('a member opens a draft', async ({ context, page }) => {
     await signIn(context, MEMBER.token);
 
-    await page.goto(`/events/${OWN_ORG_DRAFT.id}`);
+    await page.goto(`/events/${DRAFT_EVENT.id}`);
 
-    await expect(page.getByRole('heading', { name: OWN_ORG_DRAFT.title })).toBeVisible();
+    await expect(page.getByRole('heading', { name: DRAFT_EVENT.title })).toBeVisible();
 });
 
-// page.request rather than the standalone `request` fixture: only the page's
-// context carries the session cookie signIn just wrote.
-test('a member gets 404 for another organization draft', async ({ context, page }) => {
-    await signIn(context, MEMBER.token);
+// Scan-only staff are on the team, but drafts are not theirs to see. The
+// context's request carries the session cookie signIn just wrote.
+test('a staff member gets 404 for a draft', async ({ browser }) => {
+    const staff = await seedPerson({ role: 'staff' });
+    const context = await browser.newContext();
+    await signIn(context, staff.token);
 
-    const response = await page.request.get(`/events/${OTHER_ORG_DRAFT.id}`);
+    const response = await context.request.get(`/events/${DRAFT_EVENT.id}`);
 
     expect(response.status()).toBe(404);
+    await context.close();
 });
 
-test('an admin opens a draft from an organization they do not belong to', async ({
-    context,
-    page
-}) => {
+test('an admin opens a draft', async ({ context, page }) => {
     await signIn(context, ADMIN.token);
 
-    const response = await page.request.get(`/events/${OTHER_ORG_DRAFT.id}`);
+    const response = await page.request.get(`/events/${DRAFT_EVENT.id}`);
 
     expect(response.status()).toBe(200);
-    expect(withoutScripts(await response.text())).toContain(OTHER_ORG_DRAFT.title);
+    expect(withoutScripts(await response.text())).toContain(DRAFT_EVENT.title);
 });
 
 test('an event that does not exist is 404', async ({ request }) => {
@@ -87,7 +86,7 @@ test('a malformed event id is 404', async ({ request }) => {
 });
 
 // These links used to appear after hydration, once the browser had asked
-// Phoenix for the visitor's memberships. The server decides now.
+// Phoenix for the visitor's role. The server decides now.
 test('the dashboard and edit links are served to a manager and to nobody else', async ({
     browser,
     request
@@ -95,10 +94,7 @@ test('the dashboard and edit links are served to a manager and to nobody else', 
     const path = `/events/${PUBLISHED_EVENT.id}`;
     // The server writes the href relative to the page it is on.
     const dashboardLink = new RegExp(`href="[^"]*${path}/dashboard"`);
-    const staff = await seedPerson({
-        role: 'buyer',
-        membership: { organizationId: PUBLISHED_EVENT.organizationId, role: 'staff' }
-    });
+    const staff = await seedPerson({ role: 'staff' });
     const served: Record<string, boolean> = {};
 
     for (const [who, token] of Object.entries({

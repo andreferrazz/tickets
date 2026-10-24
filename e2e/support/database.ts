@@ -1,19 +1,17 @@
 import pg from 'pg';
 import { migrate } from '../../db/migrate.ts';
 import {
-    ADMIN,
     MEMBER_PAID_ORDER,
     PENDING_INVITATION,
     PUBLISHED_BATCH,
     PUBLISHED_TICKET_TYPE,
-    DRAFT_ORG,
     MEMBER,
-    OTHER_ORG,
     SEEDED_BATCHES,
     SEEDED_EVENTS,
     SEEDED_ORDER_ITEMS,
     SEEDED_ORDERS,
     SEEDED_PASSES,
+    SEEDED_PEOPLE,
     SEEDED_TICKET_TYPES,
     SESSIONS
 } from './fixtures';
@@ -50,8 +48,6 @@ const SEEDED_TABLES = [
     'ticket_batches',
     'ticket_types',
     'events',
-    'organization_memberships',
-    'organizations',
     'users'
 ];
 
@@ -84,7 +80,6 @@ async function seed(): Promise<void> {
     await client.connect();
     try {
         await client.query(`truncate table ${SEEDED_TABLES.join(', ')} cascade`);
-        await insertOrganizations(client);
         await insertUsers(client);
         await insertEvents(client);
         await insertTickets(client);
@@ -96,18 +91,8 @@ async function seed(): Promise<void> {
     }
 }
 
-async function insertOrganizations(client: pg.Client): Promise<void> {
-    for (const org of [DRAFT_ORG, OTHER_ORG]) {
-        await client.query(
-            `insert into organizations (id, name, inserted_at, updated_at)
-			 values ($1, $2, now() at time zone 'utc', now() at time zone 'utc')`,
-            [org.id, org.name]
-        );
-    }
-}
-
 async function insertUsers(client: pg.Client): Promise<void> {
-    for (const user of [MEMBER, ADMIN]) {
+    for (const user of SEEDED_PEOPLE) {
         // No profile_complete column: the flag is derived from name/cellphone/
         // tax_id when a user is read.
         await client.query(
@@ -117,24 +102,17 @@ async function insertUsers(client: pg.Client): Promise<void> {
             [user.id, user.email, user.role, `cust_e2e_${user.role}`, user.name, user.taxId]
         );
     }
-    // Only MEMBER belongs to an org; ADMIN deliberately belongs to none, so the
-    // admin spec proves role-based access rather than membership.
-    await client.query(
-        `insert into organization_memberships (id, organization_id, user_id, role, inserted_at, updated_at)
-		 values (gen_random_uuid(), $1, $2, 'leader', now() at time zone 'utc', now() at time zone 'utc')`,
-        [DRAFT_ORG.id, MEMBER.id]
-    );
 }
 
 async function insertEvents(client: pg.Client): Promise<void> {
     for (const event of SEEDED_EVENTS) {
         await client.query(
             `insert into events
-			   (id, title, description, location, starts_at, status, organization_id,
-			    created_by_id, inserted_at, updated_at)
-			 values ($1, $2, 'seeded by the e2e run', 'Sao Paulo', $3, $4, $5, $6,
+			   (id, title, description, location, starts_at, status, created_by_id,
+			    inserted_at, updated_at)
+			 values ($1, $2, 'seeded by the e2e run', 'Sao Paulo', $3, $4, $5,
 			         now() at time zone 'utc', now() at time zone 'utc')`,
-            [event.id, event.title, event.startsAt, event.status, event.organizationId, MEMBER.id]
+            [event.id, event.title, event.startsAt, event.status, MEMBER.id]
         );
     }
 }
@@ -225,13 +203,12 @@ async function insertOrders(client: pg.Client): Promise<void> {
 async function insertInvitations(client: pg.Client): Promise<void> {
     await client.query(
         `insert into invitations
-           (id, inviter_id, organization_id, email, role, status, token, expires_at, inserted_at)
-         values ($1, $2, $3, $4, $5, 'pending', $6, (now() at time zone 'utc') + interval '7 days',
+           (id, inviter_id, email, role, status, token, expires_at, inserted_at)
+         values ($1, $2, $3, $4, 'pending', $5, (now() at time zone 'utc') + interval '7 days',
                  now() at time zone 'utc')`,
         [
             PENDING_INVITATION.id,
             PENDING_INVITATION.inviterId,
-            PENDING_INVITATION.organizationId,
             PENDING_INVITATION.email,
             PENDING_INVITATION.role,
             PENDING_INVITATION.token

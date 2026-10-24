@@ -2,19 +2,19 @@ import type { OutgoingEmail } from '$lib/integrations/mail/mailer';
 
 const CODE_TTL_MINUTES = 10;
 
-/** The passwordless login email, word for word as `Backend.Mailer.send_auth_code/2` sent it. */
-export function authCodeEmail(to: string, code: string): OutgoingEmail {
+/** The passwordless login email, as `Backend.Mailer.send_auth_code/2` sent it, signed by the organization. */
+export function authCodeEmail(to: string, code: string, organizationName: string): OutgoingEmail {
     return {
         to,
         subject: `Seu código de acesso: ${code}`,
         text: [
             'Olá!',
             '',
-            `Seu código de acesso ao Tickets é: ${code}`,
+            `Seu código de acesso a ${organizationName} é: ${code}`,
             '',
             `O código expira em ${CODE_TTL_MINUTES} minutos. Não compartilhe com ninguém.`,
             '',
-            '— Equipe Tickets',
+            `— ${organizationName}`,
             ''
         ].join('\n')
     };

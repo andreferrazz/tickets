@@ -5,7 +5,6 @@
  */
 export interface EventRow {
     id: string;
-    organization_id: string;
     created_by_id: string | null;
     title: string;
     /** Null on rows Phoenix wrote from a blank field. */
@@ -22,7 +21,6 @@ export interface EventRow {
 
 export interface EventDto {
     id: string;
-    organizationId: string;
     createdById: string | null;
     title: string;
     description: string | null;

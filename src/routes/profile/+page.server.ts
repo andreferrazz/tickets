@@ -3,12 +3,12 @@ import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from '$lib/modules/sessions/co
 import { requireSessionUser } from '$lib/modules/sessions/require-user';
 import type { Actions, PageServerLoad } from './$types';
 
-/** The caller's own profile and memberships. */
+/** The caller's own profile. */
 export const load: PageServerLoad = async ({ locals, url }) => {
-    const user = requireSessionUser(locals.user, url.pathname);
-    const data = await locals.container.authBff.profilePage(user);
-    if (!data) redirect(303, '/auth/login');
-    return data;
+    const sessionUser = requireSessionUser(locals.user, url.pathname);
+    const user = await locals.container.authBff.currentUser(sessionUser);
+    if (!user) redirect(303, '/auth/login');
+    return { user };
 };
 
 /** Logging out revokes the session row and drops the cookie; the page clears the browser's copy. */

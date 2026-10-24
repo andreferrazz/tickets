@@ -2,6 +2,7 @@ import { readAbacatePayConfig } from '$lib/config/abacate-pay';
 import { readAbacateWebhookSecret } from '$lib/config/abacate-webhook';
 import { readRateLimitConfig } from '$lib/config/rate-limit';
 import { resolveIntegrationMode, type IntegrationMode } from '$lib/config/integrations';
+import { readOrganizationName } from '$lib/config/organization';
 import { readSmtpConfig } from '$lib/config/smtp';
 import { getQueryableInstance } from '$lib/db/pool';
 import type { Queryable } from '$lib/db/queryable';
@@ -18,6 +19,7 @@ import { getUserMapper, type UserMapper } from '$lib/modules/accounts/mapper';
 import { getProfileService } from '$lib/modules/accounts/profile-service';
 import { getFixedWindowRateLimiter } from '$lib/modules/accounts/rate-limit';
 import { getUserRepository } from '$lib/modules/accounts/repository';
+import { getTeamService, type TeamService } from '$lib/modules/accounts/team-service';
 import { getEventDetailMapper } from '$lib/modules/events/detail-mapper';
 import { getEventDetailRepository } from '$lib/modules/events/detail-repository';
 import { getEventDetailService } from '$lib/modules/events/detail-service';
@@ -67,12 +69,6 @@ import {
 import { getWebhookLogRepository } from '$lib/modules/webhooks/webhook-log-repository';
 import { getOrderService } from '$lib/modules/orders/service';
 import type { EventService } from '$lib/modules/events/service';
-import { getOrganizationMapper } from '$lib/modules/organizations/mapper';
-import { getOrganizationRepository } from '$lib/modules/organizations/repository';
-import {
-    getOrganizationService,
-    type OrganizationService
-} from '$lib/modules/organizations/service';
 import {
     getPassCheckInService,
     type PassCheckInService
@@ -89,8 +85,8 @@ import { getDashboardBff, type DashboardBff } from './bff/dashboard';
 import { getEventManagementBff, type EventManagementBff } from './bff/event-management';
 import { getEventOrdersBff, type EventOrdersBff } from './bff/event-orders';
 import { getOrdersBff, type OrdersBff } from './bff/orders';
-import { getOrganizationsBff, type OrganizationsBff } from './bff/organizations';
 import { getScanBff, type ScanBff } from './bff/scan';
+import { getTeamBff, type TeamBff } from './bff/team';
 
 /** The in-process stand-ins, kept reachable so test-only routes can inspect them. */
 export interface IntegrationFakes {
@@ -106,6 +102,8 @@ export interface IntegrationFakes {
 export interface Container {
     /** Which Abacate Pay and mail implementations this graph was built with. */
     integrationMode: IntegrationMode;
+    /** The one organization this deployment serves, from `ORG_NAME`. */
+    organizationName: string;
     /** Null unless `INTEGRATIONS=fake`; the `/e2e-fakes` routes answer 404 without it. */
     fakes: IntegrationFakes | null;
     abacatePay: AbacatePayGateway;
@@ -117,15 +115,15 @@ export interface Container {
     ordersBff: OrdersBff;
     dashboardBff: DashboardBff;
     eventOrdersBff: EventOrdersBff;
-    organizationsBff: OrganizationsBff;
+    teamBff: TeamBff;
     adminBff: AdminBff;
     scanBff: ScanBff;
     authBff: AuthBff;
     eventManagementBff: EventManagementBff;
     /** Writes behind the event edit page; the actions call it directly. */
     eventManagement: EventManagementService;
-    /** Membership and rename writes; the team and onboarding actions call it directly. */
-    organizations: OrganizationService;
+    /** Role changes and removals; the team page's actions call it directly. */
+    team: TeamService;
     invitationWrites: InvitationWriteService;
     /** Pass validation at the door; the scan page's load and action call it directly. */
     passCheckIn: PassCheckInService;
@@ -158,21 +156,23 @@ export function getContainer(): Container {
 
 function createContainer(): Container {
     const integrationMode = resolveIntegrationMode();
-    const integrations = buildIntegrations(integrationMode);
+    const organizationName = readOrganizationName();
+    const integrations = buildIntegrations(integrationMode, organizationName);
     const queryable = getQueryableInstance();
     const repositories = buildRepositories(queryable);
     const mappers = buildMappers();
-    const core = buildCoreServices({ queryable, repositories, integrations });
+    const core = buildCoreServices({ queryable, repositories, integrations, organizationName });
     const orders = buildOrderServices({ queryable, repositories, integrations, core });
     const bffs = buildBffs({ repositories, mappers, core });
     return {
         integrationMode,
+        organizationName,
         ...integrations,
         sessionService: core.sessionService,
         eventService: core.eventService,
         ...bffs,
         eventManagement: core.eventManagement,
-        organizations: core.organizationService,
+        team: core.teamService,
         invitationWrites: core.invitationWrites,
         passCheckIn: core.passCheckIn,
         ...orders,
@@ -195,7 +195,7 @@ type Bffs = Pick<
     | 'ordersBff'
     | 'dashboardBff'
     | 'eventOrdersBff'
-    | 'organizationsBff'
+    | 'teamBff'
     | 'adminBff'
     | 'scanBff'
     | 'authBff'
@@ -204,11 +204,11 @@ type Bffs = Pick<
 
 // The one place the fake/live choice is made. Live config is only read on the
 // live branch, so a fake run needs no secrets at all.
-function buildIntegrations(mode: IntegrationMode): Integrations {
+function buildIntegrations(mode: IntegrationMode, senderName: string): Integrations {
     const fakes: IntegrationFakes | null =
         mode === 'fake' ? { mailer: getFakeMailer(), abacatePay: getFakeAbacatePay() } : null;
     const abacatePay = fakes?.abacatePay ?? getLiveAbacatePay({ config: readAbacatePayConfig() });
-    const mailer = fakes?.mailer ?? getSmtpMailer(readSmtpConfig());
+    const mailer = fakes?.mailer ?? getSmtpMailer(readSmtpConfig(), senderName);
     return { fakes, abacatePay, mailer };
 }
 
@@ -218,7 +218,6 @@ function buildRepositories(queryable: Queryable) {
         events: getEventRepository({ queryable }),
         eventDetails: getEventDetailRepository({ queryable }),
         orders: getOrderRepository({ queryable }),
-        organizations: getOrganizationRepository({ queryable }),
         invitations: getInvitationRepository({ queryable }),
         users: getUserRepository({ queryable }),
         eventStats: getEventStatsRepository({ queryable }),
@@ -239,7 +238,6 @@ function buildMappers() {
         eventDetailMapper: getEventDetailMapper({ mapper: eventMapper }),
         orderMapper: getOrderMapper(),
         eventStatsMapper: getEventStatsMapper(),
-        organizationMapper: getOrganizationMapper(),
         invitationMapper: getInvitationMapper(),
         userMapper: getUserMapper()
     };
@@ -249,29 +247,26 @@ interface CoreServiceDeps {
     queryable: Queryable;
     repositories: Repositories;
     integrations: Integrations;
+    organizationName: string;
 }
 
 // Everything that is not the money path: who the caller is, what they may see
 // and manage, and how they got in.
-function buildCoreServices({ queryable, repositories: repos, integrations }: CoreServiceDeps) {
-    const { abacatePay, mailer } = integrations;
-    const organizationService = getOrganizationService({ repository: repos.organizations });
+function buildCoreServices(deps: CoreServiceDeps) {
+    const { queryable, repositories: repos, organizationName } = deps;
+    const { abacatePay, mailer } = deps.integrations;
     const eventDetailService = getEventDetailService({ repository: repos.eventDetails });
-    const managedEvents = getManagedEventFinder({
-        events: repos.events,
-        organizations: organizationService
-    });
+    const managedEvents = getManagedEventFinder({ events: repos.events });
     const authService = getAuthService({
         queryable,
         users: repos.users,
         authCodes: repos.authCodes,
         sessions: repos.sessions,
         invitations: repos.invitations,
-        organizations: repos.organizations,
-        mailer
+        mailer,
+        organizationName
     });
     return {
-        organizationService,
         eventDetailService,
         managedEvents,
         authService,
@@ -284,36 +279,28 @@ function buildCoreServices({ queryable, repositories: repos, integrations }: Cor
             stats: repos.eventStats
         }),
         eventOrderService: getEventOrderService({ orders: repos.orders, managedEvents }),
-        invitationService: getInvitationService({
-            invitations: repos.invitations,
-            organizations: organizationService
-        }),
-        passCheckIn: getPassCheckInService({
-            passes: repos.passes,
-            events: repos.events,
-            organizations: repos.organizations
-        }),
+        invitationService: getInvitationService({ invitations: repos.invitations }),
+        teamService: getTeamService({ queryable, users: repos.users }),
+        passCheckIn: getPassCheckInService({ passes: repos.passes, events: repos.events }),
         profileService: getProfileService({ users: repos.users, abacatePay }),
         invitationWrites: getInvitationWriteService({
             queryable,
             invitations: repos.invitations,
-            organizations: repos.organizations,
-            organizationService,
             users: repos.users,
             auth: authService,
-            mailer
+            mailer,
+            organizationName
         }),
         eventManagement: getEventManagementService({
             queryable,
             repository: repos.eventManagement,
             managedEvents,
-            organizations: organizationService,
             abacatePay
         })
     };
 }
 
-interface OrderServiceDeps extends CoreServiceDeps {
+interface OrderServiceDeps extends Omit<CoreServiceDeps, 'organizationName'> {
     core: CoreServices;
 }
 
@@ -392,23 +379,13 @@ function buildBffs({ repositories: repos, mappers, core }: BffDeps): Bffs {
             mapper: mappers.eventStatsMapper
         }),
         eventOrdersBff: getEventOrdersBff({ service: core.eventOrderService, mapper: orderMapper }),
-        organizationsBff: getOrganizationsBff({
-            organizations: core.organizationService,
-            organizationMapper: mappers.organizationMapper,
+        teamBff: getTeamBff({
+            team: core.teamService,
             invitations: core.invitationService,
             invitationMapper
         }),
-        adminBff: getAdminBff({
-            invitations: core.invitationService,
-            invitationMapper,
-            users: repos.users,
-            userMapper
-        }),
-        scanBff: getScanBff({
-            events: core.eventService,
-            eventMapper,
-            organizations: core.organizationService
-        }),
+        adminBff: getAdminBff({ users: repos.users, userMapper }),
+        scanBff: getScanBff({ events: core.eventService, eventMapper }),
         eventManagementBff: getEventManagementBff({
             managedEvents: core.managedEvents,
             details: core.eventDetailService,
@@ -424,7 +401,6 @@ function buildAuthBff({ repositories: repos, mappers, core }: BffDeps): AuthBff 
         auth: core.authService,
         profile: core.profileService,
         users: repos.users,
-        organizations: repos.organizations,
         userMapper: mappers.userMapper,
         // Process-local, like the ETS table it replaces: one instance per server.
         rateLimiter: getFixedWindowRateLimiter(),

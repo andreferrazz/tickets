@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import { E2E_BASE_URL, E2E_PORT } from './e2e/support/base-url';
 import { E2E_DATABASE_URL } from './e2e/support/database';
+import { ORGANIZATION_NAME } from './e2e/support/fixtures';
 import { E2E_WEBHOOK_SECRET } from './e2e/support/webhook';
 
 export default defineConfig({
@@ -31,6 +32,8 @@ export default defineConfig({
         env: {
             DATABASE_URL: E2E_DATABASE_URL,
             INTEGRATIONS: 'fake',
+            // The one organization the seeded world belongs to; the brand the specs read.
+            ORG_NAME: ORGANIZATION_NAME,
             // What the webhook specs put in the URL; without it every delivery is refused.
             ABACATE_PAY_WEBHOOK_SECRET: E2E_WEBHOOK_SECRET,
             // The specs run the sweep themselves (`/e2e-fakes/reconcile`); a timer

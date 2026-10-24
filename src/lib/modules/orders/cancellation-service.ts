@@ -24,7 +24,7 @@ type Cancelled = OrderOutcome<void, CancellationFailure>;
 export interface OrderCancellation {
     /** Someone else's order and a missing one are the same answer: `not_found`. */
     cancelForBuyer(buyer: SessionUser, orderId: string, origin: string): Promise<Cancelled>;
-    /** For an admin or a manager of the event's organization; the order must be on `eventId`. */
+    /** For anyone who manages events; the order must be on `eventId`. */
     cancelForManager(
         manager: SessionUser,
         eventId: string,

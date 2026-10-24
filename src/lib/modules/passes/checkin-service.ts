@@ -1,6 +1,6 @@
+import { canScan } from '$lib/modules/accounts/roles';
 import type { EventRepository } from '$lib/modules/events/repository';
 import type { EventRow } from '$lib/modules/events/types';
-import type { OrganizationRepository } from '$lib/modules/organizations/repository';
 import type { SessionUser } from '$lib/modules/sessions/types';
 import { toIso8601UtcOrNull } from '$lib/utils/datetime';
 import { isUuid } from '$lib/utils/uuid';
@@ -8,10 +8,10 @@ import type { PassRepository } from './repository';
 import type { CheckInDto, CheckInResult, ScannedPassRow } from './types';
 
 /**
- * Pass validation at the door, as `PassController.validate/2` ran it: an
- * admin or any member of the event's organization (scan-only staff included)
- * may scan, a pass is only good at its own event, and a second scan is
- * answered with the time of the first.
+ * Pass validation at the door, as `PassController.validate/2` ran it: anyone
+ * with a role in the organization (scan-only staff included) may scan any
+ * event, a pass is only good at its own event, and a second scan is answered
+ * with the time of the first.
  */
 export interface PassCheckInService {
     /** The event, when `user` may scan for it; null otherwise, missing or not. */
@@ -22,18 +22,13 @@ export interface PassCheckInService {
 export interface PassCheckInServiceDeps {
     passes: PassRepository;
     events: EventRepository;
-    organizations: OrganizationRepository;
 }
 
 export function getPassCheckInService(deps: PassCheckInServiceDeps): PassCheckInService {
     const service: PassCheckInService = {
-        async scannableEvent(user, eventId) {
-            if (!isUuid(eventId)) return null;
-            const event = await deps.events.findEventById(eventId);
-            if (!event) return null;
-            if (user.role === 'admin') return event;
-            const role = await deps.organizations.findMemberRole(user.id, event.organization_id);
-            return role ? event : null;
+        scannableEvent(user, eventId) {
+            if (!isUuid(eventId) || !canScan(user.role)) return Promise.resolve(null);
+            return deps.events.findEventById(eventId);
         },
 
         async checkIn(user, eventId, token) {

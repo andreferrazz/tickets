@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { latestAuthCode, userColumn } from './support/auth-codes';
-import { ADMIN, DRAFT_ORG, MEMBER } from './support/fixtures';
+import { ADMIN, LEADER, MEMBER } from './support/fixtures';
 import { withoutScripts } from './support/html';
 import { waitForHydration } from './support/hydration';
 import { seedInvitation, seedPerson, seedSession } from './support/people';
@@ -60,18 +60,17 @@ test('a wrong code is refused', async ({ page }) => {
 });
 
 // Logging in with the email a pending invitation names consumes it: the buyer
-// becomes a creator with the invited membership, in one transaction.
+// becomes a member, in one transaction with the invitation's acceptance.
 test('a pending invitation is accepted on first login', async ({ page }) => {
     const email = uniqueEmail('invited');
-    await seedInvitation({ email, inviterId: MEMBER.id, organizationId: DRAFT_ORG.id });
+    await seedInvitation({ email, inviterId: LEADER.id });
 
     await logInWithCode(page, email);
     await completeProfile(page);
     await expect(page).toHaveURL('/');
 
-    expect(await userColumn(email, 'role')).toBe('creator');
-    const team = await page.request.get(`/organizations/${DRAFT_ORG.id}/invitations`);
-    expect(team.status()).toBe(200);
+    expect(await userColumn(email, 'role')).toBe('member');
+    expect((await page.request.get('/events/new')).status()).toBe(200);
 });
 
 test('the next parameter survives the whole flow', async ({ page }) => {
@@ -189,13 +188,7 @@ test('a session token is not an impersonation link', async ({ page }) => {
 test('scan-only staff get "Validar" in the navigation once signed in; a buyer does not', async ({
     browser
 }) => {
-    const people = [
-        await seedPerson({
-            role: 'buyer',
-            membership: { organizationId: DRAFT_ORG.id, role: 'staff' }
-        }),
-        await seedPerson({ role: 'buyer' })
-    ];
+    const people = [await seedPerson({ role: 'staff' }), await seedPerson({ role: 'buyer' })];
     const scanLinks: number[] = [];
 
     for (const person of people) {

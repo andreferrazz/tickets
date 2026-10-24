@@ -5,102 +5,50 @@ export interface EventRepository {
     /** Every event anyone may see: published and closed. */
     listPublicEvents(): Promise<EventRow[]>;
 
-    /** Every event, drafts included. Admins only. */
+    /** Every live event, drafts included. For those who manage or scan events. */
     listAllEvents(): Promise<EventRow[]>;
-
-    /** Public events plus every event belonging to an org `userId` is a member of. */
-    listEventsForMember(userId: string): Promise<EventRow[]>;
 
     /** `id` if anyone may see it: published or closed. Null otherwise. */
     findPublicEventById(id: string): Promise<EventRow | null>;
 
-    /** `id` whatever its status, drafts included. Admins only. */
+    /** `id` whatever its status, drafts included. For those who manage or scan events. */
     findEventById(id: string): Promise<EventRow | null>;
-
-    /** `id` if it is public, or if `userId` manages the owning organization. */
-    findEventByIdForMember(id: string, userId: string): Promise<EventRow | null>;
-
-    /** Every live event of the given organizations, drafts included, by start time. */
-    listEventsForOrganizations(organizationIds: readonly string[]): Promise<EventRow[]>;
 }
 
 export function getEventRepository({ queryable }: { queryable: Queryable }): EventRepository {
     return {
         listPublicEvents() {
             const sql = `
-				select ${COLUMNS} 
+                select ${COLUMNS}
                 from events
-				where deleted_at is null and status in ('published', 'closed')
-				order by starts_at asc`;
+                where deleted_at is null and status in ('published', 'closed')
+                order by starts_at asc`;
             return queryable.query<EventRow>(sql);
         },
 
         listAllEvents() {
             const sql = `
-				select ${COLUMNS} 
+                select ${COLUMNS}
                 from events
-				where deleted_at is null
-				order by starts_at asc`;
+                where deleted_at is null
+                order by starts_at asc`;
             return queryable.query<EventRow>(sql);
-        },
-
-        listEventsForMember(userId: string) {
-            const sql = `
-				select ${COLUMNS} 
-                from events
-				where deleted_at is null
-					and (
-						status in ('published', 'closed')
-						or organization_id in (
-							select organization_id from organization_memberships where user_id = $1
-						)
-					)
-				order by starts_at asc`;
-            return queryable.query<EventRow>(sql, [userId]);
-        },
-
-        listEventsForOrganizations(organizationIds) {
-            if (organizationIds.length === 0) return Promise.resolve([]);
-            const sql = `
-				select ${COLUMNS}
-                from events
-				where deleted_at is null and organization_id = any($1::uuid[])
-				order by starts_at asc`;
-            return queryable.query<EventRow>(sql, [organizationIds]);
         },
 
         async findPublicEventById(id: string) {
             const sql = `
-				select ${COLUMNS}
+                select ${COLUMNS}
                 from events
-				where deleted_at is null and id = $1 and status in ('published', 'closed')`;
+                where deleted_at is null and id = $1 and status in ('published', 'closed')`;
             return first(await queryable.query<EventRow>(sql, [id]));
         },
 
         async findEventById(id: string) {
             const sql = `
-				select ${COLUMNS}
+                select ${COLUMNS}
                 from events
-				where deleted_at is null and id = $1`;
+                where deleted_at is null and id = $1`;
             return first(await queryable.query<EventRow>(sql, [id]));
-        },
-
-        // The membership roles mirror Backend.Organizations.can_manage?/2: scan-only
-        // `staff` members must not see an organization's drafts.
-        async findEventByIdForMember(id: string, userId: string) {
-            const sql = `
-				select ${COLUMNS}
-                from events
-				where deleted_at is null
-					and id = $1
-					and (
-						status in ('published', 'closed')
-						or organization_id in (
-							select organization_id from organization_memberships
-							where user_id = $2 and role in ('leader', 'participant')
-						)
-					)`;
-            return first(await queryable.query<EventRow>(sql, [id, userId]));
         }
     };
 }
@@ -110,7 +58,7 @@ function first(rows: EventRow[]): EventRow | null {
 }
 
 const COLUMNS = `
-	id, organization_id, created_by_id, title, description, tickets_description,
-	location, starts_at, ends_at, cover_image_url, status,
-	inserted_at, updated_at
+    id, created_by_id, title, description, tickets_description,
+    location, starts_at, ends_at, cover_image_url, status,
+    inserted_at, updated_at
 `;
