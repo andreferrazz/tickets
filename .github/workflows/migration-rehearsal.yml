@@ -1,0 +1,35 @@
+# A pull request that changes db/migrations must say it was rehearsed against a
+# production backup (`npm run db:rehearse`). The e2e suite migrates an empty
+# database, so it cannot catch a migration that breaks on existing rows; 0004
+# did exactly that on its first production deploy (2026-10-31, fixed in #62).
+name: Migration rehearsal
+
+on:
+    pull_request:
+        types: [opened, edited, synchronize, reopened]
+
+jobs:
+    recorded:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+            - name: Require a rehearsal result when migrations change
+              env:
+                  BODY: ${{ github.event.pull_request.body }}
+                  BASE: ${{ github.event.pull_request.base.sha }}
+              run: |
+                  changed=$(git diff --name-only "$BASE"...HEAD -- db/migrations)
+                  if [ -z "$changed" ]; then
+                    echo "No migration changes."
+                    exit 0
+                  fi
+                  echo "Migrations changed:"
+                  echo "$changed"
+                  if printf '%s' "$BODY" | grep -q 'db:rehearse'; then
+                    echo "Rehearsal recorded in the description."
+                    exit 0
+                  fi
+                  echo "::error::This pull request changes db/migrations. Run npm run db:rehearse against the latest production backup and put the command and its result under How to test."
+                  exit 1

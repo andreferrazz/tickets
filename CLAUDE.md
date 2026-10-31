@@ -43,6 +43,10 @@
 
 - Schema changes are SQL files in `db/migrations` (`NNNN_name.sql`),
   applied with `npm run db:migrate`.
+- A PR that adds or changes a migration runs `npm run db:rehearse` against the
+  latest production backup and puts the command and its output under How to
+  test; a GitHub check refuses the PR without it. Backups hold personal data:
+  keep them outside the repository and delete them after the rehearsal.
 - Follow the framework's convention (SvelteKit).
 - Prefer small focused modules over god files.
 - Predictable paths.
