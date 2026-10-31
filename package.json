@@ -11,6 +11,7 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"test": "playwright test",
 		"db:migrate": "node db/cli.ts",
+		"db:rehearse": "node db/rehearse.ts",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
 	},

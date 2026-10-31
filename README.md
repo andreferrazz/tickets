@@ -46,6 +46,19 @@ a container that is up is on its schema. Three things it cannot do for you:
   (`20261006000000`, which drops seating) before this image will start on it;
   otherwise the container exits naming the migration it found. The backend
   left the repository after commit `140e83d`: check that out to run it.
+- A new migration is rehearsed before it ships. Download the latest nightly
+  backup of the production database (a gzipped `pg_dump`), then:
+
+    ```
+    npm run db:rehearse -- path/to/backup.sql.gz
+    ```
+
+    It restores the backup into a throwaway `postgres:18` container, applies
+    the pending migrations, prints the rows per table before and after, and
+    removes the container (`--keep` leaves it running to inspect). It exits
+    non-zero if a migration fails. Needs Docker. The backup holds personal
+    data, so keep it out of the repository and delete it afterwards.
+
 - The environment is in `.env.example`. `INTEGRATIONS` must be `live` (or
   unset) in production, which makes the Abacate Pay and SMTP variables required.
 - `ORIGIN`, `ORG_NAME` and the Abacate Pay webhook registration are part of
