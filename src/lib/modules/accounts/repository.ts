@@ -13,6 +13,10 @@ export interface UserRepository {
     findByEmail(email: string, db?: Queryable): Promise<UserRow | null>;
     /** The minimal account a first login creates. */
     insertBuyer(email: string, db?: Queryable): Promise<UserRow>;
+    /** The one account the first run creates; its profile is completed on the first login. */
+    insertAdmin(email: string): Promise<UserRow>;
+    /** Whether anyone holds the admin role: what the first-run gate asks. */
+    hasAdmin(): Promise<boolean>;
     /**
      * A new role for `userId`. `invitedBy` is recorded when the change comes from
      * an accepted invitation; a leader's change on the team page leaves it alone.
@@ -58,6 +62,19 @@ export function getUserRepository({ queryable }: { queryable: Queryable }): User
                 values ($1, 'buyer', now() at time zone 'utc', now() at time zone 'utc')
                 returning ${COLUMNS}`;
             return firstRow(await db.query<UserRow>(sql, [email]), 'insert user');
+        },
+
+        async insertAdmin(email) {
+            const sql = `
+                insert into users (email, role, inserted_at, updated_at)
+                values ($1, 'admin', now() at time zone 'utc', now() at time zone 'utc')
+                returning ${COLUMNS}`;
+            return firstRow(await queryable.query<UserRow>(sql, [email]), 'insert admin');
+        },
+
+        async hasAdmin() {
+            const rows = await queryable.query(`select 1 from users where role = 'admin' limit 1`);
+            return rows.length > 0;
         },
 
         async setRole(db, userId, role, invitedBy) {

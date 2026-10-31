@@ -8,7 +8,8 @@
 
     let { form }: { form: ActionData } = $props();
 
-    let email = $state('');
+    // Prefilled by the first-run form, which just created the admin with this address.
+    let email = $state(page.url.searchParams.get('email') ?? '');
     let busy = $state(false);
     const next = $derived(safeNext(page.url.searchParams.get('next')) ?? '');
 </script>

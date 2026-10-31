@@ -382,6 +382,18 @@ export const pt = {
     'profile.logout': 'Sair',
     'profile.manageTeam': 'Gerenciar equipe',
 
+    // First run: naming the admin of a database that has none
+    'setup.title': 'Primeiro acesso',
+    'setup.subtitle':
+        '{org} ainda não tem um administrador. Informe o e-mail de quem vai administrar o sistema.',
+    'setup.emailLabel': 'E-mail do administrador',
+    'setup.hint':
+        'Em seguida você entra com o código enviado a esse e-mail, como em qualquer acesso.',
+    'setup.submit': 'Criar administrador',
+    'setup.submitting': 'Criando...',
+    'setup.errorAlreadySetUp': 'Já existe um administrador. Entre pela página de login.',
+    'setup.errorFallback': 'Falha ao criar o administrador.',
+
     // Roles
     'role.buyer': 'Comprador',
     'role.staff': 'Validador',

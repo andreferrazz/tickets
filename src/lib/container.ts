@@ -19,6 +19,7 @@ import { getUserMapper, type UserMapper } from '$lib/modules/accounts/mapper';
 import { getProfileService } from '$lib/modules/accounts/profile-service';
 import { getFixedWindowRateLimiter } from '$lib/modules/accounts/rate-limit';
 import { getUserRepository } from '$lib/modules/accounts/repository';
+import { getSetupService, type SetupService } from '$lib/modules/accounts/setup-service';
 import { getTeamService, type TeamService } from '$lib/modules/accounts/team-service';
 import { getEventDetailMapper } from '$lib/modules/events/detail-mapper';
 import { getEventDetailRepository } from '$lib/modules/events/detail-repository';
@@ -124,6 +125,8 @@ export interface Container {
     eventManagement: EventManagementService;
     /** Role changes and removals; the team page's actions call it directly. */
     team: TeamService;
+    /** The first-run admin; `hooks.server.ts` asks it whether to show the setup form. */
+    setup: SetupService;
     invitationWrites: InvitationWriteService;
     /** Pass validation at the door; the scan page's load and action call it directly. */
     passCheckIn: PassCheckInService;
@@ -173,6 +176,7 @@ function createContainer(): Container {
         ...bffs,
         eventManagement: core.eventManagement,
         team: core.teamService,
+        setup: core.setupService,
         invitationWrites: core.invitationWrites,
         passCheckIn: core.passCheckIn,
         ...orders,
@@ -281,6 +285,7 @@ function buildCoreServices(deps: CoreServiceDeps) {
         eventOrderService: getEventOrderService({ orders: repos.orders, managedEvents }),
         invitationService: getInvitationService({ invitations: repos.invitations }),
         teamService: getTeamService({ queryable, users: repos.users }),
+        setupService: getSetupService({ queryable, users: repos.users }),
         passCheckIn: getPassCheckInService({ passes: repos.passes, events: repos.events }),
         profileService: getProfileService({ users: repos.users, abacatePay }),
         invitationWrites: getInvitationWriteService({
