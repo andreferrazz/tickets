@@ -40,9 +40,11 @@ ALTER TABLE public.users
     ADD CONSTRAINT users_role_valid
     CHECK (role IN ('buyer', 'staff', 'member', 'leader', 'admin'));
 
--- Invitations carry only the role they grant.
-UPDATE public.invitations SET role = 'member' WHERE role = 'participant';
+-- Invitations carry only the role they grant. The old constraint goes first:
+-- it only allows leader | participant | staff, so renaming a row to member
+-- under it fails (the first production deploy of this file did, 2026-10-31).
 ALTER TABLE public.invitations DROP CONSTRAINT invitation_role_must_be_valid;
+UPDATE public.invitations SET role = 'member' WHERE role = 'participant';
 ALTER TABLE public.invitations
     ADD CONSTRAINT invitation_role_must_be_valid
     CHECK (role IN ('member', 'leader', 'staff'));
