@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { ADMIN, CLOSED_EVENT, DRAFT_EVENT, MEMBER, PUBLISHED_EVENT } from './support/fixtures';
+import {
+    ADMIN,
+    CLOSED_EVENT,
+    DRAFT_EVENT,
+    MEMBER,
+    ORGANIZATION_NAME,
+    PUBLISHED_EVENT
+} from './support/fixtures';
 import { waitForHydration } from './support/hydration';
 import { withoutScripts } from './support/html';
 import { seedPerson } from './support/people';
@@ -19,6 +26,9 @@ test('the event list is server-rendered, before any JavaScript runs', async ({ r
 
     expect(response.status()).toBe(200);
     expect(htmlMarkup).toContain(PUBLISHED_EVENT.title);
+    // One title, the organization's: a second static one in app.html used to win.
+    expect(htmlMarkup.match(/<title>/g)).toHaveLength(1);
+    expect(htmlMarkup).toContain(`<title>${ORGANIZATION_NAME}</title>`);
     // Drafts must not leak into anonymous HTML even though the page is prerendered
     // on the server, which is where a visibility bug would be invisible in the UI.
     expect(html).not.toContain(DRAFT_EVENT.title);
