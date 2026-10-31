@@ -22,15 +22,24 @@ import {
  */
 export const E2E_DATABASE = 'tickets_e2e';
 
+/**
+ * A second database the first-run spec empties and fills by itself: the seeded
+ * one always has an admin, which is exactly what that spec must start without.
+ */
+export const E2E_BLANK_DATABASE = 'tickets_e2e_blank';
+
 // Honours the libpq variables so a machine whose 5432 belongs to another project
 // can point the run at a different Postgres without editing this file.
 const PG_HOST = process.env.PGHOST ?? 'localhost';
 const PG_PORT = process.env.PGPORT ?? '5432';
 const PG_AUTH = 'postgres:postgres';
 
-export const E2E_DATABASE_URL = `postgres://${PG_AUTH}@${PG_HOST}:${PG_PORT}/${E2E_DATABASE}`;
+const databaseUrl = (name: string) => `postgres://${PG_AUTH}@${PG_HOST}:${PG_PORT}/${name}`;
 
-const ADMIN_URL = `postgres://${PG_AUTH}@${PG_HOST}:${PG_PORT}/postgres`;
+export const E2E_DATABASE_URL = databaseUrl(E2E_DATABASE);
+export const E2E_BLANK_DATABASE_URL = databaseUrl(E2E_BLANK_DATABASE);
+
+const ADMIN_URL = databaseUrl('postgres');
 
 // Only the tables these specs read. Truncating the whole schema would also wipe
 // the migration bookkeeping and make the database look unmigrated.
@@ -52,25 +61,34 @@ const SEEDED_TABLES = [
 ];
 
 /**
- * Creates the e2e database if it is missing and brings it to the current schema
+ * Creates an e2e database if it is missing and brings it to the current schema
  * with the same SQL files production runs (`db/migrations`), so a spec can only
  * pass against the schema that will actually be deployed.
  */
-async function ensureDatabase(): Promise<void> {
-    await createDatabaseIfMissing();
-    await migrate({ connectionString: E2E_DATABASE_URL });
+async function ensureDatabase(name: string): Promise<void> {
+    await createDatabaseIfMissing(name);
+    await migrate({ connectionString: databaseUrl(name) });
 }
 
-async function createDatabaseIfMissing(): Promise<void> {
+async function createDatabaseIfMissing(name: string): Promise<void> {
     const admin = new pg.Client({ connectionString: ADMIN_URL });
     await admin.connect();
     try {
-        const { rows } = await admin.query('select 1 from pg_database where datname = $1', [
-            E2E_DATABASE
-        ]);
-        if (rows.length === 0) await admin.query(`create database ${E2E_DATABASE}`);
+        const { rows } = await admin.query('select 1 from pg_database where datname = $1', [name]);
+        if (rows.length === 0) await admin.query(`create database ${name}`);
     } finally {
         await admin.end();
+    }
+}
+
+/** Leaves the blank database with its schema and nothing else, so the first run is a first run. */
+async function emptyBlankDatabase(): Promise<void> {
+    const client = new pg.Client({ connectionString: E2E_BLANK_DATABASE_URL });
+    await client.connect();
+    try {
+        await client.query(`truncate table ${SEEDED_TABLES.join(', ')} cascade`);
+    } finally {
+        await client.end();
     }
 }
 
@@ -227,8 +245,10 @@ async function insertSessions(client: pg.Client): Promise<void> {
     }
 }
 
-/** Playwright globalSetup: bring the e2e database up and load a known world. */
+/** Playwright globalSetup: bring both e2e databases up, one with a known world and one empty. */
 export default async function prepareDatabase(): Promise<void> {
-    await ensureDatabase();
+    await ensureDatabase(E2E_DATABASE);
     await seed();
+    await ensureDatabase(E2E_BLANK_DATABASE);
+    await emptyBlankDatabase();
 }

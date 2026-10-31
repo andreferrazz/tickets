@@ -31,3 +31,8 @@ One deployment serves one organization. `ORG_NAME` names it, every person's
 role lives on their `users` row (buyer, staff, member, leader, admin), and a
 second organization is a second deployment with its own database, domain and
 Abacate Pay key.
+
+The first visit to a database with no admin shows a setup form instead of
+any page: it asks for the admin's email, creates that account and sends them
+through the normal login code. The form answers 404 once an admin exists, so
+a second admin is a role change in the database.

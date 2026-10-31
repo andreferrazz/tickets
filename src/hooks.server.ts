@@ -1,5 +1,6 @@
 import { readOrderReconcilerConfig } from '$lib/config/order-reconciler';
 import { getContainer } from '$lib/container';
+import { setupGateTarget } from '$lib/modules/accounts/setup-gate';
 import { startOrderReconciler } from '$lib/modules/orders/reconciler-schedule';
 import { SESSION_COOKIE } from '$lib/modules/sessions/cookie';
 import { profileGateTarget } from '$lib/modules/sessions/profile-gate';
@@ -24,21 +25,25 @@ export const init: ServerInit = () => {
  * than failing it: public pages keep working and private ones send the visitor
  * to log in.
  *
- * A caller who never finished the profile step is sent to it before any page
- * is rendered, so the redirect needs no JavaScript and shows no flash.
+ * A database with no admin yet sends every page to the first-run form, and a
+ * caller who never finished the profile step is sent to it, both before any
+ * page is rendered, so the redirects need no JavaScript and show no flash.
  */
 export const handle: Handle = async ({ event, resolve }) => {
     const container = getContainer();
-    const token = event.cookies.get(SESSION_COOKIE);
-    const user = await container.sessionService.resolveUser(token);
-    event.locals.user = user;
-    event.locals.container = container;
-    const profileStep = profileGateTarget(user, {
+    const gated = {
         method: event.request.method,
         routeId: event.route.id,
         isDataRequest: event.isDataRequest,
         url: event.url
-    });
+    };
+    const setupStep = setupGateTarget(await container.setup.adminExists(), gated);
+    if (setupStep) redirect(303, setupStep);
+    const token = event.cookies.get(SESSION_COOKIE);
+    const user = await container.sessionService.resolveUser(token);
+    event.locals.user = user;
+    event.locals.container = container;
+    const profileStep = profileGateTarget(user, gated);
     if (profileStep) redirect(303, profileStep);
     return resolve(event);
 };
