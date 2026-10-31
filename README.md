@@ -12,6 +12,31 @@ npm test                     # Playwright; PGPORT/PGHOST point it at another Pos
 npm run check                # svelte-check over src, db and e2e
 ```
 
+## How a purchase works
+
+1. An organizer prices a ticket batch or an extra. The app creates the matching
+   Abacate Pay product right then, so nothing priced is ever on sale without
+   one. Free rows get no product.
+2. A buyer picks tickets and extras on the event page. The order is created as
+   pending and its stock is taken in the same transaction, so two buyers can
+   never get the last ticket.
+3. A free order is paid on the spot. Anything else opens an Abacate Pay
+   checkout (Pix or card) or a boleto, and the buyer is sent there to pay. If
+   the checkout cannot be opened, the stock is given back.
+4. Abacate Pay calls `/webhooks/abacate-pay` when the payment lands. The order
+   is marked paid, its passes are issued (one QR code per ticket, one for all
+   the extras) and mailed. Repeated deliveries change nothing.
+5. Every ten minutes a sweep looks at orders pending for over fifteen minutes.
+   Paid at Abacate Pay means a webhook was missed, so the order is fulfilled;
+   otherwise it expires and its stock returns. A boleto is held until its due
+   date, and an order Abacate Pay cannot be asked about is left for next time.
+6. A refund at Abacate Pay arrives by webhook too: the stock returns and the
+   passes stop scanning.
+
+The design notes from the first, Phoenix-based version of the app lived in
+`PLAN.md` until it was removed as out of date; it is in the history at
+commit `b53dae1`.
+
 ## Deploying
 
 The image (`Dockerfile`) applies `db/migrations` and then starts the server, so
