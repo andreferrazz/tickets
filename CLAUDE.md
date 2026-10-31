@@ -38,6 +38,10 @@
   only in `src/lib/container.ts` and reaches handlers via
   `event.locals.container`.
 - Wrap third-party libs behind a thin interface owned by this project.
+- Pin every dependency to an exact version and never let one move on its
+  own: npm packages without ranges (`.npmrc` has `save-exact=true`), Docker
+  images by version and digest, GitHub actions by commit SHA. An upgrade is a
+  deliberate PR that changes the pin.
 
 ## Structure
 
