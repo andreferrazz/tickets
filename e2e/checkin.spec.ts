@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { CLOSED_EVENT, DRAFT_ORG, MEMBER, PUBLISHED_EVENT } from './support/fixtures';
+import { CLOSED_EVENT, MEMBER, PUBLISHED_EVENT } from './support/fixtures';
 import { waitForHydration } from './support/hydration';
 import { seedPass } from './support/passes';
 import { seedPerson } from './support/people';
@@ -84,10 +84,7 @@ test('scan-only staff can validate; outsiders and anonymous visitors cannot reac
     browser,
     request
 }) => {
-    const staff = await seedPerson({
-        role: 'buyer',
-        membership: { organizationId: DRAFT_ORG.id, role: 'staff' }
-    });
+    const staff = await seedPerson({ role: 'staff' });
     const staffContext = await browser.newContext();
     await signIn(staffContext, staff.token);
     const staffPage = await staffContext.newPage();

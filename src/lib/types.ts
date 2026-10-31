@@ -1,4 +1,4 @@
-export type Role = 'buyer' | 'creator' | 'admin';
+export type Role = 'buyer' | 'staff' | 'member' | 'leader' | 'admin';
 
 export interface User {
     id: string;
@@ -25,10 +25,6 @@ export interface Pass {
 }
 
 export type PaymentMethod = 'PIX' | 'CARD' | 'BOLETO';
-
-export type OrgRole = 'leader' | 'participant' | 'staff';
-
-export type PixKeyType = 'cpf' | 'cnpj' | 'email' | 'phone' | 'evp';
 
 export interface RecentOrderRow {
     id: string;

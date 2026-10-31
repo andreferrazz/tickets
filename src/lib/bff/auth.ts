@@ -11,8 +11,6 @@ import type { ProfileFailure } from '$lib/modules/accounts/profile-service';
 import type { RateLimiter } from '$lib/modules/accounts/rate-limit';
 import type { UserRepository } from '$lib/modules/accounts/repository';
 import type { UserDto } from '$lib/modules/accounts/types';
-import type { OrganizationRepository } from '$lib/modules/organizations/repository';
-import type { MembershipSummaryRow } from '$lib/modules/organizations/types';
 import type { SessionUser } from '$lib/modules/sessions/types';
 
 export interface SignedInDto {
@@ -30,11 +28,6 @@ export type ProfileOutcome =
     | { ok: false; fieldErrors: ProfileFieldErrors }
     | { ok: false; failure: ProfileFailure };
 
-export interface ProfilePageData {
-    user: UserDto;
-    memberships: MembershipSummaryRow[];
-}
-
 const REQUEST_CODE_WINDOW_SECONDS = 60;
 // As long as a code lives, so the guesses allowed against one code are bounded.
 const VERIFY_WINDOW_SECONDS = 600;
@@ -49,7 +42,6 @@ export interface AuthBff {
     logout(token: string): Promise<void>;
     completeProfile(user: SessionUser, input: ProfileInput): Promise<ProfileOutcome>;
     currentUser(user: SessionUser): Promise<UserDto | null>;
-    profilePage(user: SessionUser): Promise<ProfilePageData | null>;
     /** Who a live impersonation link is for, without consuming it. */
     impersonationTarget(token: string): Promise<UserDto | null>;
     /** Consumes an impersonation link and signs in as its user; null when the link is dead. */
@@ -62,7 +54,6 @@ export interface AuthBffDeps {
     auth: AuthService;
     profile: ProfileService;
     users: UserRepository;
-    organizations: OrganizationRepository;
     userMapper: UserMapper;
     rateLimiter: RateLimiter;
     /** Code requests allowed per address per minute; five is what Phoenix allowed. */
@@ -109,14 +100,6 @@ export function getAuthBff(deps: AuthBffDeps): AuthBff {
         async currentUser(user) {
             const row = await deps.users.findById(user.id);
             return row ? deps.userMapper.toDto(row) : null;
-        },
-
-        async profilePage(user) {
-            const [row, memberships] = await Promise.all([
-                deps.users.findById(user.id),
-                deps.organizations.listMembershipsForUser(user.id)
-            ]);
-            return row ? { user: deps.userMapper.toDto(row), memberships } : null;
         },
 
         async impersonationTarget(token) {

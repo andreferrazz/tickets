@@ -1,3 +1,4 @@
+import type { Role } from '$lib/types';
 import { pt, type TranslationKey } from './pt';
 
 /** Translate a key, interpolating {var} placeholders with `params`. */
@@ -26,4 +27,9 @@ export function tStatus(status: string): string {
     };
     const key = map[status];
     return key ? pt[key] : status;
+}
+
+/** A user's role in the organization, in pt-BR. */
+export function tRole(role: Role): string {
+    return pt[`role.${role}`];
 }

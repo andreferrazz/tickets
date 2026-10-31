@@ -1,12 +1,7 @@
 import { expect, test } from '@playwright/test';
-import {
-    ADMIN,
-    MEMBER,
-    OTHER_ORG_DRAFT,
-    PUBLISHED_EVENT,
-    PUBLISHED_TICKET_TYPE
-} from './support/fixtures';
+import { ADMIN, MEMBER, PUBLISHED_EVENT, PUBLISHED_TICKET_TYPE } from './support/fixtures';
 import { withoutScripts } from './support/html';
+import { seedPerson } from './support/people';
 import { signIn } from './support/session';
 
 const DASHBOARD = `/events/${PUBLISHED_EVENT.id}/dashboard`;
@@ -56,21 +51,26 @@ test('the buyers of a ticket type are rendered from the query string', async ({
 });
 
 // 404 rather than 403 on purpose, as Phoenix's stats endpoint answered: a
-// "forbidden" would confirm that another organization's event exists.
-test('an event of another organization is 404 for a manager and 200 for an admin', async ({
+// "forbidden" would confirm that the event exists.
+test('the dashboard is 404 for scan-only staff and 200 for a member and an admin', async ({
     browser
 }) => {
-    const url = `/events/${OTHER_ORG_DRAFT.id}/dashboard`;
+    const url = `/events/${PUBLISHED_EVENT.id}/dashboard`;
+    const staff = await seedPerson({ role: 'staff' });
+    const seen: Record<string, number> = {};
 
-    const member = await browser.newContext();
-    await signIn(member, MEMBER.token);
-    expect((await member.request.get(url)).status()).toBe(404);
-    await member.close();
+    for (const [who, token] of Object.entries({
+        staff: staff.token,
+        member: MEMBER.token,
+        admin: ADMIN.token
+    })) {
+        const context = await browser.newContext();
+        await signIn(context, token);
+        seen[who] = (await context.request.get(url)).status();
+        await context.close();
+    }
 
-    const admin = await browser.newContext();
-    await signIn(admin, ADMIN.token);
-    expect((await admin.request.get(url)).status()).toBe(200);
-    await admin.close();
+    expect(seen).toEqual({ staff: 404, member: 200, admin: 200 });
 });
 
 test('the orders page lists the paid orders of the event with validated counts', async ({

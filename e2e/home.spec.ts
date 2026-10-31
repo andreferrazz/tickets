@@ -1,23 +1,15 @@
 import { expect, test } from '@playwright/test';
-import {
-    ADMIN,
-    CLOSED_EVENT,
-    MEMBER,
-    OTHER_ORG_DRAFT,
-    OWN_ORG_DRAFT,
-    PUBLISHED_EVENT
-} from './support/fixtures';
+import { ADMIN, CLOSED_EVENT, DRAFT_EVENT, MEMBER, PUBLISHED_EVENT } from './support/fixtures';
 import { waitForHydration } from './support/hydration';
 import { withoutScripts } from './support/html';
-
+import { seedPerson } from './support/people';
 import { signIn } from './support/session';
 
 test('an anonymous visitor sees published events and no drafts', async ({ page }) => {
     await page.goto('/');
 
     await expect(page.getByRole('heading', { name: PUBLISHED_EVENT.title })).toBeVisible();
-    await expect(page.getByRole('heading', { name: OWN_ORG_DRAFT.title })).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: OTHER_ORG_DRAFT.title })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: DRAFT_EVENT.title })).toHaveCount(0);
 });
 
 test('the event list is server-rendered, before any JavaScript runs', async ({ request }) => {
@@ -29,30 +21,33 @@ test('the event list is server-rendered, before any JavaScript runs', async ({ r
     expect(htmlMarkup).toContain(PUBLISHED_EVENT.title);
     // Drafts must not leak into anonymous HTML even though the page is prerendered
     // on the server, which is where a visibility bug would be invisible in the UI.
-    expect(html).not.toContain(OWN_ORG_DRAFT.title);
+    expect(html).not.toContain(DRAFT_EVENT.title);
 });
 
-test('a member sees their own organization drafts but not another org', async ({
-    context,
-    page
-}) => {
-    await signIn(context, MEMBER.token);
+test('a member and an admin see the drafts', async ({ browser }) => {
+    for (const token of [MEMBER.token, ADMIN.token]) {
+        const context = await browser.newContext();
+        await signIn(context, token);
+        const page = await context.newPage();
 
-    await page.goto('/');
+        await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: OWN_ORG_DRAFT.title })).toBeVisible();
-    await expect(page.getByRole('heading', { name: OTHER_ORG_DRAFT.title })).toHaveCount(0);
+        await expect(page.getByRole('heading', { name: DRAFT_EVENT.title })).toBeVisible();
+        await context.close();
+    }
 });
 
-test('an admin sees drafts from an organization they do not belong to', async ({
-    context,
-    page
-}) => {
-    await signIn(context, ADMIN.token);
+// Scan-only staff validate at the door; what is not on sale yet is not theirs to see.
+test('a staff member sees no drafts', async ({ browser }) => {
+    const staff = await seedPerson({ role: 'staff' });
+    const context = await browser.newContext();
+    await signIn(context, staff.token);
 
-    await page.goto('/');
+    const html = await (await context.request.get('/')).text();
 
-    await expect(page.getByRole('heading', { name: OTHER_ORG_DRAFT.title })).toBeVisible();
+    expect(withoutScripts(html)).toContain(PUBLISHED_EVENT.title);
+    expect(html).not.toContain(DRAFT_EVENT.title);
+    await context.close();
 });
 
 // The list is narrowed in the browser: every toggle used to be a navigation

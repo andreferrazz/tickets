@@ -2,31 +2,28 @@ import { logLoadFailure } from './load-failure';
 import type { EventMapper } from '$lib/modules/events/mapper';
 import type { EventService } from '$lib/modules/events/service';
 import type { EventDto } from '$lib/modules/events/types';
-import type { OrganizationService } from '$lib/modules/organizations/service';
 import type { SessionUser } from '$lib/modules/sessions/types';
 
 export interface ScanData {
-    /** The events `user` may scan: every event of every organization they belong to. */
     events: EventDto[];
     loadFailed: boolean;
 }
 
 export interface ScanBff {
+    /** The events `user` may scan: every live event, for anyone with a role in the team. */
     index(user: SessionUser): Promise<ScanData>;
 }
 
 export interface ScanBffDeps {
     events: EventService;
     eventMapper: EventMapper;
-    organizations: OrganizationService;
 }
 
 export function getScanBff(deps: ScanBffDeps): ScanBff {
     return {
         async index(user) {
             try {
-                const organizationIds = await deps.organizations.listMemberOrganizationIds(user);
-                const rows = await deps.events.listForOrganizations(organizationIds);
+                const rows = await deps.events.listScannable(user);
                 return {
                     events: rows.map((row) => deps.eventMapper.toDto(row)),
                     loadFailed: false

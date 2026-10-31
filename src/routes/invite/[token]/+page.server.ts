@@ -18,14 +18,10 @@ export const actions: Actions = {
     accept: async ({ locals, params, cookies }) => {
         const result = await locals.container.invitationWrites.accept(params.token);
         if (!result.ok) return fail(410, { failure: result.failure });
-        const { sessionToken, user, organization } = result.value;
+        const { sessionToken, user } = result.value;
         cookies.set(SESSION_COOKIE, sessionToken, SESSION_COOKIE_OPTIONS);
         return {
-            accepted: {
-                token: sessionToken,
-                user: locals.container.userMapper.toDto(user),
-                organization
-            }
+            accepted: { token: sessionToken, user: locals.container.userMapper.toDto(user) }
         };
     }
 };

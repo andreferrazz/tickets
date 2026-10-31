@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { DRAFT_ORG, MEMBER } from './fixtures';
+import { MEMBER } from './fixtures';
 import { queryRows } from './sql';
 
 export interface NewSellableEvent {
@@ -7,8 +7,6 @@ export interface NewSellableEvent {
     ticketStock: number;
     /** An add-on in the event's one section; `stock: null` is unlimited. */
     extra?: { priceCents: number; stock: number | null; limitToTicketCount?: boolean };
-    /** Defaults to MEMBER's organization. */
-    organizationId?: string;
 }
 
 export interface SellableEvent {
@@ -24,8 +22,8 @@ export interface SellableEvent {
 const NOW = "now() at time zone 'utc'";
 
 /**
- * A published event, of MEMBER's organization unless told otherwise, with one ticket type, one open
- * batch and optionally one extra. Checkout specs sell from their own event, so
+ * A published event, created by MEMBER, with one ticket type, one open batch
+ * and optionally one extra. Checkout specs sell from their own event, so
  * the stock they take never shows up in what another spec counts.
  *
  * @example
@@ -34,10 +32,10 @@ const NOW = "now() at time zone 'utc'";
 export async function seedSellableEvent(spec: NewSellableEvent): Promise<SellableEvent> {
     const title = `E2E Checkout ${randomUUID().slice(0, 8)}`;
     const id = await insertReturningId(
-        `insert into events (title, location, starts_at, status, organization_id, created_by_id,
+        `insert into events (title, location, starts_at, status, created_by_id,
                              inserted_at, updated_at)
-         values ($1, 'Sao Paulo', '2027-09-01 20:00:00', 'published', $2, $3, ${NOW}, ${NOW})`,
-        [title, spec.organizationId ?? DRAFT_ORG.id, MEMBER.id]
+         values ($1, 'Sao Paulo', '2027-09-01 20:00:00', 'published', $2, ${NOW}, ${NOW})`,
+        [title, MEMBER.id]
     );
     const ticket = await seedTicket(id, spec);
     const extraId = spec.extra ? await seedExtra(id, spec.extra) : null;

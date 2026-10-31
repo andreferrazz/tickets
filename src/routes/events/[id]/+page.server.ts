@@ -1,13 +1,14 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { statusForFailure } from '$lib/forms/action-status';
+import { canManageEvents } from '$lib/modules/accounts/roles';
 import { parseCartForm, parsePaymentMethod } from '$lib/modules/orders/cart-form';
 import { requireSessionUser } from '$lib/modules/sessions/require-user';
 import { text } from '$lib/utils/form-fields';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
- * One event and everything it sells. Drafts resolve only for members of the
- * owning organization, so this depends on `locals.user` from the session cookie.
+ * One event and everything it sells. Drafts resolve only for those who manage
+ * events, so this depends on `locals.user` from the session cookie.
  *
  * A miss is a 404 rather than a 403, mirroring the `visible?/2` rule in Phoenix's
  * EventController: answering "forbidden" would confirm that a draft exists.
@@ -25,20 +26,11 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     // Whether "buy" can go straight to checkout or must ask the visitor to sign
     // in and complete their profile first.
     const viewer = locals.user ? await locals.container.authBff.currentUser(locals.user) : null;
-    return {
-        ...data,
-        viewerReady: viewer?.profileComplete ?? false,
-        canManage: data.event ? await managesEvent(locals, data.event.organizationId) : false
-    };
+    // Whether to offer the dashboard and edit links. The pages behind them
+    // check for themselves.
+    const canManage = locals.user !== null && canManageEvents(locals.user.role);
+    return { ...data, viewerReady: viewer?.profileComplete ?? false, canManage };
 };
-
-// Whether to offer the dashboard and edit links: a creator or admin who
-// manages the event's organization. The pages behind them check for themselves.
-async function managesEvent(locals: App.Locals, organizationId: string): Promise<boolean> {
-    const user = locals.user;
-    if (!user || user.role === 'buyer') return false;
-    return locals.container.organizations.canManage(user, organizationId);
-}
 
 /**
  * Checkout: the cart arrives as one quantity field per item, the order is

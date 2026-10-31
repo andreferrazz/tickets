@@ -1,4 +1,4 @@
-import type { OrgRole } from '$lib/types';
+import type { InvitableRole } from '$lib/modules/accounts/roles';
 
 export type InvitationStatus = 'pending' | 'accepted' | 'expired';
 
@@ -6,8 +6,7 @@ export type InvitationStatus = 'pending' | 'accepted' | 'expired';
 export interface InvitationRow {
     id: string;
     inviter_id: string;
-    organization_id: string;
-    role: OrgRole;
+    role: InvitableRole;
     email: string;
     status: InvitationStatus;
     inserted_at: Date;
@@ -21,8 +20,7 @@ export interface InvitationSecretRow extends InvitationRow {
 
 export interface NewInvitationRow {
     inviterId: string;
-    organizationId: string;
-    role: OrgRole;
+    role: InvitableRole;
     email: string;
     token: string;
     ttlHours: number;
@@ -32,8 +30,7 @@ export interface NewInvitationRow {
 export interface InvitationDto {
     id: string;
     inviterId: string;
-    organizationId: string;
-    role: OrgRole;
+    role: InvitableRole;
     email: string;
     status: InvitationStatus;
     createdAt: string;

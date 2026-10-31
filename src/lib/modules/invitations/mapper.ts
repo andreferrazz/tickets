@@ -11,7 +11,6 @@ export function getInvitationMapper(): InvitationMapper {
             return {
                 id: row.id,
                 inviterId: row.inviter_id,
-                organizationId: row.organization_id,
                 role: row.role,
                 email: row.email,
                 status: row.status,

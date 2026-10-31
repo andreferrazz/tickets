@@ -5,9 +5,8 @@ import { text } from '$lib/utils/form-fields';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
- * The scanner for one event. Admins and every member of the event's
- * organization may open it, scan-only staff included; for anyone else the
- * event does not exist.
+ * The scanner for one event. Anyone with a role in the team may open it,
+ * scan-only staff included; for a buyer the event does not exist.
  */
 export const load: PageServerLoad = async ({ locals, params, url }) => {
     const user = requireSessionUser(locals.user, url.pathname);

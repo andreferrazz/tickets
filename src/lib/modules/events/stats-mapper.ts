@@ -32,8 +32,7 @@ export function getEventStatsMapper(): EventStatsMapper {
                 totals: totalsDto(view),
                 ticketTypes: view.ticketTypes.map(ticketTypeDto),
                 extras: view.extras.map(extraDto),
-                recentOrders: view.recentOrders.map(recentOrderDto),
-                organization: { id: view.event.organization_id }
+                recentOrders: view.recentOrders.map(recentOrderDto)
             };
         },
         toBuyerDto(row) {

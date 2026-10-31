@@ -1,17 +1,23 @@
 import type { Queryable } from '$lib/db/queryable';
+import type { Role } from '$lib/types';
 import type { ProfileInput } from './profile-validation';
 import type { UserRow } from './types';
 
 export interface UserRepository {
     /** Every user, by name then email. Admin listing only. */
     listUsers(): Promise<UserRow[]>;
+    /** Everyone with a role in the organization (anything but buyer), by email. */
+    listTeam(): Promise<UserRow[]>;
     findById(id: string): Promise<UserRow | null>;
     /** `email` must already be normalized (trimmed, lower-case). */
     findByEmail(email: string, db?: Queryable): Promise<UserRow | null>;
     /** The minimal account a first login creates. */
     insertBuyer(email: string, db?: Queryable): Promise<UserRow>;
-    /** Buyer to creator on an accepted invitation; runs inside the caller's transaction. */
-    promoteToCreator(db: Queryable, userId: string, invitedBy: string): Promise<UserRow>;
+    /**
+     * A new role for `userId`. `invitedBy` is recorded when the change comes from
+     * an accepted invitation; a leader's change on the team page leaves it alone.
+     */
+    setRole(db: Queryable, userId: string, role: Role, invitedBy?: string): Promise<UserRow>;
     /** Name, cellphone, tax id and the Abacate customer id in one update. */
     completeProfile(userId: string, profile: ProfileInput, customerId: string): Promise<UserRow>;
 }
@@ -23,6 +29,11 @@ export function getUserRepository({ queryable }: { queryable: Queryable }): User
     return {
         listUsers() {
             const sql = `select ${COLUMNS} from users order by name asc, email asc`;
+            return queryable.query<UserRow>(sql);
+        },
+
+        listTeam() {
+            const sql = `select ${COLUMNS} from users where role <> 'buyer' order by email asc`;
             return queryable.query<UserRow>(sql);
         },
 
@@ -49,11 +60,13 @@ export function getUserRepository({ queryable }: { queryable: Queryable }): User
             return firstRow(await db.query<UserRow>(sql, [email]), 'insert user');
         },
 
-        async promoteToCreator(db, userId, invitedBy) {
+        async setRole(db, userId, role, invitedBy) {
             const sql = `
-                update users set role = 'creator', invited_by = $2, updated_at = now() at time zone 'utc'
+                update users
+                set role = $2, invited_by = coalesce($3, invited_by), updated_at = now() at time zone 'utc'
                 where id = $1 returning ${COLUMNS}`;
-            return firstRow(await db.query<UserRow>(sql, [userId, invitedBy]), 'promote user');
+            const params = [userId, role, invitedBy ?? null];
+            return firstRow(await db.query<UserRow>(sql, params), 'set user role');
         },
 
         async completeProfile(userId, profile, customerId) {

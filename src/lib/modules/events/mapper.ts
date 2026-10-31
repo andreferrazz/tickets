@@ -19,7 +19,6 @@ export function getEventMapper(): EventMapper {
         toDto(row: EventRow): EventDto {
             return {
                 id: row.id,
-                organizationId: row.organization_id,
                 createdById: row.created_by_id,
                 title: row.title,
                 description: row.description,

@@ -135,8 +135,6 @@ export interface EventStatsDto {
     ticketTypes: TicketTypeStatsDto[];
     extras: ExtraStatsDto[];
     recentOrders: RecentOrderDto[];
-    /** Whose event it is, for the link to the team page. */
-    organization: { id: string };
 }
 
 export interface ItemBuyerDto {

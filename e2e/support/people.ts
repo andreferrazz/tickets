@@ -8,17 +8,18 @@ export interface SeededPerson {
     token: string;
 }
 
+export type SeededRole = 'buyer' | 'staff' | 'member' | 'leader' | 'admin';
+
 export interface NewPerson {
-    role: 'buyer' | 'creator';
-    membership?: { organizationId: string; role: 'leader' | 'participant' | 'staff' };
+    role: SeededRole;
     /** A boleto is issued to a name and a tax id; only its buyers need one. */
     taxId?: string;
 }
 
 /**
- * A person with a complete profile, optionally a member of an organization,
- * and a session. For specs whose subject is what that person may do, not how
- * they came to exist; the invitation flow has its own spec.
+ * A person with a complete profile, a role and a session. For specs whose
+ * subject is what that person may do, not how they came to exist; the
+ * invitation flow has its own spec.
  */
 export async function seedPerson(person: NewPerson): Promise<SeededPerson> {
     const email = uniqueEmail(person.role);
@@ -28,27 +29,7 @@ export async function seedPerson(person: NewPerson): Promise<SeededPerson> {
          returning id`,
         [email, person.role, person.taxId ?? null]
     );
-    if (person.membership) {
-        await queryRows(
-            `insert into organization_memberships (organization_id, user_id, role, inserted_at, updated_at)
-             values ($1, $2, $3, now() at time zone 'utc', now() at time zone 'utc')`,
-            [person.membership.organizationId, id, person.membership.role]
-        );
-    }
     return { id, email, token: await seedSession(id) };
-}
-
-/**
- * An organization of its own, with no members and no Pix key. For specs that
- * change what an organization holds, which the seeded ones must never see.
- */
-export async function seedOrganization(): Promise<string> {
-    const [{ id }] = await queryRows<{ id: string }>(
-        `insert into organizations (name, inserted_at, updated_at)
-         values ($1, now() at time zone 'utc', now() at time zone 'utc') returning id`,
-        [`E2E Org ${uniqueToken('own').slice(-8)}`]
-    );
-    return id;
 }
 
 /** A fresh one-day session for `userId`. */
@@ -65,20 +46,21 @@ export async function seedSession(userId: string): Promise<string> {
 export interface NewInvitation {
     email: string;
     inviterId: string;
-    organizationId: string;
+    /** `member` unless said otherwise. */
+    role?: 'member' | 'leader' | 'staff';
     /** Already past its expiry, for the refusal path. */
     expired?: boolean;
 }
 
-/** A pending participant invitation written straight to the table; returns its link token. */
+/** A pending invitation written straight to the table; returns its link token. */
 export async function seedInvitation(invitation: NewInvitation): Promise<string> {
     const token = uniqueToken('e2e-invite');
     const offset = invitation.expired ? "- interval '1 hour'" : "+ interval '1 day'";
     await queryRows(
-        `insert into invitations (inviter_id, organization_id, role, email, status, token, expires_at, inserted_at)
-         values ($1, $2, 'participant', $3, 'pending', $4, (now() at time zone 'utc') ${offset},
+        `insert into invitations (inviter_id, role, email, status, token, expires_at, inserted_at)
+         values ($1, $2, $3, 'pending', $4, (now() at time zone 'utc') ${offset},
                  now() at time zone 'utc')`,
-        [invitation.inviterId, invitation.organizationId, invitation.email, token]
+        [invitation.inviterId, invitation.role ?? 'member', invitation.email, token]
     );
     return token;
 }

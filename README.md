@@ -3,8 +3,8 @@
 The SvelteKit app: pages, form actions and the server modules behind them.
 Conventions are in `CLAUDE.md`; the test catalog is `E2E.md`.
 
-```
-cp .env.example .env         # then set DATABASE_URL; INTEGRATIONS=fake needs no secrets
+```bash
+cp .env.example .env         # then set DATABASE_URL; INTEGRATIONS=fake
 npm ci
 npm run db:migrate           # applies db/migrations to DATABASE_URL
 npm run dev
@@ -23,6 +23,11 @@ a container that is up is on its schema. Three things it cannot do for you:
   left the repository after commit `140e83d`: check that out to run it.
 - The environment is in `.env.example`. `INTEGRATIONS` must be `live` (or
   unset) in production, which makes the Abacate Pay and SMTP variables required.
-- `ORIGIN` and the Abacate Pay webhook registration are part of the
-  environment, not the image: see the comments in `.env.example`. Without
-  `ORIGIN` the server refuses to start.
+- `ORIGIN`, `ORG_NAME` and the Abacate Pay webhook registration are part of
+  the environment, not the image: see the comments in `.env.example`. Without
+  `ORIGIN` or `ORG_NAME` the server refuses to start.
+
+One deployment serves one organization. `ORG_NAME` names it, every person's
+role lives on their `users` row (buyer, staff, member, leader, admin), and a
+second organization is a second deployment with its own database, domain and
+Abacate Pay key.

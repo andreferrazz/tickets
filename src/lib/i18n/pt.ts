@@ -4,7 +4,7 @@ export const pt = {
     'nav.myOrders': 'Meus pedidos',
     'nav.newEvent': '+ Novo evento',
     'nav.scan': 'Validar',
-    'nav.invitations': 'Convites',
+    'nav.team': 'Equipe',
     'nav.users': 'Usuários',
     'nav.logout': 'Sair',
     'nav.login': 'Entrar',
@@ -70,20 +70,8 @@ export const pt = {
     'invite.errorFallback': 'Não foi possível aceitar o convite.',
     'invite.goLogin': 'Ir para o login',
     'invite.title': 'Convite para {org}',
-    'invite.hint': 'Ao aceitar, você entrará como {email}.',
+    'invite.hint': 'Ao aceitar, você entrará como {email} com a função {role}.',
     'invite.accept': 'Aceitar convite',
-
-    // Onboarding — set organization name (first step after a leader accepts an invite)
-    'onboarding.org.title': 'Nomeie sua organização',
-    'onboarding.org.subtitle':
-        'Escolha o nome que aparecerá para sua equipe e nos seus eventos. Você pode alterar depois.',
-    'onboarding.org.nameLabel': 'Nome da organização',
-    'onboarding.org.namePlaceholder': 'Ex.: Festas da Maria',
-    'onboarding.org.save': 'Salvar e continuar',
-    'onboarding.org.saving': 'Salvando...',
-    'onboarding.org.fieldRequired': 'Informe o nome da organização.',
-    'onboarding.org.errorForbidden': 'Você não tem permissão para renomear esta organização.',
-    'onboarding.org.errorFallback': 'Falha ao salvar o nome da organização.',
 
     // Home
     'home.title': 'Próximos eventos',
@@ -211,7 +199,7 @@ export const pt = {
     'dashboard.extraBuyers': 'Compradores · {name}',
     'dashboard.ticketBuyers': 'Compradores · {name}',
     'dashboard.scanTickets': 'Validar ingressos',
-    'dashboard.manageInvitations': 'Gerenciar convites',
+    'dashboard.manageTeam': 'Gerenciar equipe',
 
     // Ticket scanning / check-in
     'scan.title': 'Validar ingressos',
@@ -263,8 +251,6 @@ export const pt = {
     'eventNew.title': 'Novo evento',
     'eventNew.subtitle': 'Crie o evento e depois adicione tipos de ingresso e complementos.',
     'eventNew.cta': 'Criar evento',
-    'eventNew.noOrganization':
-        'Você precisa fazer parte de exatamente uma organização para criar eventos.',
 
     // Event edit
     'eventEdit.title': 'Editar evento',
@@ -346,15 +332,13 @@ export const pt = {
         'Não foi possível confirmar o pagamento agora. Tente novamente em instantes.',
 
     // Invitations
-    'invitations.title': 'Convites',
-    'invitations.subtitle': 'Convide alguém para se tornar criador no Tickets.',
     'invitations.send': 'Enviar convite',
     'invitations.sending': 'Enviando...',
     'invitations.empty': 'Nenhum convite enviado ainda.',
     'invitations.errorFallback': 'Falha ao carregar',
     'invitations.sendErrorFallback': 'Falha ao enviar',
     'invitations.alreadyInvited': 'Já existe um convite pendente para este e-mail.',
-    'invitations.alreadyMember': 'Esta pessoa já faz parte da organização.',
+    'invitations.alreadyMember': 'Esta pessoa já faz parte da equipe com essa função ou superior.',
 
     // Admin: user list + impersonation ("log in as user") links
     'adminUsers.title': 'Usuários',
@@ -377,32 +361,33 @@ export const pt = {
     'impersonate.hint': 'Este link funciona uma única vez e expira em 10 minutos.',
     'impersonate.confirm': 'Entrar como {email}',
 
-    // Org-scoped invitations (leader inviting participants to their org)
-    'orgInvitations.title': 'Convidar para {org}',
-    'orgInvitations.subtitle':
-        'Envie um link de convite e escolha se a pessoa entra como participante ou apenas para validar ingressos.',
-
-    // Org team management (leaders and participants changing roles / removing members)
-    'orgMembers.title': 'Membros',
-    'orgMembers.roleLabel': 'Função',
-    'orgMembers.roleHint':
-        'Validadores só podem validar ingressos; participantes gerenciam o evento.',
-    'orgMembers.changeErrorFallback': 'Falha ao alterar a função.',
-    'orgMembers.remove': 'Remover',
-    'orgMembers.removeConfirm': 'Remover {email} da organização?',
-    'orgMembers.removeErrorFallback': 'Falha ao remover o membro.',
+    // Team page (leaders and admins inviting, promoting, demoting, removing)
+    'team.title': 'Equipe de {org}',
+    'team.subtitle':
+        'Envie um link de convite e escolha a função: membro gerencia eventos, líder também cuida da equipe, validador só valida ingressos.',
+    'team.roleLabel': 'Função',
+    'team.roleHint': 'A função pode ser alterada depois, aqui mesmo.',
+    'team.members': 'Membros',
+    'team.noMembers': 'Ninguém na equipe ainda.',
+    'team.invitations': 'Convites',
+    'team.changeErrorFallback': 'Falha ao alterar a função.',
+    'team.remove': 'Remover',
+    'team.removeConfirm': 'Remover {email} da equipe?',
+    'team.removeErrorFallback': 'Falha ao remover da equipe.',
 
     // Profile
     'profile.title': 'Perfil',
     'profile.email': 'E-mail',
-    'profile.role': 'Função',
+    'profile.role': 'Função em {org}',
     'profile.logout': 'Sair',
-    'profile.orgs.title': 'Organizações',
-    'profile.orgs.empty': 'Você ainda não faz parte de nenhuma organização.',
-    'profile.orgs.roleLeader': 'Líder',
-    'profile.orgs.roleParticipant': 'Participante',
-    'profile.orgs.roleStaff': 'Validador',
-    'profile.orgs.manageInvites': 'Gerenciar convites',
+    'profile.manageTeam': 'Gerenciar equipe',
+
+    // Roles
+    'role.buyer': 'Comprador',
+    'role.staff': 'Validador',
+    'role.member': 'Membro',
+    'role.leader': 'Líder',
+    'role.admin': 'Administrador',
 
     // Status badges
     'status.draft': 'Rascunho',

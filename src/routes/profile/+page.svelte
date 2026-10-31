@@ -1,18 +1,11 @@
 <script lang="ts">
     import { resolve } from '$app/paths';
     import { enhance } from '$app/forms';
-    import { t, tStatus } from '$lib/i18n';
+    import { t, tRole } from '$lib/i18n';
     import { auth } from '$lib/stores/auth.svelte';
-    import type { OrgRole } from '$lib/types';
     import type { PageData } from './$types';
 
     let { data }: { data: PageData } = $props();
-
-    function roleLabel(role: OrgRole): string {
-        if (role === 'leader') return t('profile.orgs.roleLeader');
-        if (role === 'staff') return t('profile.orgs.roleStaff');
-        return t('profile.orgs.roleParticipant');
-    }
 </script>
 
 <h1>{t('profile.title')}</h1>
@@ -23,35 +16,10 @@
             <strong>{data.user.email}</strong>
         </div>
         <div>
-            <div class="muted small">{t('profile.role')}</div>
-            <span class="badge published">{tStatus(data.user.role)}</span>
-        </div>
-
-        <div>
-            <div class="muted small">{t('profile.orgs.title')}</div>
-            {#if data.memberships.length === 0}
-                <div class="muted small">{t('profile.orgs.empty')}</div>
-            {:else}
-                <ul class="orgs">
-                    {#each data.memberships as m (m.id)}
-                        <li>
-                            <span class="org-name">{m.name}</span>
-                            <span class="org-meta">
-                                <span class="badge" class:leader={m.role === 'leader'}
-                                    >{roleLabel(m.role)}</span
-                                >
-                                {#if m.role === 'leader' || m.role === 'participant'}
-                                    <a
-                                        class="manage"
-                                        href={resolve('/organizations/[id]/invitations', {
-                                            id: m.id
-                                        })}>{t('profile.orgs.manageInvites')}</a
-                                    >
-                                {/if}
-                            </span>
-                        </li>
-                    {/each}
-                </ul>
+            <div class="muted small">{t('profile.role', { org: data.organizationName })}</div>
+            <span class="badge published">{tRole(data.user.role)}</span>
+            {#if data.canLeadTeam}
+                <a class="manage" href={resolve('/team')}>{t('profile.manageTeam')}</a>
             {/if}
         </div>
 
@@ -75,33 +43,8 @@
     .small {
         font-size: 0.8rem;
     }
-    .orgs {
-        list-style: none;
-        padding: 0;
-        margin: 0.25rem 0 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.4rem;
-    }
-    .orgs li {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 0.75rem;
-    }
-    .org-name {
-        font-weight: 500;
-    }
-    .org-meta {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.6rem;
-    }
     .manage {
         font-size: 0.85rem;
-    }
-    .badge.leader {
-        background: var(--tone-info-bg);
-        color: var(--tone-info-fg);
+        margin-left: 0.6rem;
     }
 </style>

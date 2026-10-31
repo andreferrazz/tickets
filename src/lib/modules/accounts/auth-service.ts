@@ -2,13 +2,11 @@ import { randomBytes, randomInt } from 'node:crypto';
 import type { Queryable } from '$lib/db/queryable';
 import type { Mailer } from '$lib/integrations/mail/mailer';
 import type { InvitationRepository } from '$lib/modules/invitations/repository';
-import type { InvitationRow } from '$lib/modules/invitations/types';
-import { LeaderExistsError } from '$lib/modules/organizations/errors';
-import type { OrganizationRepository } from '$lib/modules/organizations/repository';
 import type { SessionRepository } from '$lib/modules/sessions/repository';
 import { authCodeEmail, CODE_TTL_MINUTES } from './auth-code-email';
 import type { AuthCodeRepository } from './auth-code-repository';
 import type { UserRepository } from './repository';
+import { higherRole } from './roles';
 import type { UserRow } from './types';
 
 export const SESSION_TTL_DAYS = 30;
@@ -21,8 +19,8 @@ export interface SignedIn {
 /**
  * Passwordless login as `Backend.Accounts` ran it: a 6-digit code by email,
  * then a 30-day session. Verifying a code finds or creates the buyer and, when
- * a pending invitation names their email, promotes them and attaches the
- * membership in the same transaction.
+ * a pending invitation names their email, raises their role to the invited
+ * one in the same transaction.
  */
 export interface AuthService {
     requestCode(email: string): Promise<void>;
@@ -40,8 +38,9 @@ export interface AuthServiceDeps {
     authCodes: AuthCodeRepository;
     sessions: SessionRepository;
     invitations: InvitationRepository;
-    organizations: OrganizationRepository;
     mailer: Mailer;
+    /** Signs the login email. */
+    organizationName: string;
 }
 
 export function getAuthService(deps: AuthServiceDeps): AuthService {
@@ -50,7 +49,7 @@ export function getAuthService(deps: AuthServiceDeps): AuthService {
             const email = normalizeEmail(rawEmail);
             const code = String(randomInt(100_000, 1_000_000));
             await deps.authCodes.replacePending(email, code, CODE_TTL_MINUTES);
-            await deps.mailer.send(authCodeEmail(email, code));
+            await deps.mailer.send(authCodeEmail(email, code, deps.organizationName));
         },
 
         async verifyCode(rawEmail, code) {
@@ -59,7 +58,7 @@ export function getAuthService(deps: AuthServiceDeps): AuthService {
             // presented, whatever happens next.
             if (!(await deps.authCodes.claim(email, code))) return null;
             const existing = await deps.users.findByEmail(email);
-            const user = await promoteIfInvited(
+            const user = await acceptIfInvited(
                 deps,
                 existing ?? (await deps.users.insertBuyer(email))
             );
@@ -86,44 +85,19 @@ export function normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
 }
 
-// A pending invitation for the email is consumed on login: buyers become
-// creators (staff invitations only grant the scan membership), the membership
-// is attached and the invitation marked accepted, all or nothing.
-async function promoteIfInvited(deps: AuthServiceDeps, user: UserRow): Promise<UserRow> {
-    if (user.role !== 'buyer') return user;
+// A pending invitation for the email is consumed on login: the role is raised
+// to the invited one (never lowered) and the invitation marked accepted, all
+// or nothing.
+async function acceptIfInvited(deps: AuthServiceDeps, user: UserRow): Promise<UserRow> {
     const invitation = await deps.invitations.findPendingByEmail(user.email);
     if (!invitation) return user;
-    try {
-        return await deps.queryable.transaction(async (tx) => {
-            const promoted = await applyInvitationRole(deps, tx, user, invitation);
-            const outcome = await deps.organizations.addMember(
-                tx,
-                invitation.organization_id,
-                user.id,
-                invitation.role
-            );
-            if (outcome === 'leader_exists')
-                throw new LeaderExistsError(invitation.organization_id);
-            await deps.invitations.markAccepted(tx, invitation.id);
-            return promoted;
-        });
-    } catch (cause) {
-        // The invitation cannot be honoured, but that is no reason to refuse the
-        // login itself: they sign in as they were and the invitation stays pending.
-        if (!(cause instanceof LeaderExistsError)) throw cause;
-        console.warn(
-            JSON.stringify({ event: 'invitation_leader_exists', invitationId: invitation.id })
-        );
-        return user;
-    }
-}
-
-async function applyInvitationRole(
-    deps: AuthServiceDeps,
-    tx: Queryable,
-    user: UserRow,
-    invitation: InvitationRow
-): Promise<UserRow> {
-    if (invitation.role === 'staff') return user;
-    return deps.users.promoteToCreator(tx, user.id, invitation.inviter_id);
+    return deps.queryable.transaction(async (tx) => {
+        const role = higherRole(user.role, invitation.role);
+        const updated =
+            role === user.role
+                ? user
+                : await deps.users.setRole(tx, user.id, role, invitation.inviter_id);
+        await deps.invitations.markAccepted(tx, invitation.id);
+        return updated;
+    });
 }

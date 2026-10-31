@@ -1,22 +1,18 @@
 import { fail, redirect, type RequestEvent } from '@sveltejs/kit';
 import { statusForFailure } from '$lib/forms/action-status';
-import { text } from '$lib/utils/form-fields';
+import { canLeadTeam } from '$lib/modules/accounts/roles';
 import { requireSessionUser } from '$lib/modules/sessions/require-user';
+import { text } from '$lib/utils/form-fields';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
- * Members and invitations of one organization, for its leader and
- * participants (admins bypass). Anyone else is sent home, which is what the
- * client page did once it had loaded the memberships.
+ * The team: everyone with a role and every invitation, for leaders and
+ * admins. Anyone else is sent home, which is what the organization page did.
  */
-export const load: PageServerLoad = async ({ locals, params, url }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
     const user = requireSessionUser(locals.user, url.pathname);
-    const data = await locals.container.organizationsBff.team(user, params.id);
-
-    if (!data.organization && !data.loadFailed) {
-        redirect(303, '/');
-    }
-
+    if (!canLeadTeam(user.role)) redirect(303, '/');
+    const data = await locals.container.teamBff.page(user);
     return { ...data, currentUserId: user.id };
 };
 
@@ -31,39 +27,32 @@ function caller(event: RequestEvent) {
     return requireSessionUser(event.locals.user, event.url.pathname);
 }
 
-/** The writes of the team page: invite, change a member's role, remove a member. */
+/** The writes of the team page: invite, change someone's role, remove them from the team. */
 export const actions: Actions = {
     invite: async (event) => {
         const form = await event.request.formData();
         const result = await event.locals.container.invitationWrites.create(
             caller(event),
-            {
-                email: text(form, 'email'),
-                organizationId: event.params.id,
-                role: text(form, 'role') || null,
-                organizationName: null
-            },
+            { email: text(form, 'email'), role: text(form, 'role') || null },
             event.url.origin
         );
         return answer('invite', result);
     },
     setRole: async (event) => {
         const form = await event.request.formData();
-        const result = await event.locals.container.organizations.setMemberRole(
+        const result = await event.locals.container.team.setRole(
             caller(event),
-            event.params.id,
             text(form, 'user_id'),
             text(form, 'role')
         );
         return answer('setRole', result);
     },
-    removeMember: async (event) => {
+    remove: async (event) => {
         const form = await event.request.formData();
-        const result = await event.locals.container.organizations.removeMember(
+        const result = await event.locals.container.team.remove(
             caller(event),
-            event.params.id,
             text(form, 'user_id')
         );
-        return answer('removeMember', result);
+        return answer('remove', result);
     }
 };

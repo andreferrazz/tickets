@@ -1,19 +1,17 @@
+import { canLeadTeam, canManageEvents, canScan } from '$lib/modules/accounts/roles';
 import type { LayoutServerLoad } from './$types';
 
 /**
- * What the navigation needs to know about the caller beyond who they are:
- * whether to offer "Scan". Phoenix used to answer this to the browser after
- * hydration; it is read here so no page depends on Phoenix being up.
- *
- * A database problem costs the menu entry, never the page.
+ * What every page needs beyond who the caller is: the organization's name for
+ * the brand and the title, and which navigation entries the caller's role
+ * earns. All answered from the session, so no page pays a query for it.
  */
-export const load: LayoutServerLoad = async ({ locals }) => {
-    if (!locals.user) return { scanStaff: false };
-    try {
-        return { scanStaff: await locals.container.organizations.isStaffAnywhere(locals.user) };
-    } catch (cause) {
-        const event = 'navigation_load_failed';
-        console.error(JSON.stringify({ level: 'error', event, error: String(cause) }));
-        return { scanStaff: false };
-    }
+export const load: LayoutServerLoad = ({ locals }) => {
+    const role = locals.user?.role ?? null;
+    return {
+        organizationName: locals.container.organizationName,
+        canManageEvents: role !== null && canManageEvents(role),
+        canLeadTeam: role !== null && canLeadTeam(role),
+        canScan: role !== null && canScan(role)
+    };
 };

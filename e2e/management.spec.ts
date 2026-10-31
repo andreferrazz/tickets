@@ -1,54 +1,38 @@
 import { expect, test } from '@playwright/test';
 import {
     ADMIN,
-    DRAFT_ORG,
+    DRAFT_EVENT,
+    LEADER,
     MEMBER,
-    OTHER_ORG,
-    OTHER_ORG_DRAFT,
-    OWN_ORG_DRAFT,
+    ORGANIZATION_NAME,
     PENDING_INVITATION
 } from './support/fixtures';
 import { withoutScripts } from './support/html';
+import { seedPerson } from './support/people';
 import { signIn } from './support/session';
 
-const TEAM_PAGE = `/organizations/${DRAFT_ORG.id}/invitations`;
+const TEAM_PAGE = '/team';
 
-test('a leader sees the members and pending invitations of their organization', async ({
-    context,
-    page
-}) => {
-    await signIn(context, MEMBER.token);
+test('a leader and an admin see the team and its pending invitations', async ({ browser }) => {
+    for (const token of [LEADER.token, ADMIN.token]) {
+        const context = await browser.newContext();
+        await signIn(context, token);
 
-    const html = await (await page.request.get(TEAM_PAGE)).text();
+        const response = await context.request.get(TEAM_PAGE);
+        const htmlMarkup = withoutScripts(await response.text());
 
-    const htmlMarkup = withoutScripts(html);
-
-    expect(htmlMarkup).toContain(DRAFT_ORG.name);
-    expect(htmlMarkup).toContain(MEMBER.email);
-    expect(htmlMarkup).toContain(PENDING_INVITATION.email);
+        expect(response.status()).toBe(200);
+        expect(htmlMarkup).toContain(ORGANIZATION_NAME);
+        expect(htmlMarkup).toContain(MEMBER.email);
+        expect(htmlMarkup).toContain(PENDING_INVITATION.email);
+        await context.close();
+    }
 });
 
-// Admins bypass membership for the page, but the invitation list stays the one
-// Phoenix gave them: only invitations they sent themselves.
-test('an admin opens an organization they do not belong to', async ({ context, page }) => {
-    await signIn(context, ADMIN.token);
-
-    const response = await page.request.get(TEAM_PAGE);
-    const html = await response.text();
-    const htmlMarkup = withoutScripts(html);
-
-    expect(response.status()).toBe(200);
-    expect(htmlMarkup).toContain(DRAFT_ORG.name);
-    expect(htmlMarkup).toContain(MEMBER.email);
-    expect(html).not.toContain(PENDING_INVITATION.email);
-});
-
-test('someone who does not manage the organization is sent home', async ({ context, page }) => {
+test('a member is sent home from the team page', async ({ context, page }) => {
     await signIn(context, MEMBER.token);
 
-    const response = await page.request.get(`/organizations/${OTHER_ORG.id}/invitations`, {
-        maxRedirects: 0
-    });
+    const response = await page.request.get(TEAM_PAGE, { maxRedirects: 0 });
 
     expect(response.status()).toBe(303);
     expect(response.headers()['location']).toBe('/');
@@ -62,38 +46,28 @@ test('the admin users page lists users for admins and sends others home', async 
     expect(htmlMarkup).toContain(MEMBER.email);
     await admin.close();
 
-    const member = await browser.newContext();
-    await signIn(member, MEMBER.token);
-    const response = await member.request.get('/admin/users', { maxRedirects: 0 });
+    const leader = await browser.newContext();
+    await signIn(leader, LEADER.token);
+    const response = await leader.request.get('/admin/users', { maxRedirects: 0 });
     expect(response.status()).toBe(303);
     expect(response.headers()['location']).toBe('/');
+    await leader.close();
+});
+
+test('the scan landing lists every event for the team and sends a buyer home', async ({
+    browser
+}) => {
+    const member = await browser.newContext();
+    await signIn(member, MEMBER.token);
+    const html = await (await member.request.get('/scan')).text();
+    expect(withoutScripts(html)).toContain(DRAFT_EVENT.title);
     await member.close();
-});
 
-// The admin sent no invitation in the seed, and an invitation sent by someone
-// else must not show up on their page.
-test('the admin invitations page shows only invitations the admin sent', async ({
-    context,
-    page
-}) => {
-    await signIn(context, ADMIN.token);
-
-    const response = await page.request.get('/admin/invitations');
-
-    expect(response.status()).toBe(200);
-    expect(await response.text()).not.toContain(PENDING_INVITATION.email);
-});
-
-test('the scan landing lists the events of the organizations the user belongs to', async ({
-    context,
-    page
-}) => {
-    await signIn(context, MEMBER.token);
-
-    const html = await (await page.request.get('/scan')).text();
-
-    const htmlMarkup = withoutScripts(html);
-
-    expect(htmlMarkup).toContain(OWN_ORG_DRAFT.title);
-    expect(html).not.toContain(OTHER_ORG_DRAFT.title);
+    const buyer = await seedPerson({ role: 'buyer' });
+    const theirs = await browser.newContext();
+    await signIn(theirs, buyer.token);
+    const response = await theirs.request.get('/scan', { maxRedirects: 0 });
+    expect(response.status()).toBe(303);
+    expect(response.headers()['location']).toBe('/');
+    await theirs.close();
 });

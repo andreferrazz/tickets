@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Queryable } from '$lib/db/queryable';
 import { describeAbacateFailure } from '$lib/integrations/abacate-pay/errors';
 import type { AbacatePayGateway } from '$lib/integrations/abacate-pay/gateway';
-import type { OrganizationService } from '$lib/modules/organizations/service';
+import { canManageEvents } from '$lib/modules/accounts/roles';
 import type { SessionUser } from '$lib/modules/sessions/types';
 import { isUuid } from '$lib/utils/uuid';
 import type { ManagedEventFinder } from './managed-event';
@@ -94,7 +94,6 @@ export interface EventManagementServiceDeps {
     queryable: Queryable;
     repository: EventManagementRepository;
     managedEvents: ManagedEventFinder;
-    organizations: OrganizationService;
     abacatePay: AbacatePayGateway;
 }
 
@@ -109,9 +108,9 @@ export function getEventManagementService(
 ): EventManagementService {
     const { repository: repo } = deps;
 
-    // Phoenix put every create behind `RequireCreatorPlug`: managing an
-    // organization is not enough for a member whose own role is still `buyer`.
-    const mayCreate = (user: SessionUser) => user.role === 'creator' || user.role === 'admin';
+    // Phoenix put every create behind `RequireCreatorPlug`; the role rule keeps
+    // scan-only staff and buyers out of every create.
+    const mayCreate = (user: SessionUser) => canManageEvents(user.role);
 
     const ownedTicketType = async (
         user: SessionUser,
@@ -144,15 +143,9 @@ export function getEventManagementService(
             if (!mayCreate(user)) return failed('forbidden');
             const errors = invalid<CreatedEvent>(validateEvent(input));
             if (errors) return errors;
-            const organizationId = await resolveOrganization(deps, user);
-            if (typeof organizationId !== 'string') return failed(organizationId);
             // Every event has at least one section, so the default one is born with it.
             const event = await deps.queryable.transaction(async (tx) => {
-                const created = await repo.insertEvent(tx, {
-                    ...input,
-                    organizationId,
-                    createdById: user.id
-                });
+                const created = await repo.insertEvent(tx, { ...input, createdById: user.id });
                 await repo.insertSection(tx, created.id, { title: 'Addons', description: null }, 0);
                 return created;
             });
@@ -330,17 +323,6 @@ export function getEventManagementService(
             return ok(undefined);
         }
     };
-}
-
-// Admins belong to no organization and must say which one; everyone else is
-// given their only managed organization, as `Events.create_event/2` inferred it.
-async function resolveOrganization(
-    deps: EventManagementServiceDeps,
-    user: SessionUser
-): Promise<string | ManagementFailure> {
-    if (user.role === 'admin') return 'organization_id_required';
-    const managed = await deps.organizations.listManagedOrganizationIds(user);
-    return managed.length === 1 ? managed[0] : 'organization_id_required';
 }
 
 async function resolveSection(

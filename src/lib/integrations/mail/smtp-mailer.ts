@@ -2,18 +2,16 @@ import type { SmtpConfig } from '$lib/config/smtp';
 import nodemailer from 'nodemailer';
 import type { InlineImage, Mailer } from './mailer';
 
-const SENDER_NAME = 'Tickets';
-
 /**
  * Delivers mail over an authenticated SMTP relay with STARTTLS, the same relay
  * settings the Phoenix mailer used (its config/runtime.exs: tls :always,
  * verify_none, auth :always).
  *
  * @example
- * const mailer = getSmtpMailer(readSmtpConfig());
+ * const mailer = getSmtpMailer(readSmtpConfig(), 'Grupo Scheilla');
  * await mailer.send({ to, subject: 'Seu código', text: 'Código: 123456' });
  */
-export function getSmtpMailer(config: SmtpConfig): Mailer {
+export function getSmtpMailer(config: SmtpConfig, senderName: string): Mailer {
     const transport = nodemailer.createTransport({
         host: config.host,
         port: config.port,
@@ -28,7 +26,7 @@ export function getSmtpMailer(config: SmtpConfig): Mailer {
     return {
         async send(email) {
             await transport.sendMail({
-                from: { name: SENDER_NAME, address: config.from },
+                from: { name: senderName, address: config.from },
                 to: email.to,
                 subject: email.subject,
                 text: email.text,
