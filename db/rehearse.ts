@@ -14,8 +14,10 @@ import { migrate, type AppliedMigration } from './migrate.ts';
 
 const execFileAsync = promisify(execFile);
 
-/** Matches production's major version, so the dump restores as it was taken. */
-const IMAGE = process.env.REHEARSAL_POSTGRES_IMAGE ?? 'postgres:18';
+/** Production's major version, pinned by digest like every image in the repo. */
+const IMAGE =
+    process.env.REHEARSAL_POSTGRES_IMAGE ??
+    'postgres:18.6@sha256:3a4264520e121176619f54ff867d12774bc81e95e7b84db58d63bccdb6144b81';
 const DATABASE = 'rehearsal';
 const PASSWORD = 'rehearsal';
 const READY_TIMEOUT_MS = 60_000;
